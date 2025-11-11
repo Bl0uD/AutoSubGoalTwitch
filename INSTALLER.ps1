@@ -1,0 +1,375 @@
+# ===================================================================
+#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.1.0
+# ===================================================================
+
+$ErrorActionPreference = "Stop"
+
+# Définir l'encodage pour l'affichage correct
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+Write-Host ""
+Write-Host "===================================================================" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.1.0" -ForegroundColor Cyan
+Write-Host "===================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Aller dans le dossier du projet
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptDir
+
+Write-Host "Dossier d'installation: $scriptDir" -ForegroundColor Yellow
+Write-Host ""
+
+# ==================================================================
+# FONCTION: Télécharger un fichier avec barre de progression
+# ==================================================================
+function Download-File {
+    param(
+        [string]$Url,
+        [string]$Output
+    )
+    
+    try {
+        Write-Host "   Telechargement depuis: $Url" -ForegroundColor Gray
+        $webClient = New-Object System.Net.WebClient
+        $webClient.DownloadFile($Url, $Output)
+        Write-Host "   [OK] Fichier telecharge: $Output" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "   [ERREUR] Echec du telechargement: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+# ==================================================================
+# FONCTION: Vérifier et installer Git
+# ==================================================================
+function Install-Git {
+    Write-Host "=== VERIFICATION DE GIT ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Vérifier si Git est déjà installé
+    try {
+        $gitVersion = git --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   [OK] Git est deja installe: $gitVersion" -ForegroundColor Green
+            return $true
+        }
+    } catch {
+        # Git n'est pas installé
+    }
+    
+    Write-Host "   [INFO] Git n'est pas installe" -ForegroundColor Yellow
+    Write-Host ""
+    
+    # Demander confirmation
+    $response = Read-Host "   Voulez-vous installer Git automatiquement? (O/N)"
+    if ($response -ne "O" -and $response -ne "o") {
+        Write-Host "   [SKIP] Installation de Git annulee" -ForegroundColor Yellow
+        Write-Host "   Telechargez manuellement: https://git-scm.com/download/win" -ForegroundColor Yellow
+        return $false
+    }
+    
+    Write-Host ""
+    Write-Host "   Installation de Git en cours..." -ForegroundColor Yellow
+    
+    # URL de téléchargement Git (version 64-bit)
+    $gitUrl = "https://github.com/git-for-windows/git/releases/download/v2.43.0.windows.1/Git-2.43.0-64-bit.exe"
+    $gitInstaller = Join-Path $env:TEMP "Git-Installer.exe"
+    
+    # Télécharger Git
+    Write-Host "   Telechargement de Git..." -ForegroundColor Yellow
+    if (-not (Download-File -Url $gitUrl -Output $gitInstaller)) {
+        Write-Host "   [ERREUR] Impossible de telecharger Git" -ForegroundColor Red
+        Write-Host "   Telechargez manuellement: https://git-scm.com/download/win" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Installer Git en mode silencieux
+    Write-Host "   Installation de Git (cela peut prendre quelques minutes)..." -ForegroundColor Yellow
+    try {
+        $installArgs = @(
+            "/VERYSILENT",
+            "/NORESTART",
+            "/NOCANCEL",
+            "/SP-",
+            "/CLOSEAPPLICATIONS",
+            "/RESTARTAPPLICATIONS",
+            "/COMPONENTS=`"icons,ext\shellhere,assoc,assoc_sh`"",
+            "/DIR=`"C:\Program Files\Git`""
+        )
+        
+        Start-Process -FilePath $gitInstaller -ArgumentList $installArgs -Wait -NoNewWindow
+        
+        # Nettoyer
+        Remove-Item $gitInstaller -Force -ErrorAction SilentlyContinue
+        
+        # Ajouter Git au PATH pour cette session
+        $env:Path += ";C:\Program Files\Git\cmd"
+        
+        Write-Host "   [OK] Git installe avec succes" -ForegroundColor Green
+        Write-Host "   [INFO] Redemarrez PowerShell pour utiliser Git globalement" -ForegroundColor Yellow
+        
+        return $true
+    } catch {
+        Write-Host "   [ERREUR] Echec de l'installation: $_" -ForegroundColor Red
+        Remove-Item $gitInstaller -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
+# ==================================================================
+# FONCTION: Vérifier et installer Node.js
+# ==================================================================
+function Install-NodeJS {
+    Write-Host ""
+    Write-Host "=== VERIFICATION DE NODE.JS ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Vérifier si Node.js est déjà installé
+    try {
+        $nodeVersion = node --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   [OK] Node.js est deja installe: $nodeVersion" -ForegroundColor Green
+            return $true
+        }
+    } catch {
+        # Node.js n'est pas installé
+    }
+    
+    Write-Host "   [INFO] Node.js n'est pas installe" -ForegroundColor Yellow
+    Write-Host ""
+    
+    # Demander confirmation
+    $response = Read-Host "   Voulez-vous installer Node.js automatiquement? (O/N)"
+    if ($response -ne "O" -and $response -ne "o") {
+        Write-Host "   [SKIP] Installation de Node.js annulee" -ForegroundColor Yellow
+        Write-Host "   Telechargez manuellement: https://nodejs.org" -ForegroundColor Yellow
+        return $false
+    }
+    
+    Write-Host ""
+    Write-Host "   Installation de Node.js en cours..." -ForegroundColor Yellow
+    
+    # URL de téléchargement Node.js LTS (version 20.x)
+    $nodeUrl = "https://nodejs.org/dist/v20.10.0/node-v20.10.0-x64.msi"
+    $nodeInstaller = Join-Path $env:TEMP "NodeJS-Installer.msi"
+    
+    # Télécharger Node.js
+    Write-Host "   Telechargement de Node.js..." -ForegroundColor Yellow
+    if (-not (Download-File -Url $nodeUrl -Output $nodeInstaller)) {
+        Write-Host "   [ERREUR] Impossible de telecharger Node.js" -ForegroundColor Red
+        Write-Host "   Telechargez manuellement: https://nodejs.org" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Installer Node.js en mode silencieux
+    Write-Host "   Installation de Node.js (cela peut prendre quelques minutes)..." -ForegroundColor Yellow
+    try {
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$nodeInstaller`" /quiet /norestart" -Wait -NoNewWindow
+        
+        # Nettoyer
+        Remove-Item $nodeInstaller -Force -ErrorAction SilentlyContinue
+        
+        # Recharger les variables d'environnement
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        Write-Host "   [OK] Node.js installe avec succes" -ForegroundColor Green
+        Write-Host "   [INFO] Redemarrez PowerShell pour utiliser Node.js globalement" -ForegroundColor Yellow
+        
+        return $true
+    } catch {
+        Write-Host "   [ERREUR] Echec de l'installation: $_" -ForegroundColor Red
+        Remove-Item $nodeInstaller -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
+# ==================================================================
+# FONCTION: Installer les dépendances npm
+# ==================================================================
+function Install-NpmDependencies {
+    Write-Host ""
+    Write-Host "=== INSTALLATION DES DEPENDANCES NPM ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $serverPath = Join-Path $scriptDir "server"
+    
+    if (-not (Test-Path $serverPath)) {
+        Write-Host "   [ERREUR] Dossier server/ introuvable" -ForegroundColor Red
+        return $false
+    }
+    
+    Set-Location $serverPath
+    
+    Write-Host "   Installation des dependances npm..." -ForegroundColor Yellow
+    try {
+        npm install
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   [OK] Dependances npm installees" -ForegroundColor Green
+            Set-Location $scriptDir
+            return $true
+        } else {
+            Write-Host "   [ERREUR] Echec de l'installation npm" -ForegroundColor Red
+            Set-Location $scriptDir
+            return $false
+        }
+    } catch {
+        Write-Host "   [ERREUR] Erreur lors de l'installation: $_" -ForegroundColor Red
+        Set-Location $scriptDir
+        return $false
+    }
+}
+
+# ==================================================================
+# FONCTION: Créer les dossiers nécessaires
+# ==================================================================
+function Create-Directories {
+    Write-Host ""
+    Write-Host "=== CREATION DES DOSSIERS ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $dirs = @("data", "logs", "backups")
+    
+    foreach ($dir in $dirs) {
+        $dirPath = Join-Path $scriptDir $dir
+        if (-not (Test-Path $dirPath)) {
+            New-Item -ItemType Directory -Path $dirPath -Force | Out-Null
+            Write-Host "   [OK] Dossier cree: $dir" -ForegroundColor Green
+        } else {
+            Write-Host "   [SKIP] Dossier existe: $dir" -ForegroundColor Gray
+        }
+    }
+    
+    return $true
+}
+
+# ==================================================================
+# FONCTION: Créer les fichiers de configuration
+# ==================================================================
+function Create-ConfigFiles {
+    Write-Host ""
+    Write-Host "=== CONFIGURATION INITIALE ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $configPath = Join-Path $scriptDir "config"
+    $dataPath = Join-Path $scriptDir "data"
+    
+    # Copier les fichiers .example vers data/ s'ils n'existent pas
+    $exampleFiles = Get-ChildItem -Path $configPath -Filter "*.example" -ErrorAction SilentlyContinue
+    
+    foreach ($exampleFile in $exampleFiles) {
+        $targetName = $exampleFile.Name -replace "\.example$", ""
+        $targetPath = Join-Path $dataPath $targetName
+        
+        if (-not (Test-Path $targetPath)) {
+            Copy-Item -Path $exampleFile.FullName -Destination $targetPath -Force
+            Write-Host "   [OK] Fichier cree: data\$targetName" -ForegroundColor Green
+        } else {
+            Write-Host "   [SKIP] Fichier existe: data\$targetName" -ForegroundColor Gray
+        }
+    }
+    
+    return $true
+}
+
+# ==================================================================
+# EXECUTION PRINCIPALE
+# ==================================================================
+
+Write-Host "Demarrage de l'installation..." -ForegroundColor Yellow
+Write-Host ""
+
+# Étape 1: Installer Git
+$gitInstalled = Install-Git
+
+# Étape 2: Installer Node.js
+$nodeInstalled = Install-NodeJS
+
+# Étape 3: Créer les dossiers
+$dirsCreated = Create-Directories
+
+# Étape 4: Installer les dépendances npm (seulement si Node.js est disponible)
+$npmInstalled = $false
+if ($nodeInstalled -or (Get-Command node -ErrorAction SilentlyContinue)) {
+    $npmInstalled = Install-NpmDependencies
+} else {
+    Write-Host ""
+    Write-Host "   [SKIP] Installation npm ignoree (Node.js non disponible)" -ForegroundColor Yellow
+}
+
+# Étape 5: Créer les fichiers de configuration
+$configCreated = Create-ConfigFiles
+
+# ==================================================================
+# RÉSUMÉ
+# ==================================================================
+
+Write-Host ""
+Write-Host "===================================================================" -ForegroundColor Cyan
+Write-Host "              RESUME DE L'INSTALLATION" -ForegroundColor Cyan
+Write-Host "===================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+Write-Host "Git:                " -NoNewline
+if ($gitInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Red }
+
+Write-Host "Node.js:            " -NoNewline
+if ($nodeInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Red }
+
+Write-Host "Dependances npm:    " -NoNewline
+if ($npmInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
+
+Write-Host "Dossiers:           " -NoNewline
+if ($dirsCreated) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "ERREUR" -ForegroundColor Red }
+
+Write-Host "Configuration:      " -NoNewline
+if ($configCreated) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "ERREUR" -ForegroundColor Red }
+
+Write-Host ""
+
+# ==================================================================
+# INSTRUCTIONS FINALES
+# ==================================================================
+
+if ($gitInstalled -and $nodeInstalled -and $npmInstalled) {
+    Write-Host "===================================================================" -ForegroundColor Green
+    Write-Host "         INSTALLATION TERMINEE AVEC SUCCES !" -ForegroundColor Green
+    Write-Host "===================================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Prochaines etapes:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "1. Demarrer le serveur:" -ForegroundColor White
+    Write-Host "   .\scripts\START_SERVER.bat" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "2. Configurer Twitch:" -ForegroundColor White
+    Write-Host "   http://localhost:8082/config" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "3. Ajouter dans OBS:" -ForegroundColor White
+    Write-Host "   Outils > Scripts > obs\obs_subcount_auto.py" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "4. Deployer sur GitHub (optionnel):" -ForegroundColor White
+    Write-Host "   .\scripts\deploy_to_github.ps1" -ForegroundColor Cyan
+    Write-Host ""
+} else {
+    Write-Host "===================================================================" -ForegroundColor Yellow
+    Write-Host "         INSTALLATION INCOMPLETE" -ForegroundColor Yellow
+    Write-Host "===================================================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Certains composants n'ont pas pu etre installes." -ForegroundColor Yellow
+    Write-Host "Verifiez les erreurs ci-dessus et reessayez." -ForegroundColor Yellow
+    Write-Host ""
+    
+    if (-not $gitInstalled) {
+        Write-Host "Git: https://git-scm.com/download/win" -ForegroundColor White
+    }
+    if (-not $nodeInstalled) {
+        Write-Host "Node.js: https://nodejs.org" -ForegroundColor White
+    }
+    Write-Host ""
+}
+
+Write-Host "Documentation complete: docs/" -ForegroundColor Gray
+Write-Host ""
+
+pause

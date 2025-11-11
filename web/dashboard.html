@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubCount Auto - Tableau de bord</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0e0e23 0%, #1a1a2e 100%); 
+            color: #ffffff; 
+            min-height: 100vh;
+        }
+        
+        .header { 
+            text-align: center; 
+            margin-bottom: 40px;
+            padding: 20px 0;
+        }
+        
+        .header h1 { 
+            font-size: 2.5em; 
+            background: linear-gradient(135deg, #9146ff, #00ffc7); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .header p { 
+            color: #aaa; 
+            font-size: 1.1em; 
+        }
+        
+        .card { 
+            background: rgba(26, 26, 46, 0.8); 
+            padding: 30px; 
+            border-radius: 15px; 
+            margin: 20px 0; 
+            border: 1px solid rgba(145, 70, 255, 0.2);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card h2 { 
+            margin-bottom: 20px; 
+            color: #00ffc7;
+            font-size: 1.5em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: rgba(42, 42, 74, 0.5);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-box h3 {
+            color: #aaa;
+            font-size: 0.9em;
+            font-weight: normal;
+            margin-bottom: 10px;
+        }
+        
+        .count { 
+            font-size: 3em; 
+            font-weight: bold; 
+            color: #00ff88;
+            margin: 10px 0;
+        }
+        
+        .goal { 
+            color: #ffd700; 
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        
+        .status { 
+            padding: 12px 20px; 
+            border-radius: 8px; 
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status.connected { 
+            background: rgba(26, 77, 58, 0.3); 
+            border-left: 4px solid #00ff88; 
+        }
+        
+        .status.disconnected { 
+            background: rgba(77, 26, 26, 0.3); 
+            border-left: 4px solid #ff4444; 
+        }
+        
+        button { 
+            background: linear-gradient(135deg, #6441a4, #9146ff); 
+            color: white; 
+            border: none; 
+            padding: 14px 28px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(145, 70, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.primary { 
+            background: linear-gradient(135deg, #ff6b35, #ff8560);
+            font-size: 1.1em;
+            padding: 16px 32px;
+        }
+        
+        button.success { 
+            background: linear-gradient(135deg, #28a745, #34d058); 
+        }
+        
+        button.danger { 
+            background: linear-gradient(135deg, #dc3545, #ff4444); 
+        }
+        
+        .flex { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+        }
+        
+        .device-flow { 
+            background: rgba(255, 107, 53, 0.1); 
+            padding: 30px; 
+            border-radius: 12px; 
+            border: 2px solid #ff6b35;
+            margin: 20px 0;
+        }
+        
+        .device-flow h3 {
+            color: #ff6b35;
+            margin-bottom: 20px;
+        }
+        
+        .device-code { 
+            background: rgba(42, 42, 42, 0.6); 
+            padding: 25px; 
+            border-radius: 10px; 
+            margin: 20px 0;
+            border: 1px solid rgba(0, 255, 199, 0.3);
+        }
+        
+        .user-code { 
+            font-size: 2.5em; 
+            font-weight: bold; 
+            color: #00ff88; 
+            text-align: center; 
+            letter-spacing: 8px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .instruction {
+            background: rgba(42, 42, 74, 0.4);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 3px solid #9146ff;
+        }
+        
+        .instruction strong {
+            color: #00ffc7;
+            margin-right: 10px;
+        }
+        
+        a { 
+            color: #9146ff; 
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        a:hover { 
+            color: #00ffc7;
+            text-decoration: underline; 
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .count { font-size: 2em; }
+            button { padding: 12px 20px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SubCount Auto</h1>
+        <p>Gestion de vos compteurs Twitch</p>
+    </div>
+    
+    <div class="card">
+        <h2>📊 Statistiques</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <h3>Follows</h3>
+                <div class="count" id="followCount">-</div>
+                <div class="goal" id="followGoal">Chargement...</div>
+            </div>
+            <div class="stat-box">
+                <h3>Abonnements</h3>
+                <div class="count" id="subCount">-</div>
+                <div class="goal" id="subGoal">Chargement...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>🔗 Connexion Twitch</h2>
+        <div class="status" id="statusTwitch">
+            <span id="statusText">Vérification...</span>
+        </div>
+        <div class="status" id="statusSync">
+            <span id="syncText">Vérification...</span>
+        </div>
+        
+        <div id="authSection">
+            <!-- Contenu dynamique -->
+        </div>
+    </div>
+    
+    <script>
+        let ws;
+        let authPolling = null;
+        
+        // Connexion WebSocket
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8083');
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'follow_update') {
+                    const goal = data.goal;
+                    document.getElementById('followCount').textContent = goal.current;
+                    document.getElementById('followGoal').textContent = goal.current + '/' + goal.target + ' - ' + goal.message;
+                } else if (data.type === 'sub_update') {
+                    const goal = data.goal;
+                    document.getElementById('subCount').textContent = goal.current;
+                    document.getElementById('subGoal').textContent = goal.current + '/' + goal.target + ' - ' + goal.message;
+                }
+            };
+        }
+        
+        // Vérifier le statut d'authentification
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('http://localhost:8082/api/auth-status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('statusTwitch');
+                const statusText = document.getElementById('statusText');
+                const syncDiv = document.getElementById('statusSync');
+                const syncText = document.getElementById('syncText');
+                const authSection = document.getElementById('authSection');
+                
+                if (data.authenticated) {
+                    statusDiv.className = 'status connected';
+                    statusText.textContent = '✅ Connecté (@' + data.display_name + ')';
+                    
+                    syncDiv.className = 'status connected';
+                    syncText.textContent = '✅ Synchronisation en temps réel active';
+                    
+                    authSection.innerHTML = `
+                        <div class="flex">
+                            <button onclick="syncTwitch()" class="success">🔄 Synchroniser maintenant</button>
+                            <button onclick="disconnectTwitch()" class="danger">🔌 Déconnecter Twitch</button>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusText.textContent = '❌ Non connecté';
+                    
+                    syncDiv.className = 'status disconnected';
+                    syncText.textContent = '⚠️ Synchronisation hors ligne';
+                    
+                    authSection.innerHTML = `
+                        <div class="device-flow">
+                            <h3>Authentification Twitch</h3>
+                            <p style="color: #aaa; margin-bottom: 20px;">Connectez-vous pour synchroniser vos compteurs en temps réel</p>
+                            <div class="flex">
+                                <button onclick="startDeviceAuth()" class="primary">Se connecter</button>
+                                <a href="http://localhost:8082/config"><button>Configuration</button></a>
+                            </div>
+                            <div id="deviceCodeSection" style="display: none;">
+                                <div class="device-code">
+                                    <h4 style="color: #00ffc7; margin-bottom: 15px;">Code d'activation</h4>
+                                    <div class="user-code" id="userCode"></div>
+                                    <p style="text-align: center; margin: 20px 0;">
+                                        Rendez-vous sur <a id="verificationUrl" href="#" target="_blank" style="color: #ff6b35;"></a>
+                                    </p>
+                                    <p style="text-align: center; color: #aaa;">Expire dans <span id="timeRemaining" style="color: #ffd700; font-weight: bold;"></span> secondes</p>
+                                    <div style="margin-top: 20px;">
+                                        <div class="instruction"><strong>1.</strong> Cliquez sur le lien ci-dessus</div>
+                                        <div class="instruction"><strong>2.</strong> Saisissez le code d'activation</div>
+                                        <div class="instruction"><strong>3.</strong> Autorisez l'application</div>
+                                        <div class="instruction"><strong>4.</strong> La connexion se fera automatiquement</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Charger les statistiques
+                loadStats();
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+        
+        // Charger les statistiques
+        async function loadStats() {
+            try {
+                const response = await fetch('http://localhost:8082/api/status');
+                const data = await response.json();
+                
+                document.getElementById('followCount').textContent = data.currentFollows || 0;
+                document.getElementById('subCount').textContent = data.currentSubs || 0;
+                
+                // Mettre à jour les objectifs si disponibles
+                if (data.followGoal) {
+                    document.getElementById('followGoal').textContent = 
+                        data.followGoal.current + '/' + data.followGoal.target + ' - ' + data.followGoal.message;
+                }
+                if (data.subGoal) {
+                    document.getElementById('subGoal').textContent = 
+                        data.subGoal.current + '/' + data.subGoal.target + ' - ' + data.subGoal.message;
+                }
+            } catch (error) {
+                console.error('Erreur chargement stats:', error);
+            }
+        }
+        
+        // Démarrer l'authentification
+        async function startDeviceAuth() {
+            try {
+                const response = await fetch('http://localhost:8082/api/start-device-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('userCode').textContent = data.user_code;
+                    document.getElementById('verificationUrl').href = data.verification_uri;
+                    document.getElementById('verificationUrl').textContent = data.verification_uri;
+                    document.getElementById('deviceCodeSection').style.display = 'block';
+                    
+                    startCountdown(data.expires_in);
+                    startAuthPolling();
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur de connexion: ' + error.message);
+            }
+        }
+        
+        // Compte à rebours
+        function startCountdown(seconds) {
+            let remaining = seconds;
+            const timer = setInterval(() => {
+                remaining--;
+                document.getElementById('timeRemaining').textContent = remaining;
+                if (remaining <= 0) clearInterval(timer);
+            }, 1000);
+        }
+        
+        // Polling d'authentification
+        function startAuthPolling() {
+            if (authPolling) return;
+            authPolling = setInterval(async () => {
+                try {
+                    const response = await fetch('http://localhost:8082/api/auth-status');
+                    const data = await response.json();
+                    if (data.configured && data.authenticated) {
+                        clearInterval(authPolling);
+                        location.reload();
+                    }
+                } catch (error) {
+                    console.error('Erreur polling:', error);
+                }
+            }, 2000);
+        }
+        
+        // Synchroniser avec Twitch
+        async function syncTwitch() {
+            try {
+                const response = await fetch('http://localhost:8082/api/sync-twitch');
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Synchronisation réussie !');
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur: ' + error.message);
+            }
+        }
+        
+        // Déconnecter Twitch
+        async function disconnectTwitch() {
+            if (!confirm('⚠️ Voulez-vous vraiment vous déconnecter de Twitch ?\n\nCela arrêtera la synchronisation en temps réel.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/disconnect-twitch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Déconnecté de ' + data.previousUser);
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur: ' + error.message);
+            }
+        }
+        
+        // Initialisation
+        connectWebSocket();
+        checkAuthStatus();
+        
+        // Rafraîchir toutes les 30 secondes
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

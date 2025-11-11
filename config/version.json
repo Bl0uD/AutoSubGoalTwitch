@@ -1,0 +1,22 @@
+{
+  "version": "2.1.0",
+  "release_date": "2025-11-11",
+  "changelog": [
+    "Ajout du système de vérification des dépendances au démarrage",
+    "Correction de la compatibilité Python 3.6",
+    "npm rendu optionnel si node_modules existe",
+    "Protection contre les crashs OBS"
+  ],
+  "github_repo": "Bl0uD/AutoSubGoalTwitch",
+  "update_url": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
+  "check_interval_hours": 24,
+  "auto_download": false,
+  "critical_files": [
+    "obs_subcount_auto.py",
+    "server.js",
+    "config-crypto.js",
+    "package.json",
+    "INSTALLER.bat",
+    "START_SERVER.bat"
+  ]
+}

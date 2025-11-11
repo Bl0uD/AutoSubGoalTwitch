@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Admin Panel - SubCount Auto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .warning {
+            background: rgba(255, 107, 107, 0.2);
+            border: 2px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .panel h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+        }
+
+        button.warning {
+            background: linear-gradient(135deg, #ffd93d 0%, #f9ca24 100%);
+            color: #333;
+        }
+
+        .status-display {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: #aaa;
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: #51cf66;
+        }
+
+        #logConsole {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-time {
+            color: #667eea;
+            margin-right: 10px;
+        }
+
+        .log-success {
+            color: #51cf66;
+        }
+
+        .log-error {
+            color: #ff6b6b;
+        }
+
+        .log-info {
+            color: #74c0fc;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .ws-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .ws-connected {
+            background: #51cf66;
+            box-shadow: 0 0 10px #51cf66;
+        }
+
+        .ws-disconnected {
+            background: #ff6b6b;
+            box-shadow: 0 0 10px #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Admin Panel - SubCount Auto</h1>
+            <p style="color: #aaa;">Panel de test et débogage</p>
+        </header>
+
+        <div class="warning">
+            ⚠️ <strong>ATTENTION</strong> : Cette page est réservée aux tests et au développement. 
+            Les actions effectuées ici modifient les compteurs en temps réel.
+        </div>
+
+        <!-- Status Overview -->
+        <div class="panel">
+            <h2>📊 Status Système</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Follows Actuels</div>
+                    <div class="stat-value" id="currentFollows">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Subs Actuels</div>
+                    <div class="stat-value" id="currentSubs">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Objectif Follows</div>
+                    <div class="stat-value" id="goalFollows">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Objectif Subs</div>
+                    <div class="stat-value" id="goalSubs">0</div>
+                </div>
+            </div>
+            <div class="status-display">
+                <div class="status-item">
+                    <span class="status-label">WebSocket</span>
+                    <span class="status-value" id="wsStatus">
+                        <span class="ws-status ws-disconnected"></span>Déconnecté
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">EventSub</span>
+                    <span class="status-value" id="eventsubStatus">Inactif</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Polling</span>
+                    <span class="status-value" id="pollingStatus">Inactif</span>
+                </div>
+            </div>
+            <button onclick="refreshStatus()" class="success">🔄 Actualiser Status</button>
+        </div>
+
+        <div class="grid">
+            <!-- Follow Tests -->
+            <div class="panel">
+                <h2>👥 Tests Follows</h2>
+                
+                <div class="input-group">
+                    <label>Nombre de follows à ajouter/retirer</label>
+                    <input type="number" id="followAmount" value="1" min="1" max="1000">
+                </div>
+
+                <div class="button-group">
+                    <button onclick="addFollows()" class="success">➕ Ajouter Follows</button>
+                    <button onclick="removeFollows()" class="danger">➖ Retirer Follows</button>
+                </div>
+
+                <button onclick="setFollowCount()">📝 Définir Count Exact</button>
+                <button onclick="resetFollows()" class="warning">🔄 Reset Follows (0)</button>
+                <button onclick="simulateFollowSpam()">⚡ Simuler Spam (10/sec)</button>
+            </div>
+
+            <!-- Sub Tests -->
+            <div class="panel">
+                <h2>⭐ Tests Subs</h2>
+                
+                <div class="input-group">
+                    <label>Nombre de subs à ajouter/retirer</label>
+                    <input type="number" id="subAmount" value="1" min="1" max="1000">
+                </div>
+
+                <div class="input-group">
+                    <label>Tier de sub</label>
+                    <select id="subTier">
+                        <option value="1000">Tier 1 ($4.99)</option>
+                        <option value="2000">Tier 2 ($9.99)</option>
+                        <option value="3000">Tier 3 ($24.99)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="addSubs()" class="success">➕ Ajouter Subs</button>
+                    <button onclick="removeSubs()" class="danger">➖ Retirer Subs</button>
+                </div>
+
+                <button onclick="setSubCount()">📝 Définir Count Exact</button>
+                <button onclick="resetSubs()" class="warning">🔄 Reset Subs (0)</button>
+                <button onclick="simulateSubGift()">🎁 Simuler Gift Subs (5)</button>
+            </div>
+
+            <!-- Goal Tests -->
+            <div class="panel">
+                <h2>🎯 Tests Objectifs</h2>
+                
+                <div class="input-group">
+                    <label>Objectif Follows</label>
+                    <input type="number" id="followGoal" value="100" min="0">
+                </div>
+                <button onclick="setFollowGoal()">📌 Définir Objectif Follows</button>
+
+                <div class="input-group">
+                    <label>Objectif Subs</label>
+                    <input type="number" id="subGoal" value="50" min="0">
+                </div>
+                <button onclick="setSubGoal()">📌 Définir Objectif Subs</button>
+
+                <button onclick="testGoalReached()" class="success">🎉 Tester Atteinte Objectif</button>
+            </div>
+
+            <!-- API Tests -->
+            <div class="panel">
+                <h2>🔌 Tests API / Sync</h2>
+                
+                <button onclick="syncWithTwitch()" class="success">🔄 Sync avec Twitch API</button>
+                <button onclick="disconnectTwitch()" class="danger">🔌 Déconnecter Twitch</button>
+                <button onclick="testTwitchAPI()">🔍 Test API Twitch</button>
+                <button onclick="forceSyncTwitch()">🔄 Force Sync Twitch</button>
+                <button onclick="testEventSub()">📡 Test EventSub Connection</button>
+                <button onclick="testPolling()">⏱️ Test Polling Manual</button>
+                <button onclick="testWebSocket()" class="success">🌐 Test WebSocket Local</button>
+            </div>
+
+            <!-- File Tests -->
+            <div class="panel">
+                <h2>📁 Tests Fichiers</h2>
+                
+                <button onclick="readAllFiles()">📖 Lire Tous les Fichiers</button>
+                <button onclick="testFileWrite()">💾 Test Écriture Fichiers</button>
+                <button onclick="backupAllData()">📦 Backup Données</button>
+                <button onclick="restoreFromBackup()" class="warning">↩️ Restore Backup</button>
+                <button onclick="corruptDataTest()" class="danger">🔥 Test Corruption Données</button>
+            </div>
+
+            <!-- Stress Tests -->
+            <div class="panel">
+                <h2>💪 Tests de Charge</h2>
+                
+                <button onclick="stressTestFollows()">⚡ Stress Test Follows (100)</button>
+                <button onclick="stressTestSubs()">⚡ Stress Test Subs (50)</button>
+                <button onclick="rapidFireTest()">🔫 Rapid Fire (20 events/sec)</button>
+                <button onclick="enduranceTest()" class="warning">🏃 Test Endurance (5min)</button>
+                <button onclick="stopAllTests()" class="danger">⛔ STOP Tous les Tests</button>
+            </div>
+        </div>
+
+        <!-- Logs Console -->
+        <div class="panel">
+            <h2>📜 Console de Logs</h2>
+            <div id="logConsole"></div>
+            <button onclick="clearLogs()" class="danger" style="margin-top: 15px;">🗑️ Effacer Logs</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let testIntervals = [];
+
+        // Connexion WebSocket
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8083');
+            
+            ws.onopen = () => {
+                log('WebSocket connecté', 'success');
+                updateWSStatus(true);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`WS Message: ${JSON.stringify(data)}`, 'info');
+                    updateStats();
+                } catch (e) {
+                    log(`Erreur parsing WS: ${e.message}`, 'error');
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log(`Erreur WebSocket: ${error}`, 'error');
+                updateWSStatus(false);
+            };
+            
+            ws.onclose = () => {
+                log('WebSocket déconnecté', 'error');
+                updateWSStatus(false);
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function updateWSStatus(connected) {
+            const statusEl = document.getElementById('wsStatus');
+            if (connected) {
+                statusEl.innerHTML = '<span class="ws-status ws-connected"></span>Connecté';
+            } else {
+                statusEl.innerHTML = '<span class="ws-status ws-disconnected"></span>Déconnecté';
+            }
+        }
+
+        // Logger
+        function log(message, type = 'info') {
+            const console = document.getElementById('logConsole');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span>${message}`;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logConsole').innerHTML = '';
+            log('Logs effacés', 'info');
+        }
+
+        // Update Stats
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('currentFollows').textContent = data.follows || 0;
+                document.getElementById('currentSubs').textContent = data.subs || 0;
+                document.getElementById('goalFollows').textContent = data.followGoal || 0;
+                document.getElementById('goalSubs').textContent = data.subGoal || 0;
+            } catch (error) {
+                log(`Erreur update stats: ${error.message}`, 'error');
+            }
+        }
+
+        async function refreshStatus() {
+            log('Actualisation du status...', 'info');
+            await updateStats();
+            log('Status actualisé', 'success');
+        }
+
+        // Follow Tests
+        async function addFollows() {
+            const amount = parseInt(document.getElementById('followAmount').value);
+            log(`Ajout de ${amount} follow(s)...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/add-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount })
+                });
+                
+                const result = await response.json();
+                log(`✅ ${amount} follow(s) ajouté(s). Total: ${result.total}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function removeFollows() {
+            const amount = parseInt(document.getElementById('followAmount').value);
+            log(`Retrait de ${amount} follow(s)...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/remove-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount })
+                });
+                
+                const result = await response.json();
+                log(`✅ ${amount} follow(s) retiré(s). Total: ${result.total}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function setFollowCount() {
+            const count = parseInt(prompt('Nombre de follows à définir:', '0'));
+            if (isNaN(count)) return;
+            
+            log(`Définition follows à ${count}...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/set-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count })
+                });
+                
+                const result = await response.json();
+                log(`✅ Follows définis à ${count}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetFollows() {
+            if (!confirm('Reset les follows à 0 ?')) return;
+            
+            log('Reset follows...', 'info');
+            
+            try {
+                const response = await fetch('/admin/set-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: 0 })
+                });
+                
+                log('✅ Follows reset à 0', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateFollowSpam() {
+            log('⚡ Simulation spam follows (10/sec pendant 5sec)...', 'info');
+            let count = 0;
+            
+            const interval = setInterval(async () => {
+                if (count >= 50) {
+                    clearInterval(interval);
+                    log('✅ Simulation spam terminée (50 follows)', 'success');
+                    await updateStats();
+                    return;
+                }
+                
+                await fetch('/admin/add-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 1 })
+                });
+                
+                count++;
+            }, 100);
+            
+            testIntervals.push(interval);
+        }
+
+        // Sub Tests
+        async function addSubs() {
+            const amount = parseInt(document.getElementById('subAmount').value);
+            const tier = document.getElementById('subTier').value;
+            log(`Ajout de ${amount} sub(s) tier ${tier}...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/add-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, tier })
+                });
+                
+                const result = await response.json();
+                log(`✅ ${amount} sub(s) ajouté(s). Total: ${result.total}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function removeSubs() {
+            const amount = parseInt(document.getElementById('subAmount').value);
+            log(`Retrait de ${amount} sub(s)...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/remove-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount })
+                });
+                
+                const result = await response.json();
+                log(`✅ ${amount} sub(s) retiré(s). Total: ${result.total}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function setSubCount() {
+            const count = parseInt(prompt('Nombre de subs à définir:', '0'));
+            if (isNaN(count)) return;
+            
+            log(`Définition subs à ${count}...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/set-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count })
+                });
+                
+                log(`✅ Subs définis à ${count}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetSubs() {
+            if (!confirm('Reset les subs à 0 ?')) return;
+            
+            log('Reset subs...', 'info');
+            
+            try {
+                const response = await fetch('/admin/set-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: 0 })
+                });
+                
+                log('✅ Subs reset à 0', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateSubGift() {
+            log('🎁 Simulation gift 5 subs...', 'info');
+            
+            try {
+                const response = await fetch('/admin/add-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 5, tier: '1000' })
+                });
+                
+                log('✅ Gift subs simulé (5 tier 1)', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // Goal Tests
+        async function setFollowGoal() {
+            const goal = parseInt(document.getElementById('followGoal').value);
+            log(`Définition objectif follows à ${goal}...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/set-follow-goal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal })
+                });
+                
+                log(`✅ Objectif follows défini à ${goal}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function setSubGoal() {
+            const goal = parseInt(document.getElementById('subGoal').value);
+            log(`Définition objectif subs à ${goal}...`, 'info');
+            
+            try {
+                const response = await fetch('/admin/set-sub-goal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal })
+                });
+                
+                log(`✅ Objectif subs défini à ${goal}`, 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGoalReached() {
+            log('🎉 Test atteinte objectif...', 'info');
+            
+            try {
+                const statsResponse = await fetch('/api/stats');
+                const stats = await statsResponse.json();
+                
+                // Mettre les compteurs = objectifs
+                await fetch('/admin/set-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: stats.followGoal })
+                });
+                
+                await fetch('/admin/set-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: stats.subGoal })
+                });
+                
+                log('✅ Objectifs atteints ! Vérifiez les overlays', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // API Tests
+        async function syncWithTwitch() {
+            log('🔄 Synchronisation avec Twitch API...', 'info');
+            
+            try {
+                const response = await fetch('/admin/sync-twitch');
+                const result = await response.json();
+                
+                if (result.success) {
+                    log('✅ Synchronisation Twitch réussie !', 'success');
+                    log(`📊 Follows Twitch: ${result.twitchFollows} | Locaux: ${result.localFollows}`, 'info');
+                    log(`📊 Subs Twitch: ${result.twitchSubs} | Locaux: ${result.localSubs}`, 'info');
+                    
+                    if (result.followsDiff !== 0) {
+                        log(`   Différence follows: ${result.followsDiff > 0 ? '+' : ''}${result.followsDiff}`, result.followsDiff !== 0 ? 'warning' : 'success');
+                    }
+                    if (result.subsDiff !== 0) {
+                        log(`   Différence subs: ${result.subsDiff > 0 ? '+' : ''}${result.subsDiff}`, result.subsDiff !== 0 ? 'warning' : 'success');
+                    }
+                    
+                    if (result.updated) {
+                        log('🔄 Valeurs locales mises à jour avec les valeurs Twitch', 'success');
+                    } else {
+                        log('✔️ Valeurs locales déjà synchronisées', 'success');
+                    }
+                    
+                    await updateStats();
+                } else {
+                    log(`❌ Erreur sync: ${result.error || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Erreur sync Twitch: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTwitchAPI() {
+            log('🔍 Test API Twitch...', 'info');
+            
+            try {
+                const response = await fetch('/admin/test-twitch-api');
+                const result = await response.json();
+                log(`✅ API Twitch: ${result.status}`, 'success');
+                log(`Follows: ${result.follows}, Subs: ${result.subs}`, 'info');
+            } catch (error) {
+                log(`❌ Erreur API: ${error.message}`, 'error');
+            }
+        }
+
+        async function forceSyncTwitch() {
+            log('🔄 Force sync Twitch...', 'info');
+            
+            try {
+                const response = await fetch('/api/sync-twitch');
+                const result = await response.json();
+                log('✅ Sync Twitch terminée', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur sync: ${error.message}`, 'error');
+            }
+        }
+
+        async function disconnectTwitch() {
+            if (!confirm('⚠️ Voulez-vous vraiment vous déconnecter de Twitch ?\n\nCela arrêtera la synchronisation en temps réel.')) {
+                return;
+            }
+            
+            log('🔌 Déconnexion Twitch...', 'info');
+            
+            try {
+                const response = await fetch('/api/disconnect-twitch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    log(`✅ Déconnecté de ${result.previousUser}`, 'success');
+                    log('📝 Vous pouvez maintenant connecter un autre compte', 'info');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    log(`❌ Erreur: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Erreur déconnexion: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEventSub() {
+            log('📡 Test EventSub...', 'info');
+            
+            try {
+                const response = await fetch('/admin/test-eventsub');
+                const result = await response.json();
+                log(`✅ EventSub: ${result.status}`, 'success');
+            } catch (error) {
+                log(`❌ Erreur EventSub: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPolling() {
+            log('⏱️ Test polling manuel...', 'info');
+            
+            try {
+                const response = await fetch('/admin/test-polling');
+                const result = await response.json();
+                log('✅ Polling exécuté', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur polling: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWebSocket() {
+            log('🌐 Test WebSocket...', 'info');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+                log('✅ Ping envoyé au WebSocket', 'success');
+            } else {
+                log('❌ WebSocket non connecté', 'error');
+            }
+        }
+
+        // File Tests
+        async function readAllFiles() {
+            log('📖 Lecture des fichiers...', 'info');
+            
+            try {
+                const response = await fetch('/admin/read-files');
+                const result = await response.json();
+                log('✅ Fichiers lus:', 'success');
+                log(JSON.stringify(result, null, 2), 'info');
+            } catch (error) {
+                log(`❌ Erreur lecture: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFileWrite() {
+            log('💾 Test écriture fichiers...', 'info');
+            
+            try {
+                const response = await fetch('/admin/test-file-write');
+                const result = await response.json();
+                log('✅ Test écriture réussi', 'success');
+            } catch (error) {
+                log(`❌ Erreur écriture: ${error.message}`, 'error');
+            }
+        }
+
+        async function backupAllData() {
+            log('📦 Backup des données...', 'info');
+            
+            try {
+                const response = await fetch('/admin/backup-data');
+                const result = await response.json();
+                log(`✅ Backup créé: ${result.filename}`, 'success');
+            } catch (error) {
+                log(`❌ Erreur backup: ${error.message}`, 'error');
+            }
+        }
+
+        async function restoreFromBackup() {
+            if (!confirm('Restaurer depuis le dernier backup ?')) return;
+            
+            log('↩️ Restauration backup...', 'info');
+            
+            try {
+                const response = await fetch('/admin/restore-backup');
+                const result = await response.json();
+                log('✅ Backup restauré', 'success');
+                await updateStats();
+            } catch (error) {
+                log(`❌ Erreur restore: ${error.message}`, 'error');
+            }
+        }
+
+        async function corruptDataTest() {
+            if (!confirm('⚠️ ATTENTION: Cela va corrompre les données pour tester la récupération !')) return;
+            
+            log('🔥 Corruption des données...', 'info');
+            
+            try {
+                const response = await fetch('/admin/corrupt-data');
+                const result = await response.json();
+                log('✅ Données corrompues - testez la récupération', 'success');
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // Stress Tests
+        async function stressTestFollows() {
+            log('⚡ Stress test follows (100 en 10sec)...', 'info');
+            
+            let count = 0;
+            const interval = setInterval(async () => {
+                if (count >= 100) {
+                    clearInterval(interval);
+                    log('✅ Stress test follows terminé', 'success');
+                    await updateStats();
+                    return;
+                }
+                
+                await fetch('/admin/add-follows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 1 })
+                });
+                
+                count++;
+            }, 100);
+            
+            testIntervals.push(interval);
+        }
+
+        async function stressTestSubs() {
+            log('⚡ Stress test subs (50 en 5sec)...', 'info');
+            
+            let count = 0;
+            const interval = setInterval(async () => {
+                if (count >= 50) {
+                    clearInterval(interval);
+                    log('✅ Stress test subs terminé', 'success');
+                    await updateStats();
+                    return;
+                }
+                
+                await fetch('/admin/add-subs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 1, tier: '1000' })
+                });
+                
+                count++;
+            }, 100);
+            
+            testIntervals.push(interval);
+        }
+
+        async function rapidFireTest() {
+            log('🔫 Rapid fire test (20 events/sec pendant 10sec)...', 'info');
+            
+            let count = 0;
+            const interval = setInterval(async () => {
+                if (count >= 200) {
+                    clearInterval(interval);
+                    log('✅ Rapid fire terminé (200 events)', 'success');
+                    await updateStats();
+                    return;
+                }
+                
+                // Alterne follows et subs
+                if (count % 2 === 0) {
+                    await fetch('/admin/add-follows', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 1 })
+                    });
+                } else {
+                    await fetch('/admin/add-subs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 1, tier: '1000' })
+                    });
+                }
+                
+                count++;
+            }, 50);
+            
+            testIntervals.push(interval);
+        }
+
+        async function enduranceTest() {
+            log('🏃 Test endurance (5min, 1 event/sec)...', 'info');
+            
+            let count = 0;
+            const interval = setInterval(async () => {
+                if (count >= 300) {
+                    clearInterval(interval);
+                    log('✅ Test endurance terminé (300 events)', 'success');
+                    await updateStats();
+                    return;
+                }
+                
+                // Alterne follows et subs
+                if (count % 2 === 0) {
+                    await fetch('/admin/add-follows', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 1 })
+                    });
+                } else {
+                    await fetch('/admin/add-subs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 1, tier: '1000' })
+                    });
+                }
+                
+                count++;
+                if (count % 30 === 0) {
+                    log(`Test endurance: ${count}/300 events`, 'info');
+                }
+            }, 1000);
+            
+            testIntervals.push(interval);
+        }
+
+        function stopAllTests() {
+            testIntervals.forEach(interval => clearInterval(interval));
+            testIntervals = [];
+            log('⛔ Tous les tests arrêtés', 'success');
+        }
+
+        // Initialisation au chargement de la page
+        (async function init() {
+            log('🚀 Initialisation de l\'interface admin...', 'info');
+            
+            // Charger le mot de passe admin automatiquement
+            const authSuccess = await loadAdminPassword();
+            if (authSuccess) {
+                log('✅ Authentification transparente activée', 'success');
+            } else {
+                log('❌ Erreur d\'authentification - Vérifiez que le serveur est démarré', 'error');
+            }
+            
+            // Connexions et mise à jour
+            connectWebSocket();
+            updateStats();
+            setInterval(updateStats, 5000);
+            
+            log('WebSocket: ws://localhost:8083', 'info');
+            log('Serveur: http://localhost:8082', 'info');
+            log('✅ Interface prête !', 'success');
+        })();
+    </script>
+</body>
+</html>

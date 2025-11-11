@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Subgoal Left - Device Code Grant</title>
+    <style>
+        @font-face {
+            font-family: 'SEA';
+            src: local('SEA'), url('SEA.ttf') format('truetype');
+            font-display: swap;
+        }
+        
+        body {
+            background: transparent;
+            margin: 0;
+            font-family: 'SEA', monospace;
+            display: flex;
+            justify-content: flex-start; /* Alignement à gauche */
+            align-items: center;
+            height: 100vh;
+            color: white;
+            padding-left: 20px; /* Espace sur le côté gauche */
+            padding-right: 0; /* Supprimer l'espace à droite */
+        }
+
+        .counter {
+            display: flex;
+            font-size: 64px;
+            gap: 0; /* Pas d'espace entre les conteneurs */
+            white-space: pre; /* Préserver les espaces */
+            text-shadow: 3px 3px 3px rgba(0,0,0,0.5); /* Ombre plus prononcée */
+            -webkit-text-stroke: 1px black; /* Contour noir plus épais */
+        }
+
+        .digit-container {
+            position: relative;
+            width: auto;
+            min-width: 0.3em; /* Largeur minimale pour les espaces */
+            height: 1.5em;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .space-container {
+            width: 0.25em; /* Largeur des espaces réduite par 2 */
+            display: inline-block;
+        }
+
+        .digit {
+            position: absolute;
+            width: auto;
+            white-space: nowrap;
+            left: 0;
+            text-align: left;
+            transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Animation fluide de machine à sous */
+        }
+
+        .old {
+            transform: translateY(0);
+        }
+
+        .new {
+            transform: translateY(-100%);
+        }
+
+        /* Animation avec transition CSS pour effet fluide */
+        .animate .old {
+            animation: none; /* Désactiver les anciennes animations */
+        }
+
+        .animate .new {
+            animation: none; /* Désactiver les anciennes animations */
+        }
+
+        @keyframes slideOut {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+
+        @keyframes slideIn {
+            0%   { transform: translateY(-100%); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Animations pour diminution (chiffres vers le haut) */
+        @keyframes slideOutUp {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+
+        @keyframes slideInUp {
+            0%   { transform: translateY(100%); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Classes pour augmentation (vers le bas - par défaut) */
+        .animate-down .old {
+            animation: slideOut 0.4s forwards ease-in-out;
+        }
+
+        .animate-down .new {
+            animation: slideIn 0.4s forwards ease-in-out;
+        }
+
+        /* Classes pour diminution (vers le haut) */
+        .animate-up .old {
+            animation: slideOutUp 0.4s forwards ease-in-out;
+        }
+
+        .animate-up .new {
+            animation: slideInUp 0.4s forwards ease-in-out;
+        }
+    </style>
+</head>
+<body>
+
+<div class="counter" id="counter">Chargement...</div>
+
+<script>
+    let ws;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const counterEl = document.getElementById("counter");
+    let currentText = "";
+    let previousSubCount = null; // Pour détecter augmentation/diminution
+    let animationDirection = "down"; // "down" pour augmentation, "up" pour diminution
+    let currentSubGoal = null; // Stocker l'objectif actuel
+    let isAnimating = false; // Flag pour éviter les animations simultanées
+    let animationQueue = []; // File d'attente pour les animations
+
+    function createDigitElement(char, className, delay) {
+        const div = document.createElement("div");
+        div.className = className + " digit";
+        div.textContent = char;
+        div.style.animationDelay = `${delay}ms`;
+        return div;
+    }
+
+    function updateCounter(newText) {
+        if (newText === currentText) return;
+
+        const chars = newText.split("");
+        counterEl.innerHTML = "";
+
+        // Mesure la largeur des caractères avec la même police
+        const measureDiv = document.createElement("div");
+        measureDiv.style.visibility = "hidden";
+        measureDiv.style.position = "absolute";
+        measureDiv.style.fontSize = "64px";
+        measureDiv.style.fontFamily = "'SEA', monospace";
+        document.body.appendChild(measureDiv);
+
+        const totalChars = Math.max(chars.length, currentText.length);
+        let changedCount = 0;
+
+        // Déterminer combien de caractères changent
+        for (let i = 0; i < totalChars; i++) {
+            if ((currentText[i] || "") !== (chars[i] || "")) {
+                changedCount++;
+            }
+        }
+
+        const changeRatio = changedCount / totalChars;
+        const isFullReset = changeRatio > 0.5;
+
+        chars.forEach((char, index) => {
+            // Gérer les espaces
+            if (char === " ") {
+                const spaceContainer = document.createElement("div");
+                spaceContainer.className = "space-container";
+                spaceContainer.innerHTML = "&nbsp;";
+                counterEl.appendChild(spaceContainer);
+            } else {
+                const container = document.createElement("div");
+                container.className = "digit-container";
+
+                measureDiv.textContent = char;
+                const charWidth = measureDiv.getBoundingClientRect().width;
+                container.style.width = `${Math.max(charWidth, 10)}px`;
+
+                const currentChar = currentText[index] || "";
+                const charChanged = char !== currentChar;
+                const delay = isFullReset ? 0 : index * 50;
+
+                if (!charChanged && !isFullReset) {
+                    const staticDigit = createDigitElement(char, "static", 0);
+                    staticDigit.style.transform = "translateY(0)";
+                    container.appendChild(staticDigit);
+                } else {
+                    const oldDigit = createDigitElement(currentChar === " " ? " " : currentChar, "old", delay);
+                    const newDigit = createDigitElement(char, "new", delay);
+
+                    container.appendChild(oldDigit);
+                    container.appendChild(newDigit);
+                    container.classList.add("animate");
+                    // Ajouter la direction d'animation basée sur l'augmentation/diminution
+                    container.classList.add(`animate-${animationDirection}`);
+                }
+
+                counterEl.appendChild(container);
+            }
+        });
+
+        document.body.removeChild(measureDiv);
+        currentText = newText;
+    }
+    
+    // Animation style machine à sous - Défilement fluide avec vitesse adaptative
+    function animateCounterProgressive(fromCount, toCount, goal) {
+        const steps = Math.abs(toCount - fromCount);
+        
+        if (steps === 0) {
+            displayGoalText(goal);
+            return;
+        }
+        
+        const totalDuration = 1000; // Durée totale : 1 seconde
+        const startTime = performance.now();
+        
+        // Calculer la fréquence d'affichage en fonction du nombre d'étapes
+        // Plus il y a d'étapes, plus on affiche rapidement chaque valeur
+        const updateInterval = totalDuration / Math.max(steps, 60); // Minimum 60 FPS
+        
+        console.log(`🎰 Animation machine à sous: ${fromCount} → ${toCount} (${steps} étapes, ${updateInterval.toFixed(1)}ms par affichage)`);
+        
+        let lastDisplayedValue = fromCount;
+        
+        // Fonction d'easing pour un effet fluide (ease-out)
+        function easeOutCubic(t) {
+            return 1 - Math.pow(1 - t, 3);
+        }
+        
+        function animate(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / totalDuration, 1);
+            
+            // Appliquer l'easing pour un défilement plus naturel
+            const easedProgress = easeOutCubic(progress);
+            
+            // Calculer le nombre actuel en fonction de la progression
+            const currentValue = Math.round(fromCount + (toCount - fromCount) * easedProgress);
+            
+            // Afficher seulement si la valeur a changé (pour voir chaque étape intermédiaire)
+            if (currentValue !== lastDisplayedValue || progress === 1) {
+                lastDisplayedValue = currentValue;
+                
+                // Créer un objectif intermédiaire
+                const intermediateGoal = {
+                    ...goal,
+                    current: currentValue
+                };
+                
+                // Afficher l'étape intermédiaire
+                displayGoalText(intermediateGoal);
+            }
+            
+            // Continuer l'animation si pas terminée
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Animation terminée - Forcer l'affichage de la valeur finale
+                const finalGoal = {
+                    ...goal,
+                    current: toCount
+                };
+                displayGoalText(finalGoal);
+                
+                isAnimating = false;
+                processAnimationQueue();
+            }
+        }
+        
+        // Démarrer l'animation
+        requestAnimationFrame(animate);
+    }
+    
+    // Afficher le texte du goal sans animation progressive
+    function displayGoalText(goal) {
+        let displayText;
+        
+        if (goal.isMaxReached) {
+            displayText = goal.current.toString();
+        } else {
+            if (!goal.message || goal.message.trim() === '') {
+                displayText = `${goal.current}/${goal.target}`;
+            } else {
+                displayText = `${goal.current}/${goal.target} : ${goal.message}`;
+            }
+        }
+        
+        updateCounter(displayText);
+    }
+    
+    // Gérer la file d'attente des animations
+    function processAnimationQueue() {
+        if (animationQueue.length > 0 && !isAnimating) {
+            const nextAnimation = animationQueue.shift();
+            isAnimating = true;
+            animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal);
+        }
+    }
+    
+    function connectWebSocket() {
+        try {
+            ws = new WebSocket('ws://localhost:8083');
+            
+            ws.onopen = function() {
+                console.log('✅ WebSocket Device Code Grant connecté');
+                reconnectAttempts = 0;
+                fetchCurrentData();
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'sub_update') {
+                        updateSubgoal(data.goal);
+                    }
+                } catch (error) {
+                    console.error('❌ Erreur parsing message:', error);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('🔌 WebSocket Device Code Grant fermé');
+                attemptReconnect();
+            };
+            
+            ws.onerror = function(error) {
+                console.error('❌ Erreur WebSocket Device Code Grant:', error);
+            };
+            
+        } catch (error) {
+            console.error('❌ Erreur connexion WebSocket:', error);
+            attemptReconnect();
+        }
+    }
+    
+    function attemptReconnect() {
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`🔄 Tentative reconnexion Device Code Grant ${reconnectAttempts}/${maxReconnectAttempts}...`);
+            setTimeout(connectWebSocket, 2000 * reconnectAttempts);
+        } else {
+            console.error('❌ Impossible de se reconnecter au WebSocket Device Code Grant');
+            setInterval(fetchCurrentData, 5000);
+        }
+    }
+    
+    async function fetchCurrentData() {
+        try {
+            const cacheBuster = Date.now();
+            const response = await fetch(`http://localhost:8082/api/sub_goal?_=${cacheBuster}`);
+            if (response.ok) {
+                const data = await response.json();
+                updateSubgoal(data.goal);
+            }
+        } catch (error) {
+            console.error('❌ Erreur récupération données SUB goal:', error);
+        }
+    }
+    
+    function updateSubgoal(goal) {
+        // Stocker l'objectif actuel
+        currentSubGoal = goal;
+        
+        // Détecter si le compteur augmente ou diminue
+        if (previousSubCount !== null && goal.current !== previousSubCount) {
+            animationDirection = goal.current > previousSubCount ? "down" : "up";
+            console.log(`🔄 Direction animation: ${animationDirection} (${previousSubCount} → ${goal.current})`);
+            
+            // Ajouter l'animation à la file d'attente
+            animationQueue.push({
+                from: previousSubCount,
+                to: goal.current,
+                goal: goal
+            });
+            
+            // Démarrer l'animation si aucune n'est en cours
+            if (!isAnimating) {
+                isAnimating = true;
+                const animation = animationQueue.shift();
+                animateCounterProgressive(animation.from, animation.to, animation.goal);
+            }
+        } else {
+            // Premier affichage ou pas de changement
+            displayGoalText(goal);
+        }
+        
+        previousSubCount = goal.current;
+        console.log('📊 Subgoal Device Code Grant mis à jour');
+    }
+    
+    function forceRecalculateDisplay() {
+        // Forcer le recalcul complet des largeurs avec la vraie police
+        const currentDisplayText = currentText;
+        currentText = ""; // Vider temporairement pour forcer le recalcul
+        updateCounter(currentDisplayText); // Redessiner avec les bonnes dimensions
+    }
+    
+    // Démarrer la connexion
+    connectWebSocket();
+    
+    // Récupération initiale des données
+    setTimeout(fetchCurrentData, 1000);
+    
+    // Refresh simple après 15 secondes - recalcul des dimensions de police
+    setTimeout(() => {
+        console.log('🔄 Refresh complet - recalcul des dimensions de police...');
+        forceRecalculateDisplay();
+    }, 15000);
+</script>
+
+</body>
+</html>

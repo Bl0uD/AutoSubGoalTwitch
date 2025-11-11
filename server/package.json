@@ -1,0 +1,42 @@
+{
+  "name": "subcount-auto-device-code-grant",
+  "version": "1.0.0",
+  "description": "SubCount Auto avec Device Code Grant Flow pour Twitch",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test.js all",
+    "test:status": "node test.js status",
+    "test:increment": "node test.js increment",
+    "install-deps": "npm install"
+  },
+  "keywords": [
+    "twitch",
+    "subscriber",
+    "count",
+    "obs",
+    "streaming",
+    "device-code-grant",
+    "oauth2.1"
+  ],
+  "author": "SubCount Auto Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/subcount-auto-device-code-grant"
+  },
+  "bugs": {
+    "url": "https://github.com/example/subcount-auto-device-code-grant/issues"
+  },
+  "homepage": "https://github.com/example/subcount-auto-device-code-grant#readme"
+}

@@ -1,0 +1,44 @@
+﻿# Node modules
+node_modules/
+server/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Logs
+*.log
+logs/
+!logs/.gitkeep
+
+# Backups
+backups/
+!backups/.gitkeep
+
+# Data (user-specific)
+data/
+!data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temp
+*.tmp
+temp/
+
+# Scripts de restructuration temporaires
+restructure.ps1
+restructure_simple.ps1
+update_paths.ps1

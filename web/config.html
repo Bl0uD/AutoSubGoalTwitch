@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubCount Auto - Configuration</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 700px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0e0e23 0%, #1a1a2e 100%); 
+            color: #ffffff; 
+            min-height: 100vh;
+        }
+        
+        .header { 
+            text-align: center; 
+            margin-bottom: 40px;
+            padding: 20px 0;
+        }
+        
+        .header h1 { 
+            font-size: 2.5em; 
+            background: linear-gradient(135deg, #9146ff, #00ffc7); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .header p { 
+            color: #aaa; 
+            font-size: 1.1em; 
+        }
+        
+        .card { 
+            background: rgba(26, 26, 46, 0.8); 
+            padding: 30px; 
+            border-radius: 15px; 
+            margin: 20px 0; 
+            border: 1px solid rgba(145, 70, 255, 0.2);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card h2 { 
+            margin-bottom: 20px; 
+            color: #00ffc7;
+            font-size: 1.5em;
+        }
+        
+        .form-group { 
+            margin: 20px 0; 
+        }
+        
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600;
+            color: #00ffc7;
+        }
+        
+        input { 
+            width: 100%; 
+            padding: 12px 16px; 
+            border: 1px solid rgba(145, 70, 255, 0.3); 
+            background: rgba(42, 42, 74, 0.5); 
+            color: white; 
+            border-radius: 8px; 
+            box-sizing: border-box;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #9146ff;
+            box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.2);
+        }
+        
+        small { 
+            display: block;
+            color: #aaa; 
+            margin-top: 8px;
+            font-size: 0.9em;
+        }
+        
+        button { 
+            background: linear-gradient(135deg, #6441a4, #9146ff); 
+            color: white; 
+            border: none; 
+            padding: 14px 28px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(145, 70, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.primary { 
+            background: linear-gradient(135deg, #ff6b35, #ff8560);
+            font-size: 1.1em;
+        }
+        
+        button.danger { 
+            background: linear-gradient(135deg, #dc3545, #ff4444); 
+        }
+        
+        .instruction {
+            background: rgba(42, 42, 74, 0.4);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 3px solid #9146ff;
+        }
+        
+        .instruction strong {
+            color: #00ffc7;
+            margin-right: 10px;
+            display: inline-block;
+            min-width: 25px;
+        }
+        
+        a { 
+            color: #9146ff; 
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        a:hover { 
+            color: #00ffc7;
+            text-decoration: underline; 
+        }
+        
+        .info-box {
+            background: rgba(0, 255, 199, 0.1);
+            border: 1px solid rgba(0, 255, 199, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .info-box p {
+            margin: 8px 0;
+            color: #aaa;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .button-group button {
+            flex: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SubCount Auto</h1>
+        <p>Configuration Twitch</p>
+    </div>
+    
+    <div class="card">
+        <h2>🔐 Client ID Twitch</h2>
+        <p style="color: #aaa; margin-bottom: 20px;">
+            Connectez votre application Twitch pour synchroniser vos compteurs
+        </p>
+        
+        <form id="configForm">
+            <div class="form-group">
+                <label for="client_id">Client ID</label>
+                <input 
+                    type="text" 
+                    id="client_id" 
+                    name="client_id" 
+                    value="8o91k8bmpi79inwkjj7sgggvpkavr5"
+                    placeholder="Client ID Twitch (pré-configuré)"
+                    required
+                    readonly
+                    style="background-color: #2a2a40; cursor: not-allowed;"
+                >
+                <small>✅ Client ID pré-configuré et verrouillé</small>
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="primary">Sauvegarder</button>
+                <a href="http://localhost:8082/" style="flex: 1;"><button type="button">Retour</button></a>
+                <button type="button" onclick="disconnectTwitch()" class="danger">🔌 Déconnecter Twitch</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <h2>📋 Guide de configuration</h2>
+        
+        <div class="instruction">
+            <strong>1.</strong> Rendez-vous sur <a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv/console/apps</a>
+        </div>
+        
+        <div class="instruction">
+            <strong>2.</strong> Cliquez sur "Register Your Application"
+        </div>
+        
+        <div class="instruction">
+            <strong>3.</strong> Remplissez le formulaire :
+            <ul style="margin: 10px 0 0 30px; color: #aaa;">
+                <li>Nom : SubCount Auto (ou autre)</li>
+                <li>URL de redirection : http://localhost</li>
+                <li>Catégorie : Application Integration</li>
+            </ul>
+        </div>
+        
+        <div class="instruction">
+            <strong>4.</strong> Copiez le Client ID affiché
+        </div>
+        
+        <div class="instruction">
+            <strong>5.</strong> Collez-le dans le champ ci-dessus et sauvegardez
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>ℹ️ Informations</h2>
+        <div class="info-box">
+            <p><strong>✅ Authentification sécurisée</strong></p>
+            <p>Utilise le Device Code Grant Flow recommandé par Twitch</p>
+        </div>
+        <div class="info-box">
+            <p><strong>✅ Aucun secret requis</strong></p>
+            <p>Seul le Client ID est nécessaire pour l'authentification</p>
+        </div>
+        <div class="info-box">
+            <p><strong>✅ Synchronisation en temps réel</strong></p>
+            <p>Vos compteurs se mettent à jour automatiquement</p>
+        </div>
+    </div>
+    
+    <script>
+        // Charger la configuration actuelle
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch('http://localhost:8082/api/auth-status');
+                const data = await response.json();
+                
+                // Si un client_id existe dans la config, le pré-remplir
+                // (Note: L'API ne renvoie pas le client_id pour des raisons de sécurité,
+                // mais on peut essayer de le récupérer depuis le serveur si disponible)
+            } catch (error) {
+                console.error('Erreur chargement config:', error);
+            }
+        }
+        
+        // Déconnecter Twitch
+        async function disconnectTwitch() {
+            if (!confirm('⚠️ Voulez-vous vraiment vous déconnecter de Twitch ?\n\nCela arrêtera la synchronisation en temps réel.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/disconnect-twitch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Déconnecté de ' + data.previousUser + '\n\nVous pouvez maintenant connecter un autre compte.');
+                    window.location.href = 'http://localhost:8082/';
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur: ' + error.message);
+            }
+        }
+        
+        // Sauvegarder la configuration
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const clientId = document.getElementById('client_id').value.trim();
+            
+            if (!clientId) {
+                alert('⚠️ Veuillez entrer un Client ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_id: clientId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Configuration sauvegardée ! Vous pouvez maintenant vous connecter.');
+                    window.location.href = 'http://localhost:8082/';
+                } else {
+                    alert('❌ Erreur: ' + (data.error || 'Impossible de sauvegarder'));
+                }
+            } catch (error) {
+                alert('❌ Erreur de connexion: ' + error.message);
+            }
+        });
+        
+        // Charger la config au démarrage
+        loadCurrentConfig();
+    </script>
+</body>
+</html>

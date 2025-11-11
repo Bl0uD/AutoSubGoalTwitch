@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "check_on_startup": true,
+  "update_check_url": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
+  "current_version_file": "src/config/version.json",
+  "update_download_url": "https://github.com/Bl0uD/AutoSubGoalTwitch/releases/download/{version}/AutoSubGoalTwitch.zip",
+  "check_interval": 86400,
+  "notify_on_update": true,
+  "github_api": {
+    "timeout": 10,
+    "headers": {
+      "Accept": "application/vnd.github.v3+json"
+    }
+  },
+  "backup": {
+    "enabled": true,
+    "backup_dir": "backups",
+    "keep_last": 3
+  }
+}
