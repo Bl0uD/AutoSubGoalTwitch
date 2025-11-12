@@ -791,12 +791,6 @@ def reset_overlay_config(props, prop):
     log_message("✅ Configuration overlays réinitialisée aux valeurs par défaut")
     return True
 
-def script_description():
-    """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.1</h2>
-        log_message(f"❌ Erreur récupération statut: {e}")
-    return None
-
 # ============================================================================
 # FIN PHASE 1
 # ============================================================================
