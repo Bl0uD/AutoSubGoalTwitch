@@ -812,7 +812,7 @@ def apply_overlay_font(props, prop, settings):
     return True
 
 def apply_overlay_colors(props, prop, settings):
-    """Applique la couleur prédéfinie aux overlays"""
+    """Applique la couleur prédéfinie aux overlays (callback du dropdown)"""
     if not OVERLAY_CONFIG_AVAILABLE:
         log_message("❌ Module overlay_config_manager non disponible")
         return False
@@ -841,7 +841,7 @@ def apply_overlay_colors(props, prop, settings):
     return True
 
 def apply_custom_color(props, prop, settings):
-    """Applique le code couleur personnalisé aux overlays"""
+    """Applique le code couleur personnalisé aux overlays (callback du champ texte)"""
     if not OVERLAY_CONFIG_AVAILABLE:
         log_message("❌ Module overlay_config_manager non disponible")
         return False
@@ -1023,7 +1023,7 @@ def script_properties():
             apply_overlay_font
         )
         
-        # Dropdown Couleur prédéfinie
+        # Dropdown Couleur prédéfinie (applique automatiquement au changement)
         color_list = obs.obs_properties_add_list(
             props,
             "overlay_text_color",
@@ -1046,36 +1046,30 @@ def script_properties():
         for name, value in colors:
             obs.obs_property_list_add_string(color_list, name, value)
         
-        # Bouton pour appliquer la couleur prédéfinie
-        obs.obs_properties_add_button(
-            props, "apply_preset_color", "✅ Appliquer couleur prédéfinie", 
-            apply_overlay_colors
-        )
+        # Callback pour appliquer automatiquement la couleur prédéfinie
+        obs.obs_property_set_modified_callback(color_list, apply_overlay_colors)
         
         # Séparateur
         obs.obs_properties_add_text(
             props, "color_separator", 
-            "   OU", 
+            "   ━━━━━━━━━━━ OU ━━━━━━━━━━━", 
             obs.OBS_TEXT_INFO
         )
         
-        # Champ texte pour couleur personnalisée
+        # Champ texte pour couleur personnalisée (applique en appuyant sur Entrée)
         custom_color = obs.obs_properties_add_text(
             props,
             "overlay_custom_color",
-            "   🎨 Code couleur CSS personnalisé",
+            "   🎨 Code couleur CSS (validez avec Entrée)",
             obs.OBS_TEXT_DEFAULT
         )
         obs.obs_property_set_long_description(
             custom_color,
-            "Exemples: #FF5733, rgb(255,87,51), rgba(255,87,51,0.8), white"
+            "Exemples: #FF5733, rgb(255,87,51), rgba(255,87,51,0.8), white\nAppuyez sur Entrée pour appliquer"
         )
         
-        # Bouton pour appliquer la couleur personnalisée
-        obs.obs_properties_add_button(
-            props, "apply_custom_color", "✅ Appliquer code couleur", 
-            apply_custom_color
-        )
+        # Callback pour appliquer le code couleur quand on valide le champ
+        obs.obs_property_set_modified_callback(custom_color, apply_custom_color)
         
         # Bouton Reset
         obs.obs_properties_add_button(
