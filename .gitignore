@@ -67,6 +67,7 @@ debug_*.py
 # Documentation de développement
 docs/dev/
 docs/debug/
+docs/release/
 DEVELOPMENT.md
 TODO.md
 
