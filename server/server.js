@@ -3957,7 +3957,7 @@ app.get('/api/overlay-config', (req, res) => {
 });
 
 // API REST pour mettre Ã  jour la configuration depuis Python
-app.post('/api/overlay-config', express.json(), (req, res) => {
+app.post('/api/overlay-config', (req, res) => {
     try {
         const updates = req.body;
         
@@ -4011,13 +4011,23 @@ function broadcastConfigUpdate() {
         config: overlayConfig
     });
     
+    let successCount = 0;
     overlayClients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
+        try {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+                successCount++;
+            } else {
+                // Nettoyer les clients fermés
+                overlayClients.delete(client);
+            }
+        } catch (error) {
+            logEvent('ERROR', 'âŒ Erreur envoi config Ã  un client', { error: error.message });
+            overlayClients.delete(client);
         }
     });
     
-    logEvent('INFO', `ðŸ"¡ Config diffusÃ©e Ã  ${overlayClients.size} overlays`);
+    logEvent('INFO', `ðŸ"¡ Config diffusÃ©e Ã  ${successCount}/${overlayClients.size} overlays`);
 }
 
 // Charger la config au dÃ©marrage

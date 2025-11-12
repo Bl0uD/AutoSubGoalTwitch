@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
@@ -11,7 +11,7 @@
         }
         
         :root {
-            /* Variables CSS dynamiques (modifiées par le serveur JS) */
+            /* Variables CSS dynamiques (modifiÃ©es par le serveur JS) */
             --font-family: 'SEA';
             --font-size: 64px;
             --font-weight: normal;
@@ -20,7 +20,7 @@
             --stroke-color: black;
             --anim-duration: 1s;
             --anim-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            --padding-right: 20px;
+            --padding-left: 20px;
             --gap: 0;
         }
         
@@ -33,8 +33,8 @@
             align-items: center;
             height: 100vh;
             color: var(--text-color);
-            padding-left: 0;
-            padding-right: var(--padding-right);
+            padding-right: var(--padding-left);
+            padding-right: 0;
         }
 
         .counter {
@@ -124,11 +124,11 @@
     </style>
 </head>
 <body>
-    <div class="counter" id="counter"></div>
+    <div class="counter" id="counter">Chargement...</div>
 
     <script>
         // ==================================================================
-        // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // ðŸŽ¨ CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
         // ==================================================================
         
         let configWs = null;
@@ -138,34 +138,32 @@
                 configWs = new WebSocket('ws://localhost:8084');
                 
                 configWs.onopen = () => {
-                    console.log('✅ Connecté au WebSocket de configuration');
+                    console.log('âœ… Config WebSocket connectÃ© (port 8084)');
                 };
                 
                 configWs.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        
                         if (data.type === 'config_update' && data.config) {
-                            console.log('🎨 Nouvelle configuration reçue:', data.config);
+                            console.log('ðŸŽ¨ Configuration reÃ§ue:', data.config);
                             applyConfig(data.config);
                         }
                     } catch (error) {
-                        console.error('❌ Erreur traitement message config:', error);
+                        console.error('âŒ Erreur parsing config:', error);
                     }
                 };
                 
                 configWs.onerror = (error) => {
-                    console.error('❌ Erreur WebSocket config:', error);
+                    console.error('âŒ Erreur Config WebSocket:', error);
                 };
                 
                 configWs.onclose = () => {
-                    console.log('🔌 WebSocket config déconnecté, reconnexion dans 3s...');
-                    setTimeout(connectConfigWebSocket, 3000);
+                    console.log('ðŸ”Œ Config WebSocket dÃ©connectÃ©, reconnexion dans 5s...');
+                    setTimeout(connectConfigWebSocket, 5000);
                 };
-                
             } catch (error) {
-                console.error('❌ Erreur connexion WebSocket config:', error);
-                setTimeout(connectConfigWebSocket, 3000);
+                console.error('âŒ Erreur connexion Config WebSocket:', error);
+                setTimeout(connectConfigWebSocket, 5000);
             }
         }
         
@@ -194,28 +192,30 @@
             
             // Appliquer la mise en page
             if (config.layout) {
-                if (config.layout.paddingLeft) root.style.setProperty('--padding-right', config.layout.paddingLeft);
+                if (config.layout.paddingLeft) root.style.setProperty('--padding-left', config.layout.paddingLeft);
                 if (config.layout.gap) root.style.setProperty('--gap', config.layout.gap);
             }
             
-            console.log('✅ Configuration appliquée');
+            console.log('âœ… Configuration appliquÃ©e avec succÃ¨s');
+            
+            // Forcer le rafraÃ®chissement de l'affichage
+            setTimeout(forceRecalculateDisplay, 100);
         }
         
-        // Charger la configuration initiale via HTTP
         async function loadInitialConfig() {
             try {
                 const response = await fetch('http://localhost:3001/api/overlay-config');
                 if (response.ok) {
                     const config = await response.json();
-                    console.log('📄 Configuration initiale chargée:', config);
+                    console.log('ðŸŽ¨ Configuration initiale chargÃ©e:', config);
                     applyConfig(config);
                 }
             } catch (error) {
-                console.error('❌ Erreur chargement config initiale:', error);
+                console.error('âŒ Erreur chargement config initiale:', error);
             }
         }
         
-        // Démarrer les connexions
+        // Charger la config initiale puis connecter le WebSocket
         loadInitialConfig();
         connectConfigWebSocket();
         
@@ -224,100 +224,246 @@
         // ==================================================================
         
         let ws;
-        let currentGoal = 0;
-        let currentCount = 0;
-        let previousCount = 0;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        const counterEl = document.getElementById("counter");
+        let currentText = "";
+        let previousSubCount = null;
+        let animationDirection = "down";
+        let currentFollowgoal = null;
+        let isAnimating = false;
+        let animationQueue = [];
 
-        function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:8083');
-
-            ws.onopen = () => {
-                console.log('✅ Connecté au WebSocket (compteur)');
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.type === 'follow_update' && data.goal !== undefined) {
-                        const goal = data.goal;
-                        
-                        // Formater le texte selon la structure de goal
-                        let displayText;
-                        if (goal.isMaxReached) {
-                            displayText = goal.current.toString();
-                        } else {
-                            if (!goal.message || goal.message.trim() === '') {
-                                displayText = `${goal.current}/${goal.target}`;
-                            } else {
-                                displayText = `${goal.current}/${goal.target} : ${goal.message}`;
-                            }
-                        }
-                        
-                        updateCounter(displayText);
-                    }
-                } catch (error) {
-                    console.error('Erreur traitement message:', error);
-                }
-            };
-
-            ws.onerror = (error) => {
-                console.error('Erreur WebSocket (compteur):', error);
-            };
-
-            ws.onclose = () => {
-                console.log('WebSocket compteur déconnecté, reconnexion dans 3s...');
-                setTimeout(connectWebSocket, 3000);
-            };
+        function createDigitElement(char, className, delay) {
+            const div = document.createElement("div");
+            div.className = className + " digit";
+            div.textContent = char;
+            div.style.animationDelay = `${delay}ms`;
+            return div;
         }
 
-        function updateCounter(newValue) {
-            const counterElement = document.getElementById('counter');
-            const oldValue = counterElement.textContent.trim();
-            const newValueStr = String(newValue);
+        function updateCounter(newText) {
+            if (newText === currentText) return;
 
-            if (oldValue === '' || oldValue === newValueStr) {
-                counterElement.textContent = newValueStr;
+            const chars = newText.split("");
+            counterEl.innerHTML = "";
+
+            const measureDiv = document.createElement("div");
+            measureDiv.style.visibility = "hidden";
+            measureDiv.style.position = "absolute";
+            measureDiv.style.fontSize = getComputedStyle(document.documentElement).getPropertyValue('--font-size');
+            measureDiv.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-family');
+            document.body.appendChild(measureDiv);
+
+            const totalChars = Math.max(chars.length, currentText.length);
+            let changedCount = 0;
+
+            for (let i = 0; i < totalChars; i++) {
+                if ((currentText[i] || "") !== (chars[i] || "")) {
+                    changedCount++;
+                }
+            }
+
+            const changeRatio = changedCount / totalChars;
+            const isFullReset = changeRatio > 0.5;
+
+            chars.forEach((char, index) => {
+                if (char === " ") {
+                    const spaceContainer = document.createElement("div");
+                    spaceContainer.className = "space-container";
+                    spaceContainer.innerHTML = "&nbsp;";
+                    counterEl.appendChild(spaceContainer);
+                } else {
+                    const container = document.createElement("div");
+                    container.className = "digit-container";
+
+                    measureDiv.textContent = char;
+                    const charWidth = measureDiv.getBoundingClientRect().width;
+                    container.style.width = `${Math.max(charWidth, 10)}px`;
+
+                    const currentChar = currentText[index] || "";
+                    const charChanged = char !== currentChar;
+                    const delay = isFullReset ? 0 : index * 50;
+
+                    if (!charChanged && !isFullReset) {
+                        const staticDigit = createDigitElement(char, "static", 0);
+                        staticDigit.style.transform = "translateY(0)";
+                        container.appendChild(staticDigit);
+                    } else {
+                        const oldDigit = createDigitElement(currentChar === " " ? " " : currentChar, "old", delay);
+                        const newDigit = createDigitElement(char, "new", delay);
+
+                        container.appendChild(oldDigit);
+                        container.appendChild(newDigit);
+                        container.classList.add("animate");
+                        container.classList.add(`animate-${animationDirection}`);
+                    }
+
+                    counterEl.appendChild(container);
+                }
+            });
+
+            document.body.removeChild(measureDiv);
+            currentText = newText;
+        }
+        
+        function animateCounterProgressive(fromCount, toCount, goal) {
+            const steps = Math.abs(toCount - fromCount);
+            
+            if (steps === 0) {
+                displayGoalText(goal);
                 return;
             }
-
-            const isIncreasing = newValue > parseInt(oldValue || '0');
             
-            counterElement.innerHTML = '';
+            const totalDuration = 1000;
+            const startTime = performance.now();
+            const updateInterval = totalDuration / Math.max(steps, 60);
             
-            for (let i = 0; i < newValueStr.length; i++) {
-                const char = newValueStr[i];
+            console.log(`ðŸŽ° Animation: ${fromCount} â†’ ${toCount} (${steps} Ã©tapes)`);
+            
+            let lastDisplayedValue = fromCount;
+            
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / totalDuration, 1);
+                const easedProgress = easeOutCubic(progress);
+                const currentValue = Math.round(fromCount + (toCount - fromCount) * easedProgress);
                 
-                if (char === ' ') {
-                    const spaceContainer = document.createElement('span');
-                    spaceContainer.className = 'space-container';
-                    counterElement.appendChild(spaceContainer);
-                    continue;
+                if (currentValue !== lastDisplayedValue || progress === 1) {
+                    lastDisplayedValue = currentValue;
+                    const intermediateGoal = { ...goal, current: currentValue };
+                    displayGoalText(intermediateGoal);
                 }
-
-                const container = document.createElement('div');
-                container.className = 'digit-container';
                 
-                if (i < oldValue.length && oldValue[i] !== char) {
-                    container.classList.add('animate');
-                    container.classList.add(isIncreasing ? 'animate-down' : 'animate-up');
-                    
-                    const oldDigit = document.createElement('div');
-                    oldDigit.className = 'digit old';
-                    oldDigit.textContent = oldValue[i];
-                    container.appendChild(oldDigit);
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    const finalGoal = { ...goal, current: toCount };
+                    displayGoalText(finalGoal);
+                    isAnimating = false;
+                    processAnimationQueue();
                 }
-
-                const newDigit = document.createElement('div');
-                newDigit.className = 'digit new';
-                newDigit.textContent = char;
-                container.appendChild(newDigit);
-
-                counterElement.appendChild(container);
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function displayGoalText(goal) {
+            let displayText;
+            
+            if (goal.isMaxReached) {
+                displayText = goal.current.toString();
+            } else {
+                if (!goal.message || goal.message.trim() === '') {
+                    displayText = `${goal.current}/${goal.target}`;
+                } else {
+                    displayText = `${goal.current}/${goal.target} : ${goal.message}`;
+                }
+            }
+            
+            updateCounter(displayText);
+        }
+        
+        function processAnimationQueue() {
+            if (animationQueue.length > 0 && !isAnimating) {
+                const nextAnimation = animationQueue.shift();
+                isAnimating = true;
+                animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal);
             }
         }
 
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:8083');
+
+                ws.onopen = () => {
+                    console.log('âœ… ConnectÃ© au WebSocket (compteur)');
+                    reconnectAttempts = 0;
+                    fetchCurrentData();
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'follow_update' && data.goal) {
+                            updateFollowgoal(data.goal);
+                        }
+                    } catch (error) {
+                        console.error('âŒ Erreur parsing message:', error);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('âŒ Erreur WebSocket (compteur):', error);
+                };
+
+                ws.onclose = () => {
+                    console.log('ðŸ”Œ WebSocket compteur dÃ©connectÃ©, reconnexion dans 3s...');
+                    setTimeout(connectWebSocket, 3000);
+                };
+            } catch (error) {
+                console.error('âŒ Erreur connexion WebSocket:', error);
+                setTimeout(connectWebSocket, 3000);
+            }
+        }
+        
+        async function fetchCurrentData() {
+            try {
+                const cacheBuster = Date.now();
+                const response = await fetch(`http://localhost:8082/api/follow_goal?_=${cacheBuster}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateFollowgoal(data.goal);
+                }
+            } catch (error) {
+                console.error('âŒ Erreur rÃ©cupÃ©ration donnÃ©es FOLLOW goal:', error);
+            }
+        }
+        
+        function updateFollowgoal(goal) {
+            currentFollowgoal = goal;
+            
+            if (previousSubCount !== null && goal.current !== previousSubCount) {
+                animationDirection = goal.current > previousSubCount ? "down" : "up";
+                console.log(`ðŸ”„ Direction: ${animationDirection} (${previousSubCount} â†’ ${goal.current})`);
+                
+                animationQueue.push({
+                    from: previousSubCount,
+                    to: goal.current,
+                    goal: goal
+                });
+                
+                if (!isAnimating) {
+                    isAnimating = true;
+                    const animation = animationQueue.shift();
+                    animateCounterProgressive(animation.from, animation.to, animation.goal);
+                }
+            } else {
+                displayGoalText(goal);
+            }
+            
+            previousSubCount = goal.current;
+            console.log('ðŸ“Š Followgoal mis Ã  jour');
+        }
+        
+        function forceRecalculateDisplay() {
+            const currentDisplayText = currentText;
+            currentText = "";
+            updateCounter(currentDisplayText);
+        }
+        
         connectWebSocket();
+        setTimeout(fetchCurrentData, 1000);
+        setTimeout(() => {
+            console.log('ðŸ”„ Refresh complet - recalcul des dimensions...');
+            forceRecalculateDisplay();
+        }, 15000);
     </script>
 </body>
 </html>
+
+
