@@ -167,31 +167,9 @@ def check_for_updates_async():
         elif update_info.get('available'):
             latest = update_info.get('latest_version')
             
-            # 🎯 NOTIFICATION POPUP OBS
-            def show_update_notification():
-                """Affiche une notification popup visible dans OBS"""
-                try:
-                    message = f"🎉 Mise à jour disponible !\n\n" \
-                              f"Version actuelle : v{current_ver}\n" \
-                              f"Nouvelle version : v{latest}\n\n" \
-                              f"📥 Téléchargez la mise à jour sur GitHub :\n" \
-                              f"https://github.com/Bl0uD/AutoSubGoalTwitch/releases"
-                    
-                    # Log OBS
-                    obs.script_log(obs.LOG_INFO, f"[Notification] {message}")
-                    
-                    # Affichage encadré visible
-                    print("\n" + "="*70)
-                    print("🎉 NOTIFICATION OBS - MISE À JOUR DISPONIBLE !")
-                    print("="*70)
-                    print(message)
-                    print("="*70 + "\n")
-                    
-                except Exception as e:
-                    print(f"ERROR: {e}")
-            
-            # Délai de 2 secondes
-            threading.Timer(2.0, show_update_notification).start()
+            # Log simple dans OBS
+            message = f"🎉 Mise à jour v{latest} disponible ! Version actuelle: v{current_ver}. Téléchargez sur: https://github.com/Bl0uD/AutoSubGoalTwitch/releases"
+            log_message(message, "info", force_display=True)
         
     except Exception as e:
         print(f"ERROR: {e}")

@@ -1,58 +1,84 @@
-# SubCount Auto
+# AutoSubGoalTwitch
 
-## Description
-SubCount Auto is a Python application designed to integrate with OBS (Open Broadcaster Software) for managing subscriber and follower counts in real-time. It features an automatic server that handles requests related to updates and provides a dashboard for monitoring.
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.1.0)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.6+-yellow.svg)](https://www.python.org/)
+[![OBS](https://img.shields.io/badge/OBS-31.1.2+-purple.svg)](https://obsproject.com/)
 
-## Project Structure
+## 📖 Description
+Application Python pour OBS Studio qui gère automatiquement les compteurs d'abonnés et de followers Twitch en temps réel avec mise à jour automatique.
+
+## ✨ Nouveautés v2.1.0
+- 🔄 Système de mise à jour automatique GitHub
+- 💾 Backups automatiques avant chaque mise à jour
+- 📊 Logs détaillés (update.log, error.log)
+- 🛡️ Gestion d'erreurs améliorée
+
+## 🚀 Installation rapide
+
+### Prérequis
+- Python 3.6+ 
+- Node.js 14+
+- OBS Studio 31.1.2+
+- Compte Twitch avec accès API
+
+### Installation
+
+1. **Téléchargez et extrayez** le projet
+2. **Exécutez** `INSTALLER.bat`
+3. **Configurez** `twitch_config.txt` (format: `client_id:client_secret:channel_name`)
+4. **Dans OBS** : Outils → Scripts → + → Sélectionnez `subcount_auto.py`
+5. **Ajoutez les overlays** : Source → Navigateur → `http://localhost:3000/subgoal-left` (ou `/subgoal-right`)
+
+## 📝 Utilisation
+
+### Boutons OBS
+- 🔄 **Refresh Server** : Redémarre le serveur
+- ⬆️ **Increment Sub** : +1 abonné (test)
+- ⬇️ **Decrement Sub** : -1 abonné (test)
+- 🔄 **Update Total** : Force sync Twitch
+- 🎯 **Update Sub Goal** : Change l'objectif
+
+### Configuration auto-update
+Éditez `obs/config/update_settings.json` :
+```json
+{
+  "auto_update_enabled": true,
+  "check_interval_hours": 6,
+  "backup_before_update": true
+}
 ```
-SubcountAutomatic
-├── src
-│   ├── obs_subcount_auto.py          # Main script for OBS integration
-│   ├── updater                        # Module for handling updates
-│   │   ├── __init__.py               # Initializes the updater module
-│   │   ├── version_checker.py         # Checks for the latest version
-│   │   ├── file_updater.py            # Manages file updates
-│   │   └── github_api.py              # Interacts with GitHub API
-│   ├── config                         # Configuration files
-│   │   ├── version.json               # Current version of the application
-│   │   └── update_config.json         # Update process configuration
-│   └── utils                          # Utility functions
-│       ├── __init__.py               # Initializes the utils module
-│       └── logger.py                  # Logging functionality
-├── server
-│   ├── server.js                      # Node.js server code
-│   └── package.json                   # npm configuration file
-├── updates                             # Directory for updates
-│   └── .gitkeep                       # Keeps the updates directory in Git
-├── logs                                # Directory for logs
-│   └── .gitkeep                       # Keeps the logs directory in Git
-├── START_SERVER.bat                   # Batch file to start the server
-├── INSTALLER.bat                      # Batch file for installation
-├── README.md                          # Project documentation
-└── .github
-    └── workflows
-        └── release.yml                # GitHub Actions workflow for releases
+
+## ⚠️ Dépannage
+
+### OBS crash (libcef.dll)
+```powershell
+.\scripts\fix_obs_browser_crash.ps1
 ```
 
-## Installation
-1. Clone the repository to your local machine.
-2. Navigate to the project directory.
-3. Run `INSTALLER.bat` to install the necessary dependencies.
+### Port 3000 déjà utilisé
+```powershell
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
 
-## Usage
-1. Open OBS Studio.
-2. Load the `obs_subcount_auto.py` script through the Tools > Scripts menu.
-3. The SubCount Auto server will start automatically.
-4. Use the provided buttons in OBS to manage follower and subscriber counts.
+### Erreur API Twitch
+Vérifiez `twitch_config.txt` et consultez `logs/error.log`
 
-## Features
-- Automatic server management for real-time updates.
-- Integration with Twitch API for synchronization.
-- Dashboard for monitoring follower and subscriber counts.
-- Update checking and file management for maintaining the application.
+### Windows Defender bloque
+Ajoutez le dossier aux exclusions : Sécurité Windows → Protection → Exclusions
 
-## Contributing
-Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
+## 📊 Logs
+- `logs/update.log` : Opérations de mise à jour
+- `logs/error.log` : Erreurs critiques
+- Logs OBS : Aide → Fichiers journaux
 
-## License
-This project is licensed under the MIT License. See the LICENSE file for details.
+## 🔗 Liens
+- 📦 [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
+- 🐛 [Signaler un bug](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
+
+## 📄 License
+MIT License - Copyright (c) 2025 Bl0uD
+
+---
+<div align="center">⭐ Star ce projet si il vous aide ! ⭐</div>
