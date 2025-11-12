@@ -56,6 +56,15 @@ except ImportError:
     UPDATE_MODULE_AVAILABLE = False
     print("⚠️ Module updater non disponible - vérification des mises à jour désactivée")
 
+# Import du module de configuration dynamique des overlays
+try:
+    from overlay_config_manager import OverlayConfigManager
+    overlay_config = OverlayConfigManager()
+    OVERLAY_CONFIG_AVAILABLE = True
+except ImportError:
+    OVERLAY_CONFIG_AVAILABLE = False
+    print("⚠️ Module overlay_config_manager non disponible - configuration dynamique désactivée")
+
 # Configuration
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "logs", "obs_subcount_auto.log")
@@ -699,6 +708,92 @@ def get_twitch_status():
             data = response.json()
             return data
     except Exception as e:
+        log_message(f"❌ Erreur récupération status Twitch: {e}")
+    return None
+
+# ========================================================================
+# GESTION CONFIGURATION DYNAMIQUE DES OVERLAYS
+# ========================================================================
+
+def apply_overlay_font(props, prop, settings):
+    """Applique la police sélectionnée aux overlays"""
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("❌ Module overlay_config_manager non disponible")
+        return False
+    
+    font_family = obs.obs_data_get_string(settings, "overlay_font")
+    font_size = obs.obs_data_get_int(settings, "overlay_font_size")
+    
+    if font_family:
+        overlay_config.update_font(family=font_family, size=f"{font_size}px")
+        log_message(f"✅ Police mise à jour: {font_family} @ {font_size}px")
+    
+    return True
+
+def apply_overlay_colors(props, prop, settings):
+    """Applique les couleurs sélectionnées aux overlays"""
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("❌ Module overlay_config_manager non disponible")
+        return False
+    
+    text_color = obs.obs_data_get_string(settings, "overlay_text_color")
+    
+    # Convertir le nom de couleur en code hex/rgba
+    color_map = {
+        "white": "white",
+        "red": "#FF0000",
+        "blue": "#00FFFF",
+        "green": "#00FF00",
+        "yellow": "#FFD700",
+        "purple": "#8B00FF",
+        "orange": "#FF4500"
+    }
+    
+    if text_color and text_color in color_map:
+        overlay_config.update_colors(text=color_map[text_color])
+        log_message(f"✅ Couleur mise à jour: {text_color}")
+    
+    return True
+
+def apply_overlay_animation(props, prop, settings):
+    """Applique la vitesse d'animation sélectionnée"""
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("❌ Module overlay_config_manager non disponible")
+        return False
+    
+    anim_speed = obs.obs_data_get_string(settings, "overlay_anim_speed")
+    
+    # Convertir en durée CSS
+    speed_map = {
+        "fast": "300ms",
+        "normal": "1s",
+        "slow": "2s"
+    }
+    
+    if anim_speed and anim_speed in speed_map:
+        overlay_config.update_animation(duration=speed_map[anim_speed])
+        log_message(f"✅ Animation mise à jour: {anim_speed}")
+    
+    return True
+
+def reset_overlay_config(props, prop):
+    """Réinitialise la configuration des overlays aux valeurs par défaut"""
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("❌ Module overlay_config_manager non disponible")
+        return False
+    
+    overlay_config.update_full_config(
+        font={'family': 'SEA', 'size': '64px', 'weight': 'normal'},
+        colors={'text': 'white', 'shadow': 'rgba(0,0,0,0.5)', 'stroke': 'black'},
+        animation={'duration': '1s', 'easing': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'},
+        layout={'paddingLeft': '20px', 'gap': '0'}
+    )
+    log_message("✅ Configuration overlays réinitialisée aux valeurs par défaut")
+    return True
+
+def script_description():
+    """Description du script pour OBS"""
+    return """<h2>🎮 SubCount Auto v2.1</h2>
         log_message(f"❌ Erreur récupération statut: {e}")
     return None
 
@@ -709,28 +804,7 @@ def get_twitch_status():
 # Fonctions OBS
 def script_description():
     """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.0 - Contrôle OBS</h2>
-    
-<p>Script amélioré avec contrôle total depuis OBS.</p>
-
-<h3>📋 Phase 1 - Fonctionnalités Essentielles :</h3>
-<ul>
-<li>✅ Démarrage/Arrêt automatique du serveur</li>
-<li>✅ Status en temps réel (follows/subs/objectifs)</li>
-<li>✅ Boutons +1/-1 pour corrections rapides</li>
-<li>✅ Synchronisation Twitch en un clic</li>
-<li>✅ Accès rapide aux interfaces web</li>
-</ul>
-
-<h3>🎯 Utilisation :</h3>
-<ul>
-<li><strong>Status :</strong> Affichage en temps réel des compteurs</li>
-<li><strong>+1/-1 :</strong> Ajuster manuellement pendant le stream</li>
-<li><strong>Sync :</strong> Resynchroniser avec Twitch API</li>
-<li><strong>Interfaces :</strong> Ouvrir Dashboard/Config/Admin</li>
-</ul>
-
-<p><em>Développé par Bl0uD - v2.1 Phase 1</em></p>"""
+    return """<h2>🎮 SubCount Auto v2.1</h2>"""
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
@@ -778,12 +852,15 @@ def script_tick(seconds):
 
 def script_update(settings):
     """Appelé quand les paramètres changent"""
-    # Forcer le rafraîchissement des propriétés
     pass
 
 def script_defaults(settings):
     """Définit les valeurs par défaut"""
-    pass
+    if OVERLAY_CONFIG_AVAILABLE:
+        obs.obs_data_set_default_string(settings, "overlay_font", "SEA")
+        obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
+        obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
+        obs.obs_data_set_default_string(settings, "overlay_anim_speed", "normal")
 
 def script_properties():
     """Propriétés configurables du script"""
@@ -835,6 +912,83 @@ def script_properties():
         props, "remove_sub", "➖ Retirer 1 Sub", 
         lambda props, prop: remove_sub()
     )
+    
+    # ========== SECTION CONFIGURATION OVERLAYS ==========
+    if OVERLAY_CONFIG_AVAILABLE:
+        obs.obs_properties_add_text(
+            props, "section_overlays", 
+            "\n━━━━━━━━━━━ 🎨 CONFIGURATION OVERLAYS ━━━━━━━━━━━", 
+            obs.OBS_TEXT_INFO
+        )
+        
+        # Dropdown Police
+        font_list = obs.obs_properties_add_list(
+            props,
+            "overlay_font",
+            "📝 Police",
+            obs.OBS_COMBO_TYPE_LIST,
+            obs.OBS_COMBO_FORMAT_STRING
+        )
+        fonts = ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
+        for font in fonts:
+            obs.obs_property_list_add_string(font_list, font, font)
+        obs.obs_property_set_modified_callback(font_list, apply_overlay_font)
+        
+        # Slider Taille
+        obs.obs_properties_add_int_slider(
+            props,
+            "overlay_font_size",
+            "📏 Taille",
+            24, 128, 4
+        )
+        obs.obs_property_set_modified_callback(
+            obs.obs_properties_get(props, "overlay_font_size"),
+            apply_overlay_font
+        )
+        
+        # Dropdown Couleur
+        color_list = obs.obs_properties_add_list(
+            props,
+            "overlay_text_color",
+            "🎨 Couleur",
+            obs.OBS_COMBO_TYPE_LIST,
+            obs.OBS_COMBO_FORMAT_STRING
+        )
+        colors = [
+            ("Blanc", "white"),
+            ("Rouge", "red"),
+            ("Bleu", "blue"),
+            ("Vert", "green"),
+            ("Jaune", "yellow"),
+            ("Violet", "purple"),
+            ("Orange", "orange")
+        ]
+        for name, value in colors:
+            obs.obs_property_list_add_string(color_list, name, value)
+        obs.obs_property_set_modified_callback(color_list, apply_overlay_colors)
+        
+        # Dropdown Animation
+        anim_list = obs.obs_properties_add_list(
+            props,
+            "overlay_anim_speed",
+            "⚡ Animation",
+            obs.OBS_COMBO_TYPE_LIST,
+            obs.OBS_COMBO_FORMAT_STRING
+        )
+        animations = [
+            ("Rapide", "fast"),
+            ("Normal", "normal"),
+            ("Lent", "slow")
+        ]
+        for name, value in animations:
+            obs.obs_property_list_add_string(anim_list, name, value)
+        obs.obs_property_set_modified_callback(anim_list, apply_overlay_animation)
+        
+        # Bouton Reset
+        obs.obs_properties_add_button(
+            props, "reset_overlay", "🔄 Réinitialiser aux valeurs par défaut", 
+            reset_overlay_config
+        )
     
     # ========== SECTION INTERFACES WEB ==========
     obs.obs_properties_add_text(
