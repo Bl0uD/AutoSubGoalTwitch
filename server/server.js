@@ -3907,6 +3907,123 @@ function generateTestPage() {
 </html>`;
 }
 
+// ==================================================================
+// ðŸŽ¨ SYSTEME DE CONFIGURATION DYNAMIQUE DES OVERLAYS
+// ==================================================================
+
+// Charger la configuration des overlays
+let overlayConfig = {};
+const overlayConfigPath = path.join(ROOT_DIR, 'config', 'overlay_config.json');
+
+function loadOverlayConfig() {
+    try {
+        if (fs.existsSync(overlayConfigPath)) {
+            const data = fs.readFileSync(overlayConfigPath, 'utf8');
+            overlayConfig = JSON.parse(data);
+            logEvent('INFO', 'âœ… Configuration overlay chargÃ©e', overlayConfig);
+        } else {
+            // Configuration par dÃ©faut
+            overlayConfig = {
+                font: { family: 'SEA', size: '64px', weight: 'normal' },
+                colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
+                animation: { duration: '1s', easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+                layout: { paddingLeft: '20px', gap: '0' }
+            };
+            saveOverlayConfig();
+        }
+    } catch (error) {
+        logEvent('ERROR', 'âŒ Erreur chargement config overlay', { error: error.message });
+        overlayConfig = {
+            font: { family: 'SEA', size: '64px', weight: 'normal' },
+            colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
+            animation: { duration: '1s', easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+            layout: { paddingLeft: '20px', gap: '0' }
+        };
+    }
+}
+
+function saveOverlayConfig() {
+    try {
+        fs.writeFileSync(overlayConfigPath, JSON.stringify(overlayConfig, null, 2), 'utf8');
+        logEvent('INFO', 'âœ… Configuration overlay sauvegardÃ©e');
+    } catch (error) {
+        logEvent('ERROR', 'âŒ Erreur sauvegarde config overlay', { error: error.message });
+    }
+}
+
+// API REST pour rÃ©cupÃ©rer la configuration
+app.get('/api/overlay-config', (req, res) => {
+    res.json(overlayConfig);
+});
+
+// API REST pour mettre Ã  jour la configuration depuis Python
+app.post('/api/overlay-config', express.json(), (req, res) => {
+    try {
+        const updates = req.body;
+        
+        // Fusionner les mises Ã  jour avec la config existante
+        if (updates.font) overlayConfig.font = { ...overlayConfig.font, ...updates.font };
+        if (updates.colors) overlayConfig.colors = { ...overlayConfig.colors, ...updates.colors };
+        if (updates.animation) overlayConfig.animation = { ...overlayConfig.animation, ...updates.animation };
+        if (updates.layout) overlayConfig.layout = { ...overlayConfig.layout, ...updates.layout };
+        
+        saveOverlayConfig();
+        
+        // Notifier tous les overlays connectÃ©s via WebSocket
+        broadcastConfigUpdate();
+        
+        logEvent('INFO', 'âœ… Configuration overlay mise Ã  jour depuis Python', updates);
+        res.json({ success: true, config: overlayConfig });
+    } catch (error) {
+        logEvent('ERROR', 'âŒ Erreur mise Ã  jour config', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// WebSocket Server pour communication temps rÃ©el avec les overlays
+const overlayWss = new WebSocket.Server({ port: 8084 });
+const overlayClients = new Set();
+
+overlayWss.on('connection', (ws) => {
+    overlayClients.add(ws);
+    logEvent('INFO', 'ðŸ"Œ Overlay HTML connectÃ© au WebSocket config');
+    
+    // Envoyer la configuration actuelle au nouveau client
+    ws.send(JSON.stringify({
+        type: 'config_update',
+        config: overlayConfig
+    }));
+    
+    ws.on('close', () => {
+        overlayClients.delete(ws);
+        logEvent('INFO', 'ðŸ"Œ Overlay HTML dÃ©connectÃ© du WebSocket config');
+    });
+    
+    ws.on('error', (error) => {
+        logEvent('ERROR', 'âŒ Erreur WebSocket overlay', { error: error.message });
+        overlayClients.delete(ws);
+    });
+});
+
+function broadcastConfigUpdate() {
+    const message = JSON.stringify({
+        type: 'config_update',
+        config: overlayConfig
+    });
+    
+    overlayClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+    
+    logEvent('INFO', `ðŸ"¡ Config diffusÃ©e Ã  ${overlayClients.size} overlays`);
+}
+
+// Charger la config au dÃ©marrage
+loadOverlayConfig();
+
+// ==================================================================
 // DÃ©marrage du serveur
 app.listen(PORT, () => {
     console.log('ðŸš€ SubCount Auto Server - Device Code Grant Flow v2.0');
