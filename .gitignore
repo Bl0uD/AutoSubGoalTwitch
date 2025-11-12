@@ -38,7 +38,40 @@ desktop.ini
 *.tmp
 temp/
 
-# Scripts de restructuration temporaires
-restructure.ps1
-restructure_simple.ps1
-update_paths.ps1
+# ============================================================
+# FICHIERS DE DÉVELOPPEMENT (non nécessaires pour utilisateurs)
+# ============================================================
+
+# Scripts de test et développement
+scripts/test_*.py
+scripts/*test*.py
+scripts/debug_*.py
+
+# Scripts de restructuration/déploiement (déjà utilisés)
+scripts/restructure*.ps1
+scripts/update_paths.ps1
+scripts/deploy*.ps1
+scripts/fix_*.ps1
+
+# Fichiers de backup/corruption (debug uniquement)
+*.backup
+*.corrupt
+*.old
+*.bak
+
+# Fichiers de développement Python
+*_dev.py
+*_test.py
+debug_*.py
+
+# Documentation de développement
+docs/dev/
+docs/debug/
+DEVELOPMENT.md
+TODO.md
+
+# Fichiers de configuration locaux de développement
+.env.local
+.env.development
+config.local.*
+
