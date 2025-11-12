@@ -172,22 +172,30 @@ def update_overlay_font(font_name, font_size, text_color):
     
     return success_count > 0
 
-def apply_font_settings(props, prop, settings):
-    """Applique les paramètres de police sélectionnés"""
+def apply_font_settings(props, prop):
+    """Applique les paramètres de police sélectionnés (callback OBS)"""
     global selected_font, selected_font_size, selected_text_color
+    
+    # Récupérer les valeurs actuelles depuis les propriétés
+    settings = obs.obs_properties_get_settings(props)
     
     selected_font = obs.obs_data_get_string(settings, "font_family")
     selected_font_size = obs.obs_data_get_int(settings, "font_size")
     selected_text_color = obs.obs_data_get_string(settings, "text_color")
     
-    if not selected_font:
+    # Valeurs par défaut si vides
+    if not selected_font or selected_font == "":
         selected_font = "SEA"
     if selected_font_size == 0:
         selected_font_size = 64
-    if not selected_text_color:
+    if not selected_text_color or selected_text_color == "":
         selected_text_color = "white"
     
+    # Appliquer les modifications
     update_overlay_font(selected_font, selected_font_size, selected_text_color)
+    
+    # Libérer les données
+    obs.obs_data_release(settings)
     
     return True
 
