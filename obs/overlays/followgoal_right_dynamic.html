@@ -451,8 +451,11 @@
         }
         
         function forceRecalculateDisplay() {
+            console.log(' Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
             currentText = "";
+            counterEl.innerHTML = "";
+            void counterEl.offsetHeight;
             updateCounter(currentDisplayText);
         }
         

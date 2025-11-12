@@ -170,10 +170,20 @@
         function applyConfig(config) {
             const root = document.documentElement;
             
+            let fontChanged = false;
+            
             // Appliquer la police
             if (config.font) {
-                if (config.font.family) root.style.setProperty('--font-family', config.font.family);
-                if (config.font.size) root.style.setProperty('--font-size', config.font.size);
+                if (config.font.family) {
+                    const oldFont = root.style.getPropertyValue('--font-family');
+                    root.style.setProperty('--font-family', config.font.family);
+                    if (oldFont && oldFont !== config.font.family) fontChanged = true;
+                }
+                if (config.font.size) {
+                    const oldSize = root.style.getPropertyValue('--font-size');
+                    root.style.setProperty('--font-size', config.font.size);
+                    if (oldSize && oldSize !== config.font.size) fontChanged = true;
+                }
                 if (config.font.weight) root.style.setProperty('--font-weight', config.font.weight);
             }
             
@@ -198,8 +208,19 @@
             
             console.log('✅ Configuration appliquée avec succès');
             
-            // Forcer le rafraîchissement de l'affichage
-            setTimeout(forceRecalculateDisplay, 100);
+            // Si la police a changé, forcer plusieurs recalculs pour être sûr
+            if (fontChanged) {
+                console.log('🔄 Police changée - Recalcul des dimensions...');
+                // Premier recalcul rapide
+                setTimeout(forceRecalculateDisplay, 50);
+                // Deuxième recalcul pour s'assurer
+                setTimeout(forceRecalculateDisplay, 200);
+                // Troisième recalcul final
+                setTimeout(forceRecalculateDisplay, 500);
+            } else {
+                // Sinon un seul recalcul suffit
+                setTimeout(forceRecalculateDisplay, 100);
+            }
         }
         
         async function loadInitialConfig() {
@@ -451,8 +472,14 @@
         }
         
         function forceRecalculateDisplay() {
+            console.log('🔄 Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
+            // Vider complètement
             currentText = "";
+            counterEl.innerHTML = "";
+            // Forcer un reflow du navigateur
+            void counterEl.offsetHeight;
+            // Reconstruire avec les nouvelles dimensions
             updateCounter(currentDisplayText);
         }
         
