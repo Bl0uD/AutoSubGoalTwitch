@@ -961,67 +961,97 @@ def script_properties():
     """Propriétés configurables du script"""
     props = obs.obs_properties_create()
     
-    # ========== SECTION CONTROLES RAPIDES ==========
+    # ========== CONTRÔLES RAPIDES ==========
     obs.obs_properties_add_text(
         props, "section_controls", 
-        "━━━━━━━━━━━ 🎛️ CONTRÔLES RAPIDES ━━━━━━━━━━━", 
+        "─────────────────────────────────────", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    obs.obs_properties_add_text(
+        props, "header_controls", 
+        "🎛️  CONTRÔLES RAPIDES", 
         obs.OBS_TEXT_INFO
     )
     
     # Bouton Sync Twitch
     obs.obs_properties_add_button(
-        props, "sync_twitch", "🔄 Synchroniser avec Twitch", 
+        props, "sync_twitch", "🔄  Synchroniser avec Twitch", 
         lambda props, prop: sync_with_twitch()
     )
     
-    # ========== SECTION FOLLOWS ==========
+    # ========== FOLLOWS ==========
+    obs.obs_properties_add_text(
+        props, "spacer1", 
+        " ", 
+        obs.OBS_TEXT_INFO
+    )
+    
     obs.obs_properties_add_text(
         props, "section_follows", 
-        "\n👥 FOLLOWS", 
+        "👥  FOLLOWS", 
         obs.OBS_TEXT_INFO
     )
     
     obs.obs_properties_add_button(
-        props, "add_follow", "➕ Ajouter 1 Follow", 
+        props, "add_follow", "  ➕  Ajouter 1 Follow", 
         lambda props, prop: add_follow()
     )
     
     obs.obs_properties_add_button(
-        props, "remove_follow", "➖ Retirer 1 Follow", 
+        props, "remove_follow", "  ➖  Retirer 1 Follow", 
         lambda props, prop: remove_follow()
     )
     
-    # ========== SECTION SUBS ==========
+    # ========== SUBS ==========
+    obs.obs_properties_add_text(
+        props, "spacer2", 
+        " ", 
+        obs.OBS_TEXT_INFO
+    )
+    
     obs.obs_properties_add_text(
         props, "section_subs", 
-        "\n⭐ SUBS", 
+        "⭐  SUBS", 
         obs.OBS_TEXT_INFO
     )
     
     obs.obs_properties_add_button(
-        props, "add_sub", "➕ Ajouter 1 Sub (Tier 1)", 
+        props, "add_sub", "  ➕  Ajouter 1 Sub (Tier 1)", 
         lambda props, prop: add_sub()
     )
     
     obs.obs_properties_add_button(
-        props, "remove_sub", "➖ Retirer 1 Sub", 
+        props, "remove_sub", "  ➖  Retirer 1 Sub", 
         lambda props, prop: remove_sub()
     )
     
-    # ========== SECTION CONFIGURATION OVERLAYS ==========
+    # ========== CONFIGURATION OVERLAYS ==========
     if OVERLAY_CONFIG_AVAILABLE:
         obs.obs_properties_add_text(
-            props, "section_overlays", 
-            "\n━━━━━━━━━━━ 🎨 CONFIGURATION OVERLAYS ━━━━━━━━━━━", 
+            props, "spacer3", 
+            " ", 
             obs.OBS_TEXT_INFO
         )
         
-        # Dropdown Police - Charger toutes les polices Windows
+        obs.obs_properties_add_text(
+            props, "separator_overlays", 
+            "─────────────────────────────────────", 
+            obs.OBS_TEXT_INFO
+        )
+        
+        obs.obs_properties_add_text(
+            props, "section_overlays", 
+            "🎨  CONFIGURATION OVERLAYS", 
+            obs.OBS_TEXT_INFO
+        )
+        
+        # Dropdown Police
         font_list = obs.obs_properties_add_list(
             props,
             "overlay_font",
-            "📝 Police",
-            obs.OBS_COMBO_TYPE_EDITABLE,  # Permet la saisie manuelle
+            "  📝  Police",
+            obs.OBS_COMBO_TYPE_EDITABLE,
             obs.OBS_COMBO_FORMAT_STRING
         )
         
@@ -1036,7 +1066,7 @@ def script_properties():
         obs.obs_properties_add_int_slider(
             props,
             "overlay_font_size",
-            "📏 Taille",
+            "  📏  Taille",
             24, 128, 4
         )
         obs.obs_property_set_modified_callback(
@@ -1044,11 +1074,11 @@ def script_properties():
             apply_overlay_font
         )
         
-        # Dropdown Couleur prédéfinie (applique automatiquement au changement)
+        # Dropdown Couleur prédéfinie
         color_list = obs.obs_properties_add_list(
             props,
             "overlay_text_color",
-            "🎨 Couleur prédéfinie",
+            "  🎨  Couleur prédéfinie",
             obs.OBS_COMBO_TYPE_LIST,
             obs.OBS_COMBO_FORMAT_STRING
         )
@@ -1067,56 +1097,66 @@ def script_properties():
         for name, value in colors:
             obs.obs_property_list_add_string(color_list, name, value)
         
-        # Callback pour appliquer automatiquement la couleur prédéfinie
         obs.obs_property_set_modified_callback(color_list, apply_overlay_colors)
         
-        # Séparateur
+        # Séparateur OU
         obs.obs_properties_add_text(
             props, "color_separator", 
-            "   ━━━━━━━━━━━ OU ━━━━━━━━━━━", 
+            "              ─────── OU ───────", 
             obs.OBS_TEXT_INFO
         )
         
-        # Champ texte pour couleur personnalisée (applique en appuyant sur Entrée)
+        # Champ texte pour couleur personnalisée
         custom_color = obs.obs_properties_add_text(
             props,
             "overlay_custom_color",
-            "   🎨 Code couleur CSS (validez avec Entrée)",
+            "  🎨  Code couleur CSS (validez avec Entrée)",
             obs.OBS_TEXT_DEFAULT
         )
         obs.obs_property_set_long_description(
             custom_color,
-            "Exemples: #FF5733, rgb(255,87,51), rgba(255,87,51,0.8), white\nAppuyez sur Entrée pour appliquer"
+            "Ex: #FFF00, rgb(255,87,51), rgba(255,87,51,0.8)"
         )
         
-        # Callback pour appliquer le code couleur quand on valide le champ
         obs.obs_property_set_modified_callback(custom_color, apply_custom_color)
         
         # Bouton Reset
         obs.obs_properties_add_button(
-            props, "reset_overlay", "🔄 Réinitialiser aux valeurs par défaut", 
+            props, "reset_overlay", "  🔄  Réinitialiser aux valeurs par défaut", 
             reset_overlay_config
         )
     
-    # ========== SECTION INTERFACES WEB ==========
+    # ========== INTERFACES WEB ==========
+    obs.obs_properties_add_text(
+        props, "spacer4", 
+        " ", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    obs.obs_properties_add_text(
+        props, "separator_web", 
+        "─────────────────────────────────────", 
+        obs.OBS_TEXT_INFO
+    )
+    
     obs.obs_properties_add_text(
         props, "section_web", 
-        "\n━━━━━━━━━━━ 🌐 INTERFACES WEB ━━━━━━━━━━━", 
+        "🌐  INTERFACES WEB", 
         obs.OBS_TEXT_INFO
     )
     
     obs.obs_properties_add_button(
-        props, "open_dashboard", "🏠 Ouvrir Dashboard", 
+        props, "open_dashboard", "  🏠  Dashboard", 
         lambda props, prop: open_dashboard()
     )
     
     obs.obs_properties_add_button(
-        props, "open_config", "⚙️ Ouvrir Configuration", 
+        props, "open_config", "  ⚙️  Configuration", 
         lambda props, prop: open_config()
     )
     
     obs.obs_properties_add_button(
-        props, "open_admin", "🔧 Ouvrir Panel Admin", 
+        props, "open_admin", "  🔧  Panel Admin", 
         lambda props, prop: open_admin()
     )
     
@@ -1145,7 +1185,7 @@ def script_properties():
     )
     
     obs.obs_properties_add_button(
-        props, "restart_server", "� Redémarrer Serveur", 
+        props, "restart_server", "    Redémarrer Serveur", 
         lambda props, prop: restart_server()
     )
     

@@ -1,11 +1,11 @@
 {
   "font": {
-    "family": "sEA",
+    "family": "ariali",
     "size": "64px",
     "weight": "normal"
   },
   "colors": {
-    "text": "white",
+    "text": "#FF0000",
     "shadow": "rgba(0,0,0,0.5)",
     "stroke": "black"
   },
