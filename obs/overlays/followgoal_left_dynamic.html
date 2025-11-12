@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
-    <title>Subgoal Left - Dynamic Config</title>
+    <title>Followgoal Left - Dynamic Config</title>
     <style>
         @font-face {
             font-family: 'SEA';
@@ -128,7 +128,7 @@
 
     <script>
         // ==================================================================
-        // ðŸŽ¨ CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
         // ==================================================================
         
         let configWs = null;
@@ -239,7 +239,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    if (data.type === 'sub_update' && data.goal !== undefined) {
+                    if (data.type === 'follow_update' && data.goal !== undefined) {
                         const goal = data.goal;
                         
                         // Formater le texte selon la structure de goal

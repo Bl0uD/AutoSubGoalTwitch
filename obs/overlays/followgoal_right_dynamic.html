@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
-    <title>Subgoal Left - Dynamic Config</title>
+    <title>Followgoal Right - Dynamic Config</title>
     <style>
         @font-face {
             font-family: 'SEA';
@@ -20,7 +20,7 @@
             --stroke-color: black;
             --anim-duration: 1s;
             --anim-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            --padding-left: 20px;
+            --padding-right: 20px;
             --gap: 0;
         }
         
@@ -29,12 +29,12 @@
             margin: 0;
             font-family: var(--font-family), monospace;
             display: flex;
-            justify-content: flex-start;
+            justify-content: flex-end;
             align-items: center;
             height: 100vh;
             color: var(--text-color);
-            padding-left: var(--padding-left);
-            padding-right: 0;
+            padding-left: 0;
+            padding-right: var(--padding-right);
         }
 
         .counter {
@@ -128,7 +128,7 @@
 
     <script>
         // ==================================================================
-        // ðŸŽ¨ CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
         // ==================================================================
         
         let configWs = null;
@@ -194,7 +194,7 @@
             
             // Appliquer la mise en page
             if (config.layout) {
-                if (config.layout.paddingLeft) root.style.setProperty('--padding-left', config.layout.paddingLeft);
+                if (config.layout.paddingLeft) root.style.setProperty('--padding-right', config.layout.paddingLeft);
                 if (config.layout.gap) root.style.setProperty('--gap', config.layout.gap);
             }
             
@@ -239,7 +239,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    if (data.type === 'sub_update' && data.goal !== undefined) {
+                    if (data.type === 'follow_update' && data.goal !== undefined) {
                         const goal = data.goal;
                         
                         // Formater le texte selon la structure de goal
