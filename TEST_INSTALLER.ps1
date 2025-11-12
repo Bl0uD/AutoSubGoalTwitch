@@ -109,7 +109,7 @@ $files = @(
     "server\server.js",
     "server\package.json",
     "scripts\START_SERVER.bat",
-    "subcount_auto.py",
+    "obs\obs_subcount_auto.py",
     "INSTALLER.bat",
     "README.md"
 )
