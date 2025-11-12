@@ -247,23 +247,26 @@
 
             const chars = newText.split("");
             counterEl.innerHTML = "";
-            // Créer un canvas pour mesure ultra-précise (méthode la plus fiable)
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+            // Créer un div de mesure avec EXACTEMENT les mêmes styles que counter
+            const measureDiv = document.createElement("div");
+            measureDiv.style.visibility = "hidden";
+            measureDiv.style.position = "absolute";
+            measureDiv.style.whiteSpace = "nowrap";
+            measureDiv.style.display = "inline-block";
             
-            // Récupérer les styles CSS variables actuels
-            const rootStyles = getComputedStyle(document.documentElement);
+            // Copier TOUS les styles computés du counter (la clé pour une mesure exacte)
             const counterStyles = getComputedStyle(counterEl);
+            measureDiv.style.fontSize = counterStyles.fontSize;
+            measureDiv.style.fontFamily = counterStyles.fontFamily;
+            measureDiv.style.fontWeight = counterStyles.fontWeight;
+            measureDiv.style.fontStyle = counterStyles.fontStyle;
+            measureDiv.style.letterSpacing = counterStyles.letterSpacing;
+            measureDiv.style.textShadow = counterStyles.textShadow;
+            measureDiv.style.webkitTextStroke = counterStyles.webkitTextStroke;
             
-            const fontSize = rootStyles.getPropertyValue('--font-size').trim();
-            const fontFamily = rootStyles.getPropertyValue('--font-family').trim();
-            const fontWeight = rootStyles.getPropertyValue('--font-weight').trim() || 'normal';
+            console.log(` Mesure avec styles computés: ${counterStyles.fontFamily} ${counterStyles.fontSize}`);
             
-            // Construire la chaîne font pour canvas (format: "weight size family")
-            const fontString = `${fontWeight} ${fontSize} ${fontFamily}`;
-            ctx.font = fontString;
-            
-            console.log(` Mesure CANVAS avec: ${fontString}`);
+            document.body.appendChild(measureDiv);
 
             const totalChars = Math.max(chars.length, currentText.length);
             let changedCount = 0;
@@ -287,13 +290,10 @@
                     const container = document.createElement("div");
                     container.className = "digit-container";
 
-                    // Mesurer la largeur avec canvas.measureText() (ultra-précis)
-                    const metrics = ctx.measureText(char);
-                    const charWidth = metrics.width;
-                    
-                    // Note: text-shadow et stroke ajoutent ~4-6px visuellement
-                    const shadowStrokeOffset = 5;
-                    container.style.width = `${Math.max(charWidth + shadowStrokeOffset, 10)}px`;
+                    // Mesurer avec getBoundingClientRect() car measureDiv a les MÊMES styles
+                    measureDiv.textContent = char;
+                    const charWidth = measureDiv.getBoundingClientRect().width;
+                    container.style.width = `${Math.max(charWidth, 10)}px`;
 
                     const currentChar = currentText[index] || "";
                     const charChanged = char !== currentChar;
@@ -317,7 +317,7 @@
                 }
             });
 
-            // Plus besoin de removeChild (on n'utilise plus measureDiv)
+            document.body.removeChild(measureDiv);
             currentText = newText;
         }
         
