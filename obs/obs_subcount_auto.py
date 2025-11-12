@@ -121,12 +121,28 @@ def log_message(message, level="info", force_display=False):
 
 def get_windows_fonts():
     """
-    Récupère la liste de toutes les polices installées sur Windows
+    Récupère la liste de toutes les polices installées sur Windows (polices mères uniquement, sans variantes)
     
     Returns:
-        list: Liste des noms de polices disponibles
+        list: Liste des noms de polices disponibles (sans Bold, Italic, Light, etc.)
     """
     fonts = set()
+    
+    # Variantes à filtrer (case-insensitive)
+    variants = [
+        'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'black', 'heavy',
+        'semibold', 'semi bold', 'demibold', 'demi bold', 'extrabold', 'extra bold',
+        'extralight', 'extra light', 'ultralight', 'ultra light', 'ultrabold', 'ultra bold',
+        'condensed', 'extended', 'narrow', 'wide', 'regular', 'normal', 'book', 'roman'
+    ]
+    
+    def is_variant(font_name):
+        """Vérifie si le nom contient une variante"""
+        name_lower = font_name.lower()
+        for variant in variants:
+            if variant in name_lower:
+                return True
+        return False
     
     try:
         # Méthode 1: Lire le registre Windows
@@ -143,13 +159,8 @@ def get_windows_fonts():
                     # Retirer "&" parfois présent
                     clean_name = clean_name.replace('&', '')
                     
-                    # Si c'est un fichier .ttf ou .otf, extraire le nom du fichier
-                    if isinstance(font_file, str) and (font_file.endswith('.ttf') or font_file.endswith('.otf')):
-                        file_base = os.path.splitext(font_file)[0]
-                        fonts.add(file_base)
-                    
-                    # Ajouter aussi le nom nettoyé
-                    if clean_name:
+                    # Filtrer les variantes
+                    if not is_variant(clean_name):
                         fonts.add(clean_name)
                     
                     i += 1
@@ -167,10 +178,18 @@ def get_windows_fonts():
                 if font_file.endswith(('.ttf', '.otf')):
                     # Extraire le nom sans extension
                     font_name = os.path.splitext(font_file)[0]
-                    # Nettoyer les suffixes courants
-                    for suffix in ['-Regular', '-Bold', '-Italic', '-Light', 'Regular', 'Bold', 'Italic', 'Light']:
+                    
+                    # Nettoyer les suffixes avec tirets ou espaces
+                    for suffix in ['-Regular', '-Bold', '-Italic', '-Light', '-Medium', '-Black', 
+                                   '-Thin', '-SemiBold', '-ExtraBold', 'Regular', 'Bold', 'Italic', 
+                                   'Light', 'Medium', 'Black', 'Thin']:
                         font_name = font_name.replace(suffix, '')
-                    fonts.add(font_name.strip())
+                    
+                    font_name = font_name.strip()
+                    
+                    # Ne garder que si ce n'est pas une variante
+                    if font_name and not is_variant(font_name):
+                        fonts.add(font_name)
         
         # Convertir en liste triée
         font_list = sorted(list(fonts), key=str.lower)
@@ -192,6 +211,8 @@ def get_windows_fonts():
         # Assurer que SEA est toujours présent
         if not any(f.lower() == 'sea' for f in result):
             result.insert(0, 'SEA')
+        
+        log_message(f"✅ {len(result)} polices mères chargées (variantes filtrées)", level="info")
         
         return result if len(result) > 0 else ["SEA", "Arial", "Verdana", "Georgia", "Impact"]
         
