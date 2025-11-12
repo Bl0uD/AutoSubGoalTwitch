@@ -873,79 +873,16 @@ def script_properties():
     """Propriétés configurables du script"""
     props = obs.obs_properties_create()
     
-    # ========== SECTION APPARENCE ==========
-    obs.obs_properties_add_text(
-        props, "section_appearance", 
-        "━━━━━━━━━━━ 🎨 APPARENCE DES OVERLAYS ━━━━━━━━━━━", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    # Liste déroulante des polices Windows
-    font_list = obs.obs_properties_add_list(
-        props, "font_family", "📝 Police d'écriture :",
-        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
-    )
-    
-    # Charger les polices Windows
-    windows_fonts = get_windows_fonts()
-    for font in windows_fonts:
-        obs.obs_property_list_add_string(font_list, font, font)
-    
-    # Taille de la police
-    obs.obs_properties_add_int_slider(
-        props, "font_size", "📏 Taille (px) :", 
-        24, 200, 1
-    )
-    
-    # Couleur du texte (liste déroulante)
-    color_list = obs.obs_properties_add_list(
-        props, "text_color", "🎨 Couleur du texte :",
-        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
-    )
-    
-    # Ajouter des couleurs communes
-    colors = [
-        ("Blanc", "white"),
-        ("Noir", "black"),
-        ("Rouge", "red"),
-        ("Bleu", "blue"),
-        ("Vert", "green"),
-        ("Jaune", "yellow"),
-        ("Orange", "orange"),
-        ("Violet", "purple"),
-        ("Rose", "pink"),
-        ("Cyan", "cyan"),
-        ("Or", "#FFD700"),
-        ("Argent", "#C0C0C0")
-    ]
-    
-    for label, value in colors:
-        obs.obs_property_list_add_string(color_list, label, value)
-    
-    # Bouton appliquer
-    obs.obs_properties_add_button(
-        props, "apply_font", "✅ Appliquer la Police", 
-        apply_font_settings
-    )
-    
-    obs.obs_properties_add_text(
-        props, "font_info", 
-        "💡 Astuce : Après avoir appliqué, ajoutez à l'URL de votre source navigateur OBS :\n"
-        "   ?font=VotrePolice&size=64&color=white\n"
-        "   Exemple : file:///C:/path/subgoal_left.html?font=Impact&size=80&color=yellow", 
-        obs.OBS_TEXT_INFO
-    )
-    
     # ========== SECTION CONTROLES RAPIDES ==========
     obs.obs_properties_add_text(
         props, "section_controls", 
-        "\n━━━━━━━━━━━ 🎛️ CONTRÔLES RAPIDES ━━━━━━━━━━━", 
+        "━━━━━━━━━━━ �️ CONTRÔLES RAPIDES ━━━━━━━━━━━", 
         obs.OBS_TEXT_INFO
     )
     
     # Bouton Sync Twitch
     obs.obs_properties_add_button(
-        props, "sync_twitch", "🔄 Synchroniser avec Twitch", 
+        props, "sync_twitch", "� Synchroniser avec Twitch", 
         lambda props, prop: sync_with_twitch()
     )
     
@@ -986,7 +923,7 @@ def script_properties():
     # ========== SECTION INTERFACES WEB ==========
     obs.obs_properties_add_text(
         props, "section_web", 
-        "\n━━━━━━━━━━━ 🌐 INTERFACES WEB ━━━━━━━━━━━", 
+        "\n━━━━━━━━━━━ � INTERFACES WEB ━━━━━━━━━━━", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1005,10 +942,10 @@ def script_properties():
         lambda props, prop: open_admin()
     )
     
-    # ========== SECTION TWITCH (NOUVEAU) ==========
+    # ========== SECTION TWITCH ==========
     obs.obs_properties_add_text(
         props, "section_twitch", 
-        "\n━━━━━━━━━━━ 🔐 COMPTE TWITCH ━━━━━━━━━━━", 
+        "\n━━━━━━━━━━━ � COMPTE TWITCH ━━━━━━━━━━━", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1030,13 +967,85 @@ def script_properties():
     )
     
     obs.obs_properties_add_button(
-        props, "restart_server", "� Redémarrer Serveur", 
+        props, "restart_server", "🔄 Redémarrer Serveur", 
         lambda props, prop: restart_server()
     )
     
     obs.obs_properties_add_button(
         props, "stop_server", "⏹️ Arrêter Serveur", 
         lambda props, prop: stop_server()
+    )
+    
+    # ========== SECTION APPARENCE (EN BAS) ==========
+    obs.obs_properties_add_text(
+        props, "section_appearance", 
+        "\n━━━━━━━━━━━ � APPARENCE DES OVERLAYS ━━━━━━━━━━━", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Liste déroulante des polices Windows
+    font_list = obs.obs_properties_add_list(
+        props, "font_family", "📝 Police d'écriture :",
+        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    # Charger les polices Windows
+    try:
+        windows_fonts = get_windows_fonts()
+        for font in windows_fonts:
+            obs.obs_property_list_add_string(font_list, font, font)
+    except Exception as e:
+        log_message(f"⚠️ Erreur chargement polices: {e}", level="warning")
+        # Fallback sur polices communes
+        common_fonts = ['SEA', 'Arial', 'Impact', 'Segoe UI', 'Calibri', 'Comic Sans MS']
+        for font in common_fonts:
+            obs.obs_property_list_add_string(font_list, font, font)
+    
+    # Taille de la police
+    obs.obs_properties_add_int_slider(
+        props, "font_size", "� Taille (px) :", 
+        24, 200, 1
+    )
+    
+    # Couleur du texte (liste déroulante)
+    color_list = obs.obs_properties_add_list(
+        props, "text_color", "🎨 Couleur du texte :",
+        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    # Ajouter des couleurs communes
+    colors = [
+        ("Blanc", "white"),
+        ("Noir", "black"),
+        ("Rouge", "red"),
+        ("Bleu", "blue"),
+        ("Vert", "green"),
+        ("Jaune", "yellow"),
+        ("Orange", "orange"),
+        ("Violet", "purple"),
+        ("Rose", "pink"),
+        ("Cyan", "cyan"),
+        ("Or", "#FFD700"),
+        ("Argent", "#C0C0C0")
+    ]
+    
+    for label, value in colors:
+        obs.obs_property_list_add_string(color_list, label, value)
+    
+    # Bouton appliquer
+    obs.obs_properties_add_button(
+        props, "apply_font", "✅ Appliquer la Police", 
+        apply_font_settings
+    )
+    
+    obs.obs_properties_add_text(
+        props, "font_info", 
+        "💡 Aide : Après avoir cliqué sur 'Appliquer', ajoutez ces paramètres à l'URL\n"
+        "   de votre source navigateur OBS (à la fin de l'URL) :\n"
+        "   ?font=NomPolice&size=64&color=white\n\n"
+        "   Exemple complet :\n"
+        "   file:///C:/path/subgoal_left.html?font=Impact&size=80&color=yellow", 
+        obs.OBS_TEXT_INFO
     )
     
     return props
@@ -1056,28 +1065,39 @@ def restart_server():
 # Fonctions OBS
 def script_description():
     """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.0 - Contrôle OBS</h2>
+    return """<h2>🎮 SubCount Auto v2.1 - Contrôle OBS</h2>
     
-<p>Script amélioré avec contrôle total depuis OBS.</p>
+<p>Script amélioré avec contrôle total depuis OBS et personnalisation des polices.</p>
 
-<h3>📋 Phase 1 - Fonctionnalités Essentielles :</h3>
+<h3>🎨 Nouveau : Personnalisation Apparence</h3>
+<ul>
+<li>✅ Sélection de la police d'écriture (toutes les polices Windows)</li>
+<li>✅ Réglage de la taille (24-200px)</li>
+<li>✅ Choix de la couleur (12 couleurs + custom)</li>
+<li>✅ Application en temps réel sur les overlays</li>
+</ul>
+
+<h3>📋 Fonctionnalités Principales :</h3>
 <ul>
 <li>✅ Démarrage/Arrêt automatique du serveur</li>
 <li>✅ Status en temps réel (follows/subs/objectifs)</li>
 <li>✅ Boutons +1/-1 pour corrections rapides</li>
 <li>✅ Synchronisation Twitch en un clic</li>
 <li>✅ Accès rapide aux interfaces web</li>
+<li>✅ Gestion compte Twitch (connexion/déconnexion)</li>
 </ul>
 
 <h3>🎯 Utilisation :</h3>
 <ul>
-<li><strong>Status :</strong> Affichage en temps réel des compteurs</li>
+<li><strong>Apparence :</strong> Personnalisez police, taille et couleur des overlays</li>
 <li><strong>+1/-1 :</strong> Ajuster manuellement pendant le stream</li>
 <li><strong>Sync :</strong> Resynchroniser avec Twitch API</li>
 <li><strong>Interfaces :</strong> Ouvrir Dashboard/Config/Admin</li>
 </ul>
 
-<p><em>Développé par Bl0uD - v2.1 Phase 1</em></p>"""
+<p><strong>⚠️ Important :</strong> Après modification, rechargez le script (bouton ⟳)</p>
+
+<p><em>Développé par Bl0uD - v2.1</em></p>"""
 
 # Point d'entrée principal
 if __name__ == "__main__":
