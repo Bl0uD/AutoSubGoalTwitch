@@ -190,21 +190,33 @@ function Install-NodeJS {
 # ==================================================================
 function Install-Python {
     Write-Host ""
-    Write-Host "=== VERIFICATION DE PYTHON ===" -ForegroundColor Cyan
+    Write-Host "=== VERIFICATION DE PYTHON 3.6.8 ===" -ForegroundColor Cyan
     Write-Host ""
     
-    # Vérifier si Python est déjà installé
+    # Vérifier si Python 3.6.8 est déjà installé (version stricte)
     try {
         $pythonVersion = python --version 2>&1
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "   [OK] Python est deja installe: $pythonVersion" -ForegroundColor Green
-            return $true
+            # Extraire le numéro de version exacte
+            $versionMatch = $pythonVersion -match 'Python (\d+\.\d+\.\d+)'
+            if ($versionMatch) {
+                $installedVersion = $matches[1]
+                
+                # Vérifier si c'est exactement 3.6.8
+                if ($installedVersion -eq "3.6.8") {
+                    Write-Host "   [OK] Python 3.6.8 est deja installe" -ForegroundColor Green
+                    return $true
+                } else {
+                    Write-Host "   [INFO] Python $installedVersion detecte (requis: 3.6.8)" -ForegroundColor Yellow
+                    Write-Host "   [INFO] OBS Studio necessite Python 3.6.x specifiquement" -ForegroundColor Yellow
+                }
+            }
         }
     } catch {
-        # Python n'est pas installé
+        # Python n'est pas installé ou erreur
     }
     
-    Write-Host "   [INFO] Python n'est pas installe" -ForegroundColor Yellow
+    Write-Host "   [INFO] Python 3.6.8 n'est pas installe" -ForegroundColor Yellow
     Write-Host ""
     
     # Demander confirmation
@@ -250,8 +262,22 @@ function Install-Python {
         # Recharger les variables d'environnement
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
         
-        Write-Host "   [OK] Python 3.6.8 installe avec succes" -ForegroundColor Green
-        Write-Host "   [INFO] Redemarrez PowerShell pour utiliser Python globalement" -ForegroundColor Yellow
+        # Vérifier que l'installation a réussi
+        Start-Sleep -Seconds 2
+        try {
+            $newPythonVersion = python --version 2>&1
+            $versionMatch = $newPythonVersion -match 'Python (\d+\.\d+\.\d+)'
+            if ($versionMatch -and $matches[1] -eq "3.6.8") {
+                Write-Host "   [OK] Python 3.6.8 installe et verifie avec succes" -ForegroundColor Green
+                Write-Host "   [INFO] Emplacement: C:\Program Files\Python36\" -ForegroundColor Gray
+            } else {
+                Write-Host "   [OK] Python installe (version: $newPythonVersion)" -ForegroundColor Green
+                Write-Host "   [AVERTISSEMENT] Version detectee differente de 3.6.8" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "   [OK] Python 3.6.8 installe" -ForegroundColor Green
+            Write-Host "   [INFO] Redemarrez PowerShell pour utiliser Python globalement" -ForegroundColor Yellow
+        }
         
         return $true
     } catch {

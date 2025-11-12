@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8" />
     <title>Subgoal Left - Device Code Grant</title>
+    <script>
+        // Récupérer les paramètres d'URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const customFont = urlParams.get('font') || 'SEA';
+        const fontSize = urlParams.get('size') || '64';
+        const textColor = urlParams.get('color') || 'white';
+    </script>
     <style>
         @font-face {
             font-family: 'SEA';
@@ -13,19 +20,19 @@
         body {
             background: transparent;
             margin: 0;
-            font-family: 'SEA', monospace;
+            font-family: var(--custom-font, 'SEA'), monospace;
             display: flex;
             justify-content: flex-start; /* Alignement à gauche */
             align-items: center;
             height: 100vh;
-            color: white;
+            color: var(--text-color, white);
             padding-left: 20px; /* Espace sur le côté gauche */
             padding-right: 0; /* Supprimer l'espace à droite */
         }
 
         .counter {
             display: flex;
-            font-size: 64px;
+            font-size: var(--font-size, 64px);
             gap: 0; /* Pas d'espace entre les conteneurs */
             white-space: pre; /* Préserver les espaces */
             text-shadow: 3px 3px 3px rgba(0,0,0,0.5); /* Ombre plus prononcée */
@@ -111,6 +118,12 @@
             animation: slideInUp 0.4s forwards ease-in-out;
         }
     </style>
+    <script>
+        // Appliquer les variables CSS depuis les paramètres d'URL
+        document.documentElement.style.setProperty('--custom-font', customFont);
+        document.documentElement.style.setProperty('--font-size', fontSize + 'px');
+        document.documentElement.style.setProperty('--text-color', textColor);
+    </script>
 </head>
 <body>
 

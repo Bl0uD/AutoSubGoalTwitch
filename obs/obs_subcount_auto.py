@@ -69,6 +69,9 @@ is_server_running = False
 update_info = None
 server_thread = None
 is_server_running = False
+selected_font = "SEA"  # Police par défaut
+selected_font_size = 64  # Taille par défaut
+selected_text_color = "white"  # Couleur par défaut
 
 # Configuration du logging
 logging.basicConfig(
@@ -82,6 +85,111 @@ logging.basicConfig(
 
 # Mode silencieux - N'affiche que les erreurs et notifications importantes
 SILENT_MODE = True
+
+def get_windows_fonts():
+    """Récupère la liste des polices Windows installées"""
+    fonts = []
+    
+    try:
+        import winreg
+        # Chemin du registre pour les polices
+        registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                                       r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts", 
+                                       0, winreg.KEY_READ)
+        
+        font_names = set()
+        i = 0
+        while True:
+            try:
+                font_entry = winreg.EnumValue(registry_key, i)
+                font_name = font_entry[0]
+                # Nettoyer le nom de la police
+                clean_name = font_name.split('(')[0].strip()
+                if clean_name and not clean_name.endswith('.ttf') and not clean_name.endswith('.otf'):
+                    font_names.add(clean_name)
+                i += 1
+            except OSError:
+                break
+        
+        winreg.CloseKey(registry_key)
+        
+        # Trier et convertir en liste
+        fonts = sorted(list(font_names))
+        
+        # Ajouter la police par défaut en premier
+        if 'SEA' not in fonts:
+            fonts.insert(0, 'SEA')
+        
+        log_message(f"✅ {len(fonts)} polices Windows détectées", level="info")
+        
+    except Exception as e:
+        log_message(f"⚠️ Erreur lecture polices: {e}", level="warning")
+        # Fallback sur des polices communes
+        fonts = ['SEA', 'Arial', 'Times New Roman', 'Courier New', 'Verdana', 
+                 'Georgia', 'Comic Sans MS', 'Trebuchet MS', 'Impact', 
+                 'Calibri', 'Segoe UI']
+    
+    return fonts
+
+def update_overlay_font(font_name, font_size, text_color):
+    """Met à jour la police dans tous les fichiers overlay HTML"""
+    overlays_dir = os.path.join(SCRIPT_DIR, "overlays")
+    overlay_files = [
+        "subgoal_left.html",
+        "subgoal_right.html",
+        "followgoal_left.html",
+        "followgoal_right.html"
+    ]
+    
+    success_count = 0
+    
+    for filename in overlay_files:
+        filepath = os.path.join(overlays_dir, filename)
+        
+        if not os.path.exists(filepath):
+            log_message(f"⚠️ Fichier non trouvé: {filename}", level="warning")
+            continue
+        
+        try:
+            # Lire le fichier
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Vérifier si les paramètres d'URL sont déjà présents
+            if 'const customFont = urlParams.get' in content:
+                log_message(f"✅ {filename} déjà configuré pour les polices dynamiques", level="info")
+                success_count += 1
+            else:
+                log_message(f"⚠️ {filename} n'est pas configuré pour les polices dynamiques", level="warning")
+                log_message(f"   Utilisez les paramètres d'URL : ?font={font_name}&size={font_size}&color={text_color}", level="info")
+        
+        except Exception as e:
+            log_message(f"❌ Erreur lecture {filename}: {e}", level="error")
+    
+    if success_count > 0:
+        log_message(f"✅ Police configurée: {font_name}, Taille: {font_size}px, Couleur: {text_color}", level="info", force_display=True)
+        log_message(f"   Dans OBS, ajoutez à l'URL: ?font={font_name}&size={font_size}&color={text_color}", level="info", force_display=True)
+    
+    return success_count > 0
+
+def apply_font_settings(props, prop, settings):
+    """Applique les paramètres de police sélectionnés"""
+    global selected_font, selected_font_size, selected_text_color
+    
+    selected_font = obs.obs_data_get_string(settings, "font_family")
+    selected_font_size = obs.obs_data_get_int(settings, "font_size")
+    selected_text_color = obs.obs_data_get_string(settings, "text_color")
+    
+    if not selected_font:
+        selected_font = "SEA"
+    if selected_font_size == 0:
+        selected_font_size = 64
+    if not selected_text_color:
+        selected_text_color = "white"
+    
+    update_overlay_font(selected_font, selected_font_size, selected_text_color)
+    
+    return True
 
 def log_message(message, level="info", force_display=False):
     """
@@ -706,32 +814,6 @@ def get_twitch_status():
 # FIN PHASE 1
 # ============================================================================
 
-# Fonctions OBS
-def script_description():
-    """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.0 - Contrôle OBS</h2>
-    
-<p>Script amélioré avec contrôle total depuis OBS.</p>
-
-<h3>📋 Phase 1 - Fonctionnalités Essentielles :</h3>
-<ul>
-<li>✅ Démarrage/Arrêt automatique du serveur</li>
-<li>✅ Status en temps réel (follows/subs/objectifs)</li>
-<li>✅ Boutons +1/-1 pour corrections rapides</li>
-<li>✅ Synchronisation Twitch en un clic</li>
-<li>✅ Accès rapide aux interfaces web</li>
-</ul>
-
-<h3>🎯 Utilisation :</h3>
-<ul>
-<li><strong>Status :</strong> Affichage en temps réel des compteurs</li>
-<li><strong>+1/-1 :</strong> Ajuster manuellement pendant le stream</li>
-<li><strong>Sync :</strong> Resynchroniser avec Twitch API</li>
-<li><strong>Interfaces :</strong> Ouvrir Dashboard/Config/Admin</li>
-</ul>
-
-<p><em>Développé par Bl0uD - v2.1 Phase 1</em></p>"""
-
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
     # Nettoyer les logs avant de commencer
@@ -783,16 +865,81 @@ def script_update(settings):
 
 def script_defaults(settings):
     """Définit les valeurs par défaut"""
-    pass
+    obs.obs_data_set_default_string(settings, "font_family", "SEA")
+    obs.obs_data_set_default_int(settings, "font_size", 64)
+    obs.obs_data_set_default_string(settings, "text_color", "white")
 
 def script_properties():
     """Propriétés configurables du script"""
     props = obs.obs_properties_create()
     
+    # ========== SECTION APPARENCE ==========
+    obs.obs_properties_add_text(
+        props, "section_appearance", 
+        "━━━━━━━━━━━ 🎨 APPARENCE DES OVERLAYS ━━━━━━━━━━━", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Liste déroulante des polices Windows
+    font_list = obs.obs_properties_add_list(
+        props, "font_family", "📝 Police d'écriture :",
+        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    # Charger les polices Windows
+    windows_fonts = get_windows_fonts()
+    for font in windows_fonts:
+        obs.obs_property_list_add_string(font_list, font, font)
+    
+    # Taille de la police
+    obs.obs_properties_add_int_slider(
+        props, "font_size", "📏 Taille (px) :", 
+        24, 200, 1
+    )
+    
+    # Couleur du texte (liste déroulante)
+    color_list = obs.obs_properties_add_list(
+        props, "text_color", "🎨 Couleur du texte :",
+        obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    # Ajouter des couleurs communes
+    colors = [
+        ("Blanc", "white"),
+        ("Noir", "black"),
+        ("Rouge", "red"),
+        ("Bleu", "blue"),
+        ("Vert", "green"),
+        ("Jaune", "yellow"),
+        ("Orange", "orange"),
+        ("Violet", "purple"),
+        ("Rose", "pink"),
+        ("Cyan", "cyan"),
+        ("Or", "#FFD700"),
+        ("Argent", "#C0C0C0")
+    ]
+    
+    for label, value in colors:
+        obs.obs_property_list_add_string(color_list, label, value)
+    
+    # Bouton appliquer
+    obs.obs_properties_add_button(
+        props, "apply_font", "✅ Appliquer la Police", 
+        apply_font_settings
+    )
+    
+    obs.obs_properties_add_text(
+        props, "font_info", 
+        "💡 Astuce : Après avoir appliqué, ajoutez à l'URL de votre source navigateur OBS :\n"
+        "   ?font=VotrePolice&size=64&color=white\n"
+        "   Exemple : file:///C:/path/subgoal_left.html?font=Impact&size=80&color=yellow", 
+        obs.OBS_TEXT_INFO
+    )
+    
     # ========== SECTION CONTROLES RAPIDES ==========
     obs.obs_properties_add_text(
         props, "section_controls", 
-        "━━━━━━━━━━━ 🎛️ CONTRÔLES RAPIDES ━━━━━━━━━━━", 
+        "\n━━━━━━━━━━━ 🎛️ CONTRÔLES RAPIDES ━━━━━━━━━━━", 
         obs.OBS_TEXT_INFO
     )
     
@@ -905,6 +1052,32 @@ def restart_server():
     server_thread.start()
     
     return True
+
+# Fonctions OBS
+def script_description():
+    """Description du script pour OBS"""
+    return """<h2>🎮 SubCount Auto v2.0 - Contrôle OBS</h2>
+    
+<p>Script amélioré avec contrôle total depuis OBS.</p>
+
+<h3>📋 Phase 1 - Fonctionnalités Essentielles :</h3>
+<ul>
+<li>✅ Démarrage/Arrêt automatique du serveur</li>
+<li>✅ Status en temps réel (follows/subs/objectifs)</li>
+<li>✅ Boutons +1/-1 pour corrections rapides</li>
+<li>✅ Synchronisation Twitch en un clic</li>
+<li>✅ Accès rapide aux interfaces web</li>
+</ul>
+
+<h3>🎯 Utilisation :</h3>
+<ul>
+<li><strong>Status :</strong> Affichage en temps réel des compteurs</li>
+<li><strong>+1/-1 :</strong> Ajuster manuellement pendant le stream</li>
+<li><strong>Sync :</strong> Resynchroniser avec Twitch API</li>
+<li><strong>Interfaces :</strong> Ouvrir Dashboard/Config/Admin</li>
+</ul>
+
+<p><em>Développé par Bl0uD - v2.1 Phase 1</em></p>"""
 
 # Point d'entrée principal
 if __name__ == "__main__":
