@@ -13,8 +13,8 @@ Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.1.0" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Aller dans le dossier du projet
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Aller dans le dossier du projet (remonter d'un niveau depuis scripts/)
+$scriptDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $scriptDir
 
 Write-Host "Dossier d'installation: $scriptDir" -ForegroundColor Yellow
