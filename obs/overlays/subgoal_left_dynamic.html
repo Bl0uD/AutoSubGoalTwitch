@@ -269,11 +269,23 @@
             const chars = newText.split("");
             counterEl.innerHTML = "";
 
+            // Créer un élément de mesure avec TOUS les styles du counter
             const measureDiv = document.createElement("div");
             measureDiv.style.visibility = "hidden";
             measureDiv.style.position = "absolute";
-            measureDiv.style.fontSize = getComputedStyle(document.documentElement).getPropertyValue('--font-size');
-            measureDiv.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-family');
+            measureDiv.style.whiteSpace = "pre";
+            measureDiv.style.display = "inline-block";
+            
+            // Copier tous les styles CSS du root et du counter
+            const rootStyles = getComputedStyle(document.documentElement);
+            const counterStyles = getComputedStyle(counterEl);
+            
+            measureDiv.style.fontSize = rootStyles.getPropertyValue('--font-size').trim();
+            measureDiv.style.fontFamily = rootStyles.getPropertyValue('--font-family').trim();
+            measureDiv.style.fontWeight = rootStyles.getPropertyValue('--font-weight').trim() || 'normal';
+            measureDiv.style.letterSpacing = counterStyles.letterSpacing;
+            measureDiv.style.lineHeight = counterStyles.lineHeight;
+            
             document.body.appendChild(measureDiv);
 
             const totalChars = Math.max(chars.length, currentText.length);
@@ -298,9 +310,19 @@
                     const container = document.createElement("div");
                     container.className = "digit-container";
 
+                    // Mesurer la largeur EXACTE du caractère
                     measureDiv.textContent = char;
-                    const charWidth = measureDiv.getBoundingClientRect().width;
-                    container.style.width = `${Math.max(charWidth, 10)}px`;
+                    const rect = measureDiv.getBoundingClientRect();
+                    const charWidth = Math.ceil(rect.width); // Arrondir au pixel supérieur
+                    
+                    // Forcer la largeur exacte + padding de sécurité
+                    container.style.width = `${charWidth + 4}px`;
+                    container.style.minWidth = `${charWidth + 4}px`;
+                    container.style.maxWidth = `${charWidth + 4}px`;
+                    container.style.overflow = "visible";
+                    container.style.display = "inline-flex";
+                    container.style.justifyContent = "center";
+                    container.style.alignItems = "center";
 
                     const currentChar = currentText[index] || "";
                     const charChanged = char !== currentChar;
