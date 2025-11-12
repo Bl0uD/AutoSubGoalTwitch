@@ -661,7 +661,7 @@ async function canGrantSelfModerator() {
 // Sauvegarder le nombre de follows sur disque pour la persistence
 function saveFollowCountToFile(count) {
     try {
-        const backupPath = path.join(ROOT_DIR, 'followcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'data', 'followcount_backup.txt');
         const timestamp = new Date().toISOString();
         const data = `${count}|${timestamp}`;
         fs.writeFileSync(backupPath, data, 'utf8');
@@ -674,7 +674,7 @@ function saveFollowCountToFile(count) {
 // Charger le nombre de follows depuis le disque
 function loadFollowCountFromFile() {
     try {
-        const backupPath = path.join(ROOT_DIR, 'followcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'data', 'followcount_backup.txt');
         if (fs.existsSync(backupPath)) {
             const content = fs.readFileSync(backupPath, 'utf8').trim();
             const [count, timestamp] = content.split('|');
@@ -3258,11 +3258,11 @@ app.get('/api/status', (req, res) => {
     const eventSubConnected = twitchEventSubWs && twitchEventSubWs.readyState === WebSocket.OPEN;
     
     // Backup info pour les follows
-    const followBackupExists = fs.existsSync(path.join(ROOT_DIR, 'followcount_backup.txt'));
+    const followBackupExists = fs.existsSync(path.join(ROOT_DIR, 'data', 'followcount_backup.txt'));
     let followBackupInfo = null;
     if (followBackupExists) {
         try {
-            const content = fs.readFileSync(path.join(ROOT_DIR, 'followcount_backup.txt'), 'utf8');
+            const content = fs.readFileSync(path.join(ROOT_DIR, 'data', 'followcount_backup.txt'), 'utf8');
             const [count, timestamp] = content.split('|');
             followBackupInfo = {
                 count: parseInt(count) || 0,
