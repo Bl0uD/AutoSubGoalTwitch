@@ -27,7 +27,7 @@ Application Python pour OBS Studio qui gère automatiquement les compteurs d'abo
 1. **Téléchargez et extrayez** le projet
 2. **Exécutez** `INSTALLER.bat`
 3. **Configurez** `twitch_config.txt` (format: `client_id:client_secret:channel_name`)
-4. **Dans OBS** : Outils → Scripts → + → Sélectionnez `subcount_auto.py`
+4. **Dans OBS** : Outils → Scripts → + → Sélectionnez `obs\obs_subcount_auto.py`
 5. **Ajoutez les overlays** : Source → Navigateur → `http://localhost:3000/subgoal-left` (ou `/subgoal-right`)
 
 ## 📝 Utilisation

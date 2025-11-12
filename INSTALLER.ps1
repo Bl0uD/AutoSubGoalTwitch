@@ -2,7 +2,7 @@
 #  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.1.0
 # ===================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # Définir l'encodage pour l'affichage correct
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -417,17 +417,17 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host ""
     Write-Host "Prochaines etapes:" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "1. Demarrer le serveur:" -ForegroundColor White
+    Write-Host "1. Configurer Twitch:" -ForegroundColor White
+    Write-Host "   Editez data\twitch_config.txt avec vos identifiants" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "2. Demarrer le serveur:" -ForegroundColor White
     Write-Host "   .\scripts\START_SERVER.bat" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "2. Configurer Twitch:" -ForegroundColor White
-    Write-Host "   http://localhost:8082/config" -ForegroundColor Cyan
-    Write-Host ""
     Write-Host "3. Ajouter dans OBS:" -ForegroundColor White
-    Write-Host "   Outils > Scripts > obs\obs_subcount_auto.py" -ForegroundColor Cyan
+    Write-Host "   Outils > Scripts > + > Selectionnez obs\obs_subcount_auto.py" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "4. Deployer sur GitHub (optionnel):" -ForegroundColor White
-    Write-Host "   .\scripts\deploy_to_github.ps1" -ForegroundColor Cyan
+    Write-Host "4. Ajouter les overlays dans OBS:" -ForegroundColor White
+    Write-Host "   Source > Navigateur > http://localhost:3000/subgoal-left" -ForegroundColor Cyan
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow
@@ -444,10 +444,16 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     if (-not $nodeInstalled) {
         Write-Host "Node.js: https://nodejs.org" -ForegroundColor White
     }
+    if (-not $pythonInstalled) {
+        Write-Host "Python: https://www.python.org/downloads/" -ForegroundColor White
+    }
     Write-Host ""
 }
 
-Write-Host "Documentation complete: docs/" -ForegroundColor Gray
+Write-Host "Documentation complete: README.md" -ForegroundColor Gray
+Write-Host ""
+
+pause
 Write-Host ""
 
 pause
