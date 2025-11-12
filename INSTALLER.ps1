@@ -222,6 +222,60 @@ function Install-NpmDependencies {
 }
 
 # ==================================================================
+# FONCTION: Installer les dépendances Python
+# ==================================================================
+function Install-PythonDependencies {
+    Write-Host ""
+    Write-Host "=== INSTALLATION DES DEPENDANCES PYTHON ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Vérifier si Python est installé
+    try {
+        $pythonVersion = python --version 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "   [ERREUR] Python n'est pas installe" -ForegroundColor Red
+            Write-Host "   Telechargez Python 3.6+: https://www.python.org/downloads/" -ForegroundColor Yellow
+            return $false
+        }
+        Write-Host "   [OK] Python detecte: $pythonVersion" -ForegroundColor Green
+    } catch {
+        Write-Host "   [ERREUR] Python introuvable" -ForegroundColor Red
+        Write-Host "   Telechargez Python 3.6+: https://www.python.org/downloads/" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Liste des modules Python requis
+    $pythonModules = @("psutil", "requests", "websocket-client")
+    
+    Write-Host "   Installation des modules Python..." -ForegroundColor Yellow
+    $allInstalled = $true
+    
+    foreach ($module in $pythonModules) {
+        Write-Host "   - Installation de $module..." -ForegroundColor Gray
+        try {
+            $output = python -m pip install $module 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "     [OK] $module installe" -ForegroundColor Green
+            } else {
+                Write-Host "     [ERREUR] Echec installation de $module" -ForegroundColor Red
+                $allInstalled = $false
+            }
+        } catch {
+            Write-Host "     [ERREUR] Erreur: $_" -ForegroundColor Red
+            $allInstalled = $false
+        }
+    }
+    
+    if ($allInstalled) {
+        Write-Host "   [OK] Tous les modules Python sont installes" -ForegroundColor Green
+        return $true
+    } else {
+        Write-Host "   [ATTENTION] Certains modules ont echoue" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+# ==================================================================
 # FONCTION: Créer les dossiers nécessaires
 # ==================================================================
 function Create-Directories {
@@ -270,6 +324,17 @@ function Create-ConfigFiles {
         }
     }
     
+    # Créer twitch_config.txt s'il n'existe pas
+    $twitchConfigPath = Join-Path $dataPath "twitch_config.txt"
+    if (-not (Test-Path $twitchConfigPath)) {
+        $twitchConfigContent = "your_client_id:your_client_secret:your_channel_name"
+        Set-Content -Path $twitchConfigPath -Value $twitchConfigContent -Encoding UTF8
+        Write-Host "   [OK] Fichier cree: data\twitch_config.txt" -ForegroundColor Green
+        Write-Host "   [INFO] Editez ce fichier avec vos identifiants Twitch" -ForegroundColor Yellow
+    } else {
+        Write-Host "   [SKIP] Fichier existe: data\twitch_config.txt" -ForegroundColor Gray
+    }
+    
     return $true
 }
 
@@ -289,7 +354,17 @@ $nodeInstalled = Install-NodeJS
 # Étape 3: Créer les dossiers
 $dirsCreated = Create-Directories
 
-# Étape 4: Installer les dépendances npm (seulement si Node.js est disponible)
+# Étape 4: Installer les dépendances Python
+$pythonInstalled = $false
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    $pythonInstalled = Install-PythonDependencies
+} else {
+    Write-Host ""
+    Write-Host "   [SKIP] Installation Python ignoree (Python non disponible)" -ForegroundColor Yellow
+    Write-Host "   Telechargez Python 3.6+: https://www.python.org/downloads/" -ForegroundColor Yellow
+}
+
+# Étape 5: Installer les dépendances npm (seulement si Node.js est disponible)
 $npmInstalled = $false
 if ($nodeInstalled -or (Get-Command node -ErrorAction SilentlyContinue)) {
     $npmInstalled = Install-NpmDependencies
@@ -298,7 +373,7 @@ if ($nodeInstalled -or (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "   [SKIP] Installation npm ignoree (Node.js non disponible)" -ForegroundColor Yellow
 }
 
-# Étape 5: Créer les fichiers de configuration
+# Étape 6: Créer les fichiers de configuration
 $configCreated = Create-ConfigFiles
 
 # ==================================================================
@@ -317,6 +392,9 @@ if ($gitInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host 
 Write-Host "Node.js:            " -NoNewline
 if ($nodeInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Red }
 
+Write-Host "Python modules:     " -NoNewline
+if ($pythonInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
+
 Write-Host "Dependances npm:    " -NoNewline
 if ($npmInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
 
@@ -332,7 +410,7 @@ Write-Host ""
 # INSTRUCTIONS FINALES
 # ==================================================================
 
-if ($gitInstalled -and $nodeInstalled -and $npmInstalled) {
+if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) {
     Write-Host "===================================================================" -ForegroundColor Green
     Write-Host "         INSTALLATION TERMINEE AVEC SUCCES !" -ForegroundColor Green
     Write-Host "===================================================================" -ForegroundColor Green
