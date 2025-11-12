@@ -258,11 +258,16 @@
             const rootStyles = getComputedStyle(document.documentElement);
             const counterStyles = getComputedStyle(counterEl);
             
-            measureDiv.style.fontSize = rootStyles.getPropertyValue('--font-size').trim();
-            measureDiv.style.fontFamily = rootStyles.getPropertyValue('--font-family').trim();
+            const fontFamily = rootStyles.getPropertyValue('--font-family').trim();
+            const fontSize = rootStyles.getPropertyValue('--font-size').trim();
+            
+            measureDiv.style.fontSize = fontSize;
+            measureDiv.style.fontFamily = fontFamily;
             measureDiv.style.fontWeight = rootStyles.getPropertyValue('--font-weight').trim() || 'normal';
             measureDiv.style.letterSpacing = counterStyles.letterSpacing;
             measureDiv.style.lineHeight = counterStyles.lineHeight;
+            
+            console.log(` Mesure avec: ${fontFamily} ${fontSize}`);
             
             document.body.appendChild(measureDiv);
 
