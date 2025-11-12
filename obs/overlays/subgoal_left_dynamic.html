@@ -269,20 +269,29 @@
             const chars = newText.split("");
             counterEl.innerHTML = "";
 
-            // Mesurer la largeur des caractères avec la police actuelle (comme l'ancien code)
+            // Mesurer la largeur des caractères avec TOUS les styles qui affectent la largeur
             const measureDiv = document.createElement("div");
             measureDiv.style.visibility = "hidden";
             measureDiv.style.position = "absolute";
+            measureDiv.style.whiteSpace = "nowrap";
             
             // Récupérer les styles CSS variables actuels
             const rootStyles = getComputedStyle(document.documentElement);
+            const counterStyles = getComputedStyle(counterEl);
+            
             const fontSize = rootStyles.getPropertyValue('--font-size').trim();
             const fontFamily = rootStyles.getPropertyValue('--font-family').trim();
+            const fontWeight = rootStyles.getPropertyValue('--font-weight').trim();
             
+            // Appliquer TOUS les styles qui affectent la largeur du texte
             measureDiv.style.fontSize = fontSize;
             measureDiv.style.fontFamily = fontFamily;
+            measureDiv.style.fontWeight = fontWeight;
+            // IMPORTANT : text-shadow et stroke augmentent la largeur visuelle !
+            measureDiv.style.textShadow = counterStyles.textShadow;
+            measureDiv.style.webkitTextStroke = counterStyles.webkitTextStroke;
             
-            console.log(`📏 Mesure avec: ${fontFamily} ${fontSize}`);
+            console.log(`📏 Mesure avec: ${fontFamily} ${fontSize} (weight: ${fontWeight})`);
             
             document.body.appendChild(measureDiv);
 
