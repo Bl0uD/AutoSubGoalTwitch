@@ -12,7 +12,7 @@ echo Demarrage de l'installation...
 echo.
 
 REM Lancer le script PowerShell d'installation
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0INSTALLER.ps1"
+powershell.exe -ExecutionPolicy Bypass -File "%~dp0scripts\INSTALLER.ps1"
 
 IF ERRORLEVEL 1 (
     echo.

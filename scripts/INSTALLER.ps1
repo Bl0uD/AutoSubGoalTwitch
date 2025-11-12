@@ -193,18 +193,29 @@ function Install-Python {
     Write-Host "=== VERIFICATION DE PYTHON ===" -ForegroundColor Cyan
     Write-Host ""
     
-    # Vérifier si Python est déjà installé
+    # Vérifier si Python 3.6.8 est déjà installé
+    $python368Installed = $false
     try {
         $pythonVersion = python --version 2>&1
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "   [OK] Python est deja installe: $pythonVersion" -ForegroundColor Green
-            return $true
+            Write-Host "   [INFO] Python detecte: $pythonVersion" -ForegroundColor Cyan
+            
+            # Vérifier si c'est exactement la version 3.6.8
+            if ($pythonVersion -match "Python 3\.6\.8") {
+                Write-Host "   [OK] Python 3.6.8 est deja installe" -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "   [ATTENTION] Version differente de 3.6.8 detectee" -ForegroundColor Yellow
+                Write-Host "   Ce projet necessite specifiquement Python 3.6.8" -ForegroundColor Yellow
+            }
         }
     } catch {
-        # Python n'est pas installé
+        Write-Host "   [INFO] Python n'est pas installe" -ForegroundColor Yellow
     }
     
-    Write-Host "   [INFO] Python n'est pas installe" -ForegroundColor Yellow
+    if (-not $python368Installed) {
+        Write-Host "   [INFO] Python 3.6.8 n'est pas installe" -ForegroundColor Yellow
+    }
     Write-Host ""
     
     # Demander confirmation
