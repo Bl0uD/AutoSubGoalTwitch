@@ -186,6 +186,82 @@ function Install-NodeJS {
 }
 
 # ==================================================================
+# FONCTION: Vérifier et installer Python 3.6.8
+# ==================================================================
+function Install-Python {
+    Write-Host ""
+    Write-Host "=== VERIFICATION DE PYTHON ===" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Vérifier si Python est déjà installé
+    try {
+        $pythonVersion = python --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   [OK] Python est deja installe: $pythonVersion" -ForegroundColor Green
+            return $true
+        }
+    } catch {
+        # Python n'est pas installé
+    }
+    
+    Write-Host "   [INFO] Python n'est pas installe" -ForegroundColor Yellow
+    Write-Host ""
+    
+    # Demander confirmation
+    $response = Read-Host "   Voulez-vous installer Python 3.6.8 automatiquement? (O/N)"
+    if ($response -ne "O" -and $response -ne "o") {
+        Write-Host "   [SKIP] Installation de Python annulee" -ForegroundColor Yellow
+        Write-Host "   Telechargez manuellement: https://www.python.org/downloads/release/python-368/" -ForegroundColor Yellow
+        return $false
+    }
+    
+    Write-Host ""
+    Write-Host "   Installation de Python 3.6.8 en cours..." -ForegroundColor Yellow
+    
+    # URL de téléchargement Python 3.6.8 (64-bit)
+    $pythonUrl = "https://www.python.org/ftp/python/3.6.8/python-3.6.8-amd64.exe"
+    $pythonInstaller = Join-Path $env:TEMP "Python-3.6.8-Installer.exe"
+    
+    # Télécharger Python
+    Write-Host "   Telechargement de Python 3.6.8..." -ForegroundColor Yellow
+    if (-not (Download-File -Url $pythonUrl -Output $pythonInstaller)) {
+        Write-Host "   [ERREUR] Impossible de telecharger Python" -ForegroundColor Red
+        Write-Host "   Telechargez manuellement: https://www.python.org/downloads/release/python-368/" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Installer Python en mode silencieux
+    Write-Host "   Installation de Python (cela peut prendre quelques minutes)..." -ForegroundColor Yellow
+    try {
+        $installArgs = @(
+            "/quiet",
+            "InstallAllUsers=1",
+            "PrependPath=1",
+            "Include_test=0",
+            "Include_pip=1",
+            "Include_doc=0"
+        )
+        
+        Start-Process -FilePath $pythonInstaller -ArgumentList $installArgs -Wait -NoNewWindow
+        
+        # Nettoyer
+        Remove-Item $pythonInstaller -Force -ErrorAction SilentlyContinue
+        
+        # Recharger les variables d'environnement
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        Write-Host "   [OK] Python 3.6.8 installe avec succes" -ForegroundColor Green
+        Write-Host "   [INFO] Redemarrez PowerShell pour utiliser Python globalement" -ForegroundColor Yellow
+        
+        return $true
+    } catch {
+        Write-Host "   [ERREUR] Echec de l'installation: $_" -ForegroundColor Red
+        Remove-Item $pythonInstaller -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
+# ==================================================================
 # FONCTION: Installer les dépendances npm
 # ==================================================================
 function Install-NpmDependencies {
@@ -351,20 +427,23 @@ $gitInstalled = Install-Git
 # Étape 2: Installer Node.js
 $nodeInstalled = Install-NodeJS
 
-# Étape 3: Créer les dossiers
+# Étape 3: Installer Python 3.6.8
+$pythonInstalled = Install-Python
+
+# Étape 4: Créer les dossiers
 $dirsCreated = Create-Directories
 
-# Étape 4: Installer les dépendances Python
-$pythonInstalled = $false
-if (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonInstalled = Install-PythonDependencies
+# Étape 5: Installer les dépendances Python (modules)
+$pythonModulesInstalled = $false
+if ($pythonInstalled -or (Get-Command python -ErrorAction SilentlyContinue)) {
+    $pythonModulesInstalled = Install-PythonDependencies
 } else {
     Write-Host ""
-    Write-Host "   [SKIP] Installation Python ignoree (Python non disponible)" -ForegroundColor Yellow
-    Write-Host "   Telechargez Python 3.6+: https://www.python.org/downloads/" -ForegroundColor Yellow
+    Write-Host "   [SKIP] Installation modules Python ignoree (Python non disponible)" -ForegroundColor Yellow
+    Write-Host "   Telechargez Python 3.6.8: https://www.python.org/downloads/release/python-368/" -ForegroundColor Yellow
 }
 
-# Étape 5: Installer les dépendances npm (seulement si Node.js est disponible)
+# Étape 6: Installer les dépendances npm (seulement si Node.js est disponible)
 $npmInstalled = $false
 if ($nodeInstalled -or (Get-Command node -ErrorAction SilentlyContinue)) {
     $npmInstalled = Install-NpmDependencies
@@ -373,7 +452,7 @@ if ($nodeInstalled -or (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "   [SKIP] Installation npm ignoree (Node.js non disponible)" -ForegroundColor Yellow
 }
 
-# Étape 6: Créer les fichiers de configuration
+# Étape 7: Créer les fichiers de configuration
 $configCreated = Create-ConfigFiles
 
 # ==================================================================
@@ -392,8 +471,11 @@ if ($gitInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host 
 Write-Host "Node.js:            " -NoNewline
 if ($nodeInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Red }
 
+Write-Host "Python 3.6.8:       " -NoNewline
+if ($pythonInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Red }
+
 Write-Host "Python modules:     " -NoNewline
-if ($pythonInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
+if ($pythonModulesInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
 
 Write-Host "Dependances npm:    " -NoNewline
 if ($npmInstalled) { Write-Host "OK" -ForegroundColor Green } else { Write-Host "A INSTALLER" -ForegroundColor Yellow }
