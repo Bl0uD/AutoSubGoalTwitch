@@ -242,6 +242,62 @@
             return div;
         }
 
+                // Fonction pour extraire la police et ses variantes
+        function parseFontFamily(fontName) {
+            const result = {
+                family: fontName,
+                style: 'normal',
+                weight: 'normal'
+            };
+            
+            const lowerName = fontName.toLowerCase();
+            
+            // Détecter Italic / Oblique
+            if (lowerName.includes('italic') || lowerName.includes('oblique')) {
+                result.style = 'italic';
+                result.family = fontName.replace(/\s*(italic|oblique)\s*/gi, '').trim();
+            }
+            
+            // Détecter Bold
+            if (lowerName.includes('bold')) {
+                if (lowerName.includes('extra bold') || lowerName.includes('extrabold')) {
+                    result.weight = '800';
+                } else if (lowerName.includes('semi bold') || lowerName.includes('semibold') || lowerName.includes('demi bold')) {
+                    result.weight = '600';
+                } else {
+                    result.weight = 'bold';
+                }
+                result.family = fontName.replace(/\s*(extra\s*bold|semi\s*bold|demi\s*bold|bold)\s*/gi, '').trim();
+            }
+            
+            // Détecter Light / Thin
+            if (lowerName.includes('thin')) {
+                result.weight = '100';
+                result.family = fontName.replace(/\s*thin\s*/gi, '').trim();
+            } else if (lowerName.includes('extra light') || lowerName.includes('extralight')) {
+                result.weight = '200';
+                result.family = fontName.replace(/\s*extra\s*light\s*/gi, '').trim();
+            } else if (lowerName.includes('light')) {
+                result.weight = '300';
+                result.family = fontName.replace(/\s*light\s*/gi, '').trim();
+            }
+            
+            // Détecter Medium
+            if (lowerName.includes('medium') && !lowerName.includes('bold')) {
+                result.weight = '500';
+                result.family = fontName.replace(/\s*medium\s*/gi, '').trim();
+            }
+            
+            // Détecter Black / Heavy
+            if (lowerName.includes('black') || lowerName.includes('heavy')) {
+                result.weight = '900';
+                result.family = fontName.replace(/\s*(black|heavy)\s*/gi, '').trim();
+            }
+            
+            return result;
+        }
+
+
         function updateCounter(newText) {
             if (newText === currentText) return;
 
@@ -258,11 +314,18 @@
             const rootStyles = getComputedStyle(document.documentElement);
             const counterStyles = getComputedStyle(counterEl);
             
+            // Parser la police pour extraire la famille et les variantes
+            const fontFamily = rootStyles.getPropertyValue('--font-family').trim();
+            const parsedFont = parseFontFamily(fontFamily);
+            
             measureDiv.style.fontSize = rootStyles.getPropertyValue('--font-size').trim();
-            measureDiv.style.fontFamily = rootStyles.getPropertyValue('--font-family').trim();
-            measureDiv.style.fontWeight = rootStyles.getPropertyValue('--font-weight').trim() || 'normal';
+            measureDiv.style.fontFamily = parsedFont.family;
+            measureDiv.style.fontStyle = parsedFont.style;
+            measureDiv.style.fontWeight = parsedFont.weight;
             measureDiv.style.letterSpacing = counterStyles.letterSpacing;
             measureDiv.style.lineHeight = counterStyles.lineHeight;
+            
+            console.log(` Mesure avec: ${parsedFont.family} | Style: ${parsedFont.style} | Weight: ${parsedFont.weight}`);
             
             document.body.appendChild(measureDiv);
 
