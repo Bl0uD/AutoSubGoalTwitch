@@ -204,7 +204,7 @@
         
         async function loadInitialConfig() {
             try {
-                const response = await fetch('http://localhost:3001/api/overlay-config');
+                const response = await fetch('http://localhost:8082/api/overlay-config');
                 if (response.ok) {
                     const config = await response.json();
                     console.log('ðŸŽ¨ Configuration initiale chargÃ©e:', config);

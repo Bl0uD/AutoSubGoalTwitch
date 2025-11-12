@@ -12,7 +12,7 @@ import os
 class OverlayConfigManager:
     """Gestionnaire de configuration dynamique des overlays"""
     
-    def __init__(self, server_url="http://localhost:3001"):
+    def __init__(self, server_url="http://localhost:8082"):
         self.server_url = server_url
         self.config_endpoint = f"{server_url}/api/overlay-config"
     

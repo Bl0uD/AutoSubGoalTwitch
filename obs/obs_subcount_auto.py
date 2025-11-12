@@ -26,6 +26,7 @@ import threading
 import logging
 import webbrowser
 import json
+import winreg  # Pour lire les polices du registre Windows
 
 # Ajouter le répertoire du script au sys.path pour les imports
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # Pointe vers obs/
@@ -117,6 +118,57 @@ def log_message(message, level="info", force_display=False):
         
         # Afficher aussi dans la console
         print(f"[OBS SubCount Auto] {message}")
+
+def get_windows_fonts():
+    """
+    Récupère la liste de toutes les polices installées sur Windows
+    
+    Returns:
+        list: Liste des noms de polices disponibles
+    """
+    fonts = set()  # Utiliser un set pour éviter les doublons
+    
+    try:
+        # Lire le registre Windows pour les polices
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
+        
+        i = 0
+        while True:
+            try:
+                font_name, _, _ = winreg.EnumValue(key, i)
+                # Nettoyer le nom de la police (retirer les suffixes comme "(TrueType)")
+                clean_name = font_name.split('(')[0].strip()
+                # Retirer les variantes (Bold, Italic, etc.) pour avoir seulement le nom de base
+                if clean_name and not any(x in clean_name.lower() for x in ['bold', 'italic', 'light', 'regular']):
+                    fonts.add(clean_name)
+                i += 1
+            except OSError:
+                break
+        
+        winreg.CloseKey(key)
+        
+        # Convertir en liste triée
+        font_list = sorted(list(fonts))
+        
+        # Ajouter quelques polices courantes en premier si elles existent
+        priority_fonts = ["SEA", "Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Impact"]
+        result = []
+        
+        for font in priority_fonts:
+            if font in font_list:
+                result.append(font)
+                font_list.remove(font)
+        
+        # Ajouter le reste
+        result.extend(font_list)
+        
+        return result if result else ["SEA", "Arial", "Verdana"]  # Fallback
+        
+    except Exception as e:
+        log_message(f"⚠️ Erreur lecture polices Windows: {e}", level="warning")
+        # Retourner une liste par défaut
+        return ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
 
 def cleanup_log_file(log_file_path, max_size_mb=5, keep_lines=1000):
     """
@@ -737,20 +789,29 @@ def apply_overlay_colors(props, prop, settings):
         return False
     
     text_color = obs.obs_data_get_string(settings, "overlay_text_color")
+    custom_color = obs.obs_data_get_string(settings, "overlay_custom_color")
     
-    # Convertir le nom de couleur en code hex/rgba
-    color_map = {
-        "white": "white",
-        "red": "#FF0000",
-        "blue": "#00FFFF",
-        "green": "#00FF00",
-        "yellow": "#FFD700",
-        "purple": "#8B00FF",
-        "orange": "#FF4500"
-    }
-    
-    if text_color and text_color in color_map:
-        overlay_config.update_colors(text=color_map[text_color])
+    # Si "Personnalisé" est sélectionné, utiliser la couleur personnalisée
+    if text_color == "custom" and custom_color:
+        overlay_config.update_colors(text=custom_color)
+        log_message(f"✅ Couleur personnalisée appliquée: {custom_color}")
+    elif text_color:
+        # Convertir le nom de couleur en code CSS
+        color_map = {
+            "white": "white",
+            "black": "black",
+            "red": "#FF0000",
+            "blue": "#00FFFF",
+            "green": "#00FF00",
+            "yellow": "#FFD700",
+            "purple": "#8B00FF",
+            "orange": "#FF4500",
+            "pink": "#FF69B4",
+            "cyan": "#00FFFF"
+        }
+        
+        final_color = color_map.get(text_color, text_color)
+        overlay_config.update_colors(text=final_color)
         log_message(f"✅ Couleur mise à jour: {text_color}")
     
     return True
@@ -854,6 +915,7 @@ def script_defaults(settings):
         obs.obs_data_set_default_string(settings, "overlay_font", "SEA")
         obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
         obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
+        obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
         obs.obs_data_set_default_string(settings, "overlay_anim_speed", "normal")
 
 def script_properties():
@@ -915,17 +977,20 @@ def script_properties():
             obs.OBS_TEXT_INFO
         )
         
-        # Dropdown Police
+        # Dropdown Police - Charger toutes les polices Windows
         font_list = obs.obs_properties_add_list(
             props,
             "overlay_font",
             "📝 Police",
-            obs.OBS_COMBO_TYPE_LIST,
+            obs.OBS_COMBO_TYPE_EDITABLE,  # Permet la saisie manuelle
             obs.OBS_COMBO_FORMAT_STRING
         )
-        fonts = ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
-        for font in fonts:
+        
+        # Récupérer toutes les polices installées
+        all_fonts = get_windows_fonts()
+        for font in all_fonts:
             obs.obs_property_list_add_string(font_list, font, font)
+        
         obs.obs_property_set_modified_callback(font_list, apply_overlay_font)
         
         # Slider Taille
@@ -940,26 +1005,43 @@ def script_properties():
             apply_overlay_font
         )
         
-        # Dropdown Couleur
+        # Dropdown Couleur prédéfinie
         color_list = obs.obs_properties_add_list(
             props,
             "overlay_text_color",
-            "🎨 Couleur",
+            "🎨 Couleur prédéfinie",
             obs.OBS_COMBO_TYPE_LIST,
             obs.OBS_COMBO_FORMAT_STRING
         )
         colors = [
             ("Blanc", "white"),
+            ("Noir", "black"),
             ("Rouge", "red"),
             ("Bleu", "blue"),
             ("Vert", "green"),
             ("Jaune", "yellow"),
             ("Violet", "purple"),
-            ("Orange", "orange")
+            ("Orange", "orange"),
+            ("Rose", "pink"),
+            ("Cyan", "cyan"),
+            ("Personnalisé", "custom")
         ]
         for name, value in colors:
             obs.obs_property_list_add_string(color_list, name, value)
         obs.obs_property_set_modified_callback(color_list, apply_overlay_colors)
+        
+        # Champ texte pour couleur personnalisée
+        custom_color = obs.obs_properties_add_text(
+            props,
+            "overlay_custom_color",
+            "   🎨 Code couleur personnalisé",
+            obs.OBS_TEXT_DEFAULT
+        )
+        obs.obs_property_set_long_description(
+            custom_color,
+            "Entrez un code couleur CSS (ex: #FF5733, rgb(255,87,51), rgba(255,87,51,0.8))"
+        )
+        obs.obs_property_set_modified_callback(custom_color, apply_overlay_colors)
         
         # Dropdown Animation
         anim_list = obs.obs_properties_add_list(
