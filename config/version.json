@@ -1,11 +1,12 @@
 {
   "version": "2.1.0",
-  "release_date": "2025-11-11",
+  "release_date": "2025-11-12",
   "changelog": [
-    "Ajout du système de vérification des dépendances au démarrage",
-    "Correction de la compatibilité Python 3.6",
-    "npm rendu optionnel si node_modules existe",
-    "Protection contre les crashs OBS"
+    "Système d'auto-update intégré avec vérification GitHub",
+    "Notification popup visible dans OBS pour les mises à jour",
+    "Mode silencieux pour logs ultra-propres (warnings/erreurs uniquement)",
+    "Correction complète du système de logging",
+    "Amélioration de l'UX pour les notifications de mises à jour"
   ],
   "github_repo": "Bl0uD/AutoSubGoalTwitch",
   "update_url": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
