@@ -370,7 +370,7 @@ function Create-Directories {
     Write-Host "=== CREATION DES DOSSIERS ===" -ForegroundColor Cyan
     Write-Host ""
     
-    $dirs = @("data", "logs", "backups")
+    $dirs = @("data", "logs", "backups", "config")
     
     foreach ($dir in $dirs) {
         $dirPath = Join-Path $scriptDir $dir
@@ -420,6 +420,37 @@ function Create-ConfigFiles {
         Write-Host "   [INFO] Editez ce fichier avec vos identifiants Twitch" -ForegroundColor Yellow
     } else {
         Write-Host "   [SKIP] Fichier existe: data\twitch_config.txt" -ForegroundColor Gray
+    }
+    
+    # Créer overlay_config.json s'il n'existe pas
+    $overlayConfigPath = Join-Path $configPath "overlay_config.json"
+    if (-not (Test-Path $overlayConfigPath)) {
+        $overlayConfigContent = @"
+{
+  "font": {
+    "family": "SEA",
+    "size": "64px",
+    "weight": "normal"
+  },
+  "colors": {
+    "text": "white",
+    "shadow": "rgba(0,0,0,0.5)",
+    "stroke": "black"
+  },
+  "animation": {
+    "duration": "1s",
+    "easing": "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+  },
+  "layout": {
+    "paddingLeft": "20px",
+    "gap": "0"
+  }
+}
+"@
+        Set-Content -Path $overlayConfigPath -Value $overlayConfigContent -Encoding UTF8
+        Write-Host "   [OK] Fichier cree: config\overlay_config.json" -ForegroundColor Green
+    } else {
+        Write-Host "   [SKIP] Fichier existe: config\overlay_config.json" -ForegroundColor Gray
     }
     
     return $true

@@ -958,7 +958,7 @@ def script_defaults(settings):
         obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
 
 def script_properties():
-    """Propriétés configurables du script - Version redesignée"""
+    """Propriétés configurables du script"""
     props = obs.obs_properties_create()
     
     # ========== CONTRÔLES RAPIDES ==========
@@ -1164,7 +1164,6 @@ def script_properties():
     obs.obs_properties_add_text(
         props, "section_twitch", 
         "\n─────────────────────────────────────", 
-        "\n🔐 COMPTE TWITCH", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1182,7 +1181,6 @@ def script_properties():
     obs.obs_properties_add_text(
         props, "section_server", 
         "\n─────────────────────────────────────", 
-        "\n🔄 GESTION SERVEUR", 
         obs.OBS_TEXT_INFO
     )
     
