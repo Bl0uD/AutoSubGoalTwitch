@@ -27,7 +27,6 @@
 - Nouveau dossier `config/` pour configuration persistante
 - `overlay_config.json` créé automatiquement avec valeurs par défaut
 - **Documentation simplifiée** : 1 guide utilisateur, notes de release pour GitHub
-- **Projet nettoyé** : aucun fichier temporaire ou obsolète
 
 ---
 
@@ -35,13 +34,11 @@
 
 ### Affichage
 - **Recalcul progressif** des dimensions (50ms, 200ms, 500ms) lors du changement de police
-- **Copie complète des styles CSS** pour rendu parfait
-- **Support des effets** : text-shadow, webkit-text-stroke, letter-spacing
 
 ### Configuration
 - **Détection intelligente** des polices Windows (registre + dossier système)
 - **Filtrage automatique** des variantes (Bold, Italic, Light, etc.)
-- **Polices prioritaires** en tête de liste (SEA, Arial, Verdana)
+- **Polices prioritaires** en tête de liste (Arial, Verdana)
 
 ### Installeur
 - **Création automatique** de tous les dossiers nécessaires
@@ -59,6 +56,19 @@
 
 ---
 
+## 🔔 Améliorations Post-Release
+
+### Notification de Mise à Jour Ultra-Visible
+- **Affichage optimisé** : Notification claire et lisible sans duplication
+- **Bordures propres** : Caractères `=` compatibles avec tous les terminaux
+- **Ultra-visible** : 17 lignes avec émojis, espacement et séparateurs
+- **Impossible à louper** : Les utilisateurs verront immédiatement les nouvelles versions
+- **Commits** : d448759, 3701ccd, 51c8160
+
+Les utilisateurs en v2.1.0 verront une magnifique notification au démarrage d'OBS les informant de la disponibilité de v2.2.0 !
+
+---
+
 ## 📦 Installation
 
 ### Nouvelle installation
@@ -66,8 +76,7 @@
 1. **Télécharger** le ZIP de la release
 2. **Extraire** dans un dossier
 3. **Lancer** `INSTALLER.bat`
-4. **Configurer** Twitch dans `data/twitch_config.txt`
-5. **Charger** `obs/obs_subcount_auto.py` dans OBS → Outils → Scripts
+4. **Charger** `obs/obs_subcount_auto.py` dans OBS → Outils → Scripts
 
 ### Mise à jour depuis v2.0.x/v2.1.x
 
@@ -117,19 +126,6 @@ Tous les overlays supportent la **configuration dynamique** :
 - **8082** : API REST
 - **8083** : WebSocket données (subs/follows)
 - **8084** : WebSocket configuration (styles)
-
----
-
-## 📊 Statistiques
-
-### Code
-- **Réduction** : 50% de fichiers overlays (8 → 4)
-- **Nettoyage** : ~3100 lignes de code dupliqué éliminées
-- **Performance** : Mesure de caractères optimisée
-
-### Documentation
-- **Simplification** : 1 guide utilisateur complet
-- **Clarté** : Structure organisée et maintenable
 
 ---
 
