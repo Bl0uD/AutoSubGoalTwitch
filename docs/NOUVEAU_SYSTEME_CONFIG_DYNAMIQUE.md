@@ -1,5 +1,11 @@
 # 🎉 SYSTÈME DE CONFIGURATION DYNAMIQUE DÉPLOYÉ !
 
+> **📢 Mise à jour v2.1.0** : Tous les overlays HTML sont maintenant dynamiques par défaut !  
+> Les fichiers `*_dynamic.html` ont été renommés pour remplacer les versions statiques.  
+> Plus besoin de choisir entre deux versions - la configuration en temps réel est toujours active.
+
+---
+
 ## ✅ Ce qui a été fait
 
 ### 🎨 Système complet de configuration dynamique des overlays
@@ -20,10 +26,14 @@ Vous pouvez maintenant **modifier en temps réel** la police, les couleurs et le
 - **`obs/overlay_config_manager.py`**  
   API Python complète pour modifier les overlays
 
-### 3. Overlay HTML dynamique
+### 3. Overlays HTML dynamiques (4 fichiers)
 
-- **`obs/overlays/subgoal_left_dynamic.html`**  
-  Exemple d'overlay avec support temps réel
+- **`obs/overlays/subgoal_left.html`**
+- **`obs/overlays/subgoal_right.html`**
+- **`obs/overlays/followgoal_left.html`**
+- **`obs/overlays/followgoal_right.html`**
+
+Tous avec support de configuration en temps réel intégré
 
 ### 4. Documentation
 
@@ -33,21 +43,16 @@ Vous pouvez maintenant **modifier en temps réel** la police, les couleurs et le
 - **`docs/CHANGEMENTS_DYNAMIC_CONFIG.md`**  
   Récapitulatif technique des modifications
 
-### 5. Outils de test
-
-- **`scripts/test_dynamic_config.py`**  
-  Script pour tester le système
-
-### 6. Serveur modifié
+### 5. Serveur modifié
 
 - **`server/server.js`**  
   WebSocket Server (port 8084) + API REST ajoutés
 
 ---
 
-## 🛡️ Backups créés
+## 🛡️ Backups historiques
 
-Tous vos fichiers originaux ont été sauvegardés dans :
+Les fichiers originaux (avant migration dynamique) ont été sauvegardés dans :
 
 ```
 backups/before_websocket_config_20251112_224423/

@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
-    <title>Followgoal Right - Device Code Grant</title>
+    <title>Followgoal Right - Dynamic Config</title>
     <style>
         @font-face {
             font-family: 'SEA';
@@ -10,48 +10,64 @@
             font-display: swap;
         }
         
+        :root {
+            /* Variables CSS dynamiques (modifiÃ©es par le serveur JS) */
+            --font-family: 'SEA';
+            --font-size: 64px;
+            --font-weight: normal;
+            --text-color: white;
+            --shadow-color: rgba(0,0,0,0.5);
+            --stroke-color: black;
+            --anim-duration: 1s;
+            --anim-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --padding-left: 20px;
+            --gap: 0;
+        }
+        
         body {
             background: transparent;
             margin: 0;
-            font-family: 'SEA', monospace;
+            font-family: var(--font-family), monospace;
             display: flex;
-            justify-content: flex-end; /* Alignement à droite */
+            justify-content: flex-end;
             align-items: center;
             height: 100vh;
-            color: white;
-            padding-left: 0; /* Supprimer l'espace à gauche */
-            padding-right: 20px; /* Espace sur le côté droit */
+            color: var(--text-color);
+            padding-right: var(--padding-left);
+            padding-right: 0;
         }
 
         .counter {
             display: flex;
-            font-size: 64px;
-            gap: 0; /* Pas d'espace entre les conteneurs */
-            white-space: pre; /* Préserver les espaces */
-            text-shadow: 3px 3px 3px rgba(0,0,0,0.5); /* Ombre plus prononcée */
-            -webkit-text-stroke: 1px black; /* Contour noir plus épais */
+            font-size: var(--font-size);
+            font-weight: var(--font-weight);
+            gap: var(--gap);
+            white-space: pre;
+            text-shadow: 3px 3px 3px var(--shadow-color);
+            -webkit-text-stroke: 1px var(--stroke-color);
         }
 
         .digit-container {
             position: relative;
             width: auto;
-            min-width: 0.3em; /* Largeur minimale pour les espaces */
-            height: 1em;
+            min-width: 0.3em;
+            height: 1.3em;
             overflow: hidden;
             display: inline-block;
         }
 
         .space-container {
-            width: 0.25em; /* Largeur des espaces réduite par 2 */
+            width: 0.25em;
             display: inline-block;
         }
 
         .digit {
             position: absolute;
-            width: auto; /* Largeur automatique */
-            white-space: nowrap; /* Éviter que le texte se coupe */
-            left: 0; /* Aligner à gauche dans le conteneur */
-            text-align: left; /* Aligner le texte à gauche */
+            width: auto;
+            white-space: nowrap;
+            left: 0;
+            text-align: left;
+            transition: transform var(--anim-duration) var(--anim-easing);
         }
 
         .old {
@@ -63,11 +79,11 @@
         }
 
         .animate .old {
-            animation: slideOut 0.4s forwards ease-in-out;
+            animation: none;
         }
 
         .animate .new {
-            animation: slideIn 0.4s forwards ease-in-out;
+            animation: none;
         }
 
         @keyframes slideOut {
@@ -80,7 +96,6 @@
             100% { transform: translateY(0); }
         }
 
-        /* Animations pour diminution (chiffres vers le haut) */
         @keyframes slideOutUp {
             0%   { transform: translateY(0); }
             100% { transform: translateY(-100%); }
@@ -91,7 +106,6 @@
             100% { transform: translateY(0); }
         }
 
-        /* Classes pour augmentation (vers le bas - par défaut) */
         .animate-down .old {
             animation: slideOut 0.4s forwards ease-in-out;
         }
@@ -100,7 +114,6 @@
             animation: slideIn 0.4s forwards ease-in-out;
         }
 
-        /* Classes pour diminution (vers le haut) */
         .animate-up .old {
             animation: slideOutUp 0.4s forwards ease-in-out;
         }
@@ -111,297 +124,363 @@
     </style>
 </head>
 <body>
+    <div class="counter" id="counter">Chargement...</div>
 
-<div class="counter" id="counter">Chargement...</div>
-
-<script>
-    let ws;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-    const counterEl = document.getElementById("counter");
-    let currentText = "";
-    let previousFollowCount = null; // Pour détecter augmentation/diminution
-    let animationDirection = "down"; // "down" pour augmentation, "up" pour diminution
-    let currentFollowGoal = null; // Stocker l'objectif actuel
-    let isAnimating = false; // Flag pour éviter les animations simultanées
-    let animationQueue = []; // File d'attente pour les animations
-
-    function createDigitElement(char, className, delay) {
-        const div = document.createElement("div");
-        div.className = className + " digit";
-        div.textContent = char;
-        div.style.animationDelay = `${delay}ms`;
-        return div;
-    }
-
-    function updateCounter(newText) {
-        if (newText === currentText) return;
-
-        const chars = newText.split("");
-        counterEl.innerHTML = "";
-
-        // Mesure la largeur des caractères avec la même police
-        const measureDiv = document.createElement("div");
-        measureDiv.style.visibility = "hidden";
-        measureDiv.style.position = "absolute";
-        measureDiv.style.fontSize = "64px";
-        measureDiv.style.fontFamily = "'SEA', monospace";
-        document.body.appendChild(measureDiv);
-
-        const totalChars = Math.max(chars.length, currentText.length);
-        let changedCount = 0;
-
-        // Déterminer combien de caractères changent
-        for (let i = 0; i < totalChars; i++) {
-            if ((currentText[i] || "") !== (chars[i] || "")) {
-                changedCount++;
-            }
-        }
-
-        const changeRatio = changedCount / totalChars;
-        const isFullReset = changeRatio > 0.5;
-
-        chars.forEach((char, index) => {
-            // Gérer les espaces
-            if (char === " ") {
-                const spaceContainer = document.createElement("div");
-                spaceContainer.className = "space-container";
-                spaceContainer.innerHTML = "&nbsp;";
-                counterEl.appendChild(spaceContainer);
-            } else {
-                const container = document.createElement("div");
-                container.className = "digit-container";
-
-                measureDiv.textContent = char;
-                const charWidth = measureDiv.getBoundingClientRect().width;
-                container.style.width = `${Math.max(charWidth, 10)}px`;
-
-                const currentChar = currentText[index] || "";
-                const charChanged = char !== currentChar;
-                const delay = isFullReset ? 0 : index * 50;
-
-                if (!charChanged && !isFullReset) {
-                    const staticDigit = createDigitElement(char, "static", 0);
-                    staticDigit.style.transform = "translateY(0)";
-                    container.appendChild(staticDigit);
-                } else {
-                    const oldDigit = createDigitElement(currentChar === " " ? " " : currentChar, "old", delay);
-                    const newDigit = createDigitElement(char, "new", delay);
-
-                    container.appendChild(oldDigit);
-                    container.appendChild(newDigit);
-                    container.classList.add("animate");
-                    // Ajouter la direction d'animation basée sur l'augmentation/diminution
-                    container.classList.add(`animate-${animationDirection}`);
-                }
-
-                counterEl.appendChild(container);
-            }
-        });
-
-        document.body.removeChild(measureDiv);
-        currentText = newText;
-    }
-    
-    // Animation style machine à sous - Défilement fluide avec vitesse adaptative
-    function animateCounterProgressive(fromCount, toCount, goal) {
-        const steps = Math.abs(toCount - fromCount);
+    <script>
+        // ==================================================================
+        // ðŸŽ¨ CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // ==================================================================
         
-        if (steps === 0) {
-            displayGoalText(goal);
-            return;
-        }
+        let configWs = null;
         
-        const totalDuration = 1000; // Durée totale : 1 seconde
-        const startTime = performance.now();
-        
-        // Calculer la fréquence d'affichage en fonction du nombre d'étapes
-        // Plus il y a d'étapes, plus on affiche rapidement chaque valeur
-        const updateInterval = totalDuration / Math.max(steps, 60); // Minimum 60 FPS
-        
-        console.log(`🎰 Animation machine à sous: ${fromCount} → ${toCount} (${steps} étapes, ${updateInterval.toFixed(1)}ms par affichage)`);
-        
-        let lastDisplayedValue = fromCount;
-        
-        // Fonction d'easing pour un effet fluide (ease-out)
-        function easeOutCubic(t) {
-            return 1 - Math.pow(1 - t, 3);
-        }
-        
-        function animate(currentTime) {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / totalDuration, 1);
-            
-            // Appliquer l'easing pour un défilement plus naturel
-            const easedProgress = easeOutCubic(progress);
-            
-            // Calculer le nombre actuel en fonction de la progression
-            const currentValue = Math.round(fromCount + (toCount - fromCount) * easedProgress);
-            
-            // Afficher seulement si la valeur a changé (pour voir chaque étape intermédiaire)
-            if (currentValue !== lastDisplayedValue || progress === 1) {
-                lastDisplayedValue = currentValue;
+        function connectConfigWebSocket() {
+            try {
+                configWs = new WebSocket('ws://localhost:8084');
                 
-                // Créer un objectif intermédiaire
-                const intermediateGoal = {
-                    ...goal,
-                    current: currentValue
+                configWs.onopen = () => {
+                    console.log('âœ… Config WebSocket connectÃ© (port 8084)');
                 };
                 
-                // Afficher l'étape intermédiaire
-                displayGoalText(intermediateGoal);
-            }
-            
-            // Continuer l'animation si pas terminée
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                // Animation terminée - Forcer l'affichage de la valeur finale
-                const finalGoal = {
-                    ...goal,
-                    current: toCount
-                };
-                displayGoalText(finalGoal);
-                
-                isAnimating = false;
-                processAnimationQueue();
-            }
-        }
-        
-        // Démarrer l'animation
-        requestAnimationFrame(animate);
-    }
-    
-    function displayGoalText(goal) {
-        let displayText;
-        
-        if (goal.isMaxReached) {
-            displayText = goal.current.toString();
-        } else {
-            if (!goal.message || goal.message.trim() === '') {
-                displayText = `${goal.current}/${goal.target}`;
-            } else {
-                displayText = `${goal.current}/${goal.target} : ${goal.message}`;
-            }
-        }
-        
-        updateCounter(displayText);
-    }
-    
-    function processAnimationQueue() {
-        if (animationQueue.length > 0 && !isAnimating) {
-            const nextAnimation = animationQueue.shift();
-            isAnimating = true;
-            animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal);
-        }
-    }
-    
-    function connectWebSocket() {
-        try {
-            ws = new WebSocket('ws://localhost:8083');
-            
-            ws.onopen = function() {
-                console.log('✅ WebSocket Device Code Grant connecté');
-                reconnectAttempts = 0;
-                fetchCurrentData();
-            };
-            
-            ws.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'follow_update') {
-                        updateFollowgoal(data.goal);
+                configWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'config_update' && data.config) {
+                            console.log('ðŸŽ¨ Configuration reÃ§ue:', data.config);
+                            applyConfig(data.config);
+                        }
+                    } catch (error) {
+                        console.error('âŒ Erreur parsing config:', error);
                     }
-                } catch (error) {
-                    console.error('❌ Erreur parsing message:', error);
+                };
+                
+                configWs.onerror = (error) => {
+                    console.error('âŒ Erreur Config WebSocket:', error);
+                };
+                
+                configWs.onclose = () => {
+                    console.log('ðŸ”Œ Config WebSocket dÃ©connectÃ©, reconnexion dans 5s...');
+                    setTimeout(connectConfigWebSocket, 5000);
+                };
+            } catch (error) {
+                console.error('âŒ Erreur connexion Config WebSocket:', error);
+                setTimeout(connectConfigWebSocket, 5000);
+            }
+        }
+        
+        function applyConfig(config) {
+            const root = document.documentElement;
+            
+            // Appliquer la police
+            if (config.font) {
+                if (config.font.family) root.style.setProperty('--font-family', config.font.family);
+                if (config.font.size) root.style.setProperty('--font-size', config.font.size);
+                if (config.font.weight) root.style.setProperty('--font-weight', config.font.weight);
+            }
+            
+            // Appliquer les couleurs
+            if (config.colors) {
+                if (config.colors.text) root.style.setProperty('--text-color', config.colors.text);
+                if (config.colors.shadow) root.style.setProperty('--shadow-color', config.colors.shadow);
+                if (config.colors.stroke) root.style.setProperty('--stroke-color', config.colors.stroke);
+            }
+            
+            // Appliquer l'animation
+            if (config.animation) {
+                if (config.animation.duration) root.style.setProperty('--anim-duration', config.animation.duration);
+                if (config.animation.easing) root.style.setProperty('--anim-easing', config.animation.easing);
+            }
+            
+            // Appliquer la mise en page
+            if (config.layout) {
+                if (config.layout.paddingLeft) root.style.setProperty('--padding-left', config.layout.paddingLeft);
+                if (config.layout.gap) root.style.setProperty('--gap', config.layout.gap);
+            }
+            
+            console.log('âœ… Configuration appliquÃ©e avec succÃ¨s');
+            
+            // Forcer le rafraÃ®chissement de l'affichage
+            setTimeout(forceRecalculateDisplay, 100);
+        }
+        
+        async function loadInitialConfig() {
+            try {
+                const response = await fetch('http://localhost:8082/api/overlay-config');
+                if (response.ok) {
+                    const config = await response.json();
+                    console.log('ðŸŽ¨ Configuration initiale chargÃ©e:', config);
+                    applyConfig(config);
                 }
-            };
-            
-            ws.onclose = function() {
-                console.log('🔌 WebSocket Device Code Grant fermé');
-                attemptReconnect();
-            };
-            
-            ws.onerror = function(error) {
-                console.error('❌ Erreur WebSocket Device Code Grant:', error);
-            };
-            
-        } catch (error) {
-            console.error('❌ Erreur connexion WebSocket:', error);
-            attemptReconnect();
-        }
-    }
-    
-    function attemptReconnect() {
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            console.log(`🔄 Tentative reconnexion Device Code Grant ${reconnectAttempts}/${maxReconnectAttempts}...`);
-            setTimeout(connectWebSocket, 2000 * reconnectAttempts);
-        } else {
-            console.error('❌ Impossible de se reconnecter au WebSocket Device Code Grant');
-            setInterval(fetchCurrentData, 5000);
-        }
-    }
-    
-    async function fetchCurrentData() {
-        try {
-            const cacheBuster = Date.now();
-            const response = await fetch(`http://localhost:8082/api/follow_goal?_=${cacheBuster}`);
-            if (response.ok) {
-                const data = await response.json();
-                updateFollowgoal(data.goal);
+            } catch (error) {
+                console.error('âŒ Erreur chargement config initiale:', error);
             }
-        } catch (error) {
-            console.error('❌ Erreur récupération données FOLLOW goal:', error);
-        }
-    }
-    
-    function updateFollowgoal(goal) {
-        currentFollowGoal = goal;
-        
-        // Détecter si le compteur augmente ou diminue
-        if (previousFollowCount !== null && goal.current !== previousFollowCount) {
-            animationDirection = goal.current > previousFollowCount ? "down" : "up";
-            console.log(`🔄 Direction animation: ${animationDirection} (${previousFollowCount} → ${goal.current})`);
-            
-            animationQueue.push({
-                from: previousFollowCount,
-                to: goal.current,
-                goal: goal
-            });
-            
-            if (!isAnimating) {
-                isAnimating = true;
-                const animation = animationQueue.shift();
-                animateCounterProgressive(animation.from, animation.to, animation.goal);
-            }
-        } else {
-            displayGoalText(goal);
         }
         
-        previousFollowCount = goal.current;
-        console.log('📊 Followgoal Device Code Grant mis à jour');
-    }
-    
-    function forceRecalculateDisplay() {
-        // Forcer le recalcul complet des largeurs avec la vraie police
-        const currentDisplayText = currentText;
-        currentText = ""; // Vider temporairement pour forcer le recalcul
-        updateCounter(currentDisplayText); // Redessiner avec les bonnes dimensions
-    }
-    
-    // Démarrer la connexion
-    connectWebSocket();
-    
-    // Récupération initiale des données
-    setTimeout(fetchCurrentData, 1000);
-    
-    // 🔄 REFRESH COMPLET : Recalcul des dimensions après 15 secondes
-    setTimeout(() => {
-        console.log('🔄 Refresh complet - recalcul des dimensions de police...');
-        forceRecalculateDisplay();
-    }, 15000);
-</script>
+        // Charger la config initiale puis connecter le WebSocket
+        loadInitialConfig();
+        connectConfigWebSocket();
+        
+        // ==================================================================
+        // RESTE DU CODE ORIGINAL (WebSocket compteur, animations, etc.)
+        // ==================================================================
+        
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        const counterEl = document.getElementById("counter");
+        let currentText = "";
+        let previousSubCount = null;
+        let animationDirection = "down";
+        let currentFollowgoal = null;
+        let isAnimating = false;
+        let animationQueue = [];
 
+        function createDigitElement(char, className, delay) {
+            const div = document.createElement("div");
+            div.className = className + " digit";
+            div.textContent = char;
+            div.style.animationDelay = `${delay}ms`;
+            return div;
+        }
+
+                function updateCounter(newText) {
+            if (newText === currentText) return;
+
+            const chars = newText.split("");
+            counterEl.innerHTML = "";
+            // Créer un div de mesure avec EXACTEMENT les mêmes styles que counter
+            const measureDiv = document.createElement("div");
+            measureDiv.style.visibility = "hidden";
+            measureDiv.style.position = "absolute";
+            measureDiv.style.whiteSpace = "nowrap";
+            measureDiv.style.display = "inline-block";
+            
+            // Copier TOUS les styles computés du counter (la clé pour une mesure exacte)
+            const counterStyles = getComputedStyle(counterEl);
+            measureDiv.style.fontSize = counterStyles.fontSize;
+            measureDiv.style.fontFamily = counterStyles.fontFamily;
+            measureDiv.style.fontWeight = counterStyles.fontWeight;
+            measureDiv.style.fontStyle = counterStyles.fontStyle;
+            measureDiv.style.letterSpacing = counterStyles.letterSpacing;
+            measureDiv.style.textShadow = counterStyles.textShadow;
+            measureDiv.style.webkitTextStroke = counterStyles.webkitTextStroke;
+            
+            console.log(` Mesure avec styles computés: ${counterStyles.fontFamily} ${counterStyles.fontSize}`);
+            
+            document.body.appendChild(measureDiv);
+
+            const totalChars = Math.max(chars.length, currentText.length);
+            let changedCount = 0;
+
+            for (let i = 0; i < totalChars; i++) {
+                if ((currentText[i] || "") !== (chars[i] || "")) {
+                    changedCount++;
+                }
+            }
+
+            const changeRatio = changedCount / totalChars;
+            const isFullReset = changeRatio > 0.5;
+
+            chars.forEach((char, index) => {
+                if (char === " ") {
+                    const spaceContainer = document.createElement("div");
+                    spaceContainer.className = "space-container";
+                    spaceContainer.innerHTML = "&nbsp;";
+                    counterEl.appendChild(spaceContainer);
+                } else {
+                    const container = document.createElement("div");
+                    container.className = "digit-container";
+
+                    // Mesurer avec getBoundingClientRect() car measureDiv a les MÊMES styles
+                    measureDiv.textContent = char;
+                    const charWidth = measureDiv.getBoundingClientRect().width;
+                    container.style.width = `${Math.max(charWidth, 10)}px`;
+
+                    const currentChar = currentText[index] || "";
+                    const charChanged = char !== currentChar;
+                    const delay = isFullReset ? 0 : index * 50;
+
+                    if (!charChanged && !isFullReset) {
+                        const staticDigit = createDigitElement(char, "static", 0);
+                        staticDigit.style.transform = "translateY(0)";
+                        container.appendChild(staticDigit);
+                    } else {
+                        const oldDigit = createDigitElement(currentChar === " " ? " " : currentChar, "old", delay);
+                        const newDigit = createDigitElement(char, "new", delay);
+
+                        container.appendChild(oldDigit);
+                        container.appendChild(newDigit);
+                        container.classList.add("animate");
+                        container.classList.add(`animate-${animationDirection}`);
+                    }
+
+                    counterEl.appendChild(container);
+                }
+            });
+
+            document.body.removeChild(measureDiv);
+            currentText = newText;
+        }
+        
+        function animateCounterProgressive(fromCount, toCount, goal) {
+            const steps = Math.abs(toCount - fromCount);
+            
+            if (steps === 0) {
+                displayGoalText(goal);
+                return;
+            }
+            
+            const totalDuration = 1000;
+            const startTime = performance.now();
+            const updateInterval = totalDuration / Math.max(steps, 60);
+            
+            console.log(`ðŸŽ° Animation: ${fromCount} â†’ ${toCount} (${steps} Ã©tapes)`);
+            
+            let lastDisplayedValue = fromCount;
+            
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / totalDuration, 1);
+                const easedProgress = easeOutCubic(progress);
+                const currentValue = Math.round(fromCount + (toCount - fromCount) * easedProgress);
+                
+                if (currentValue !== lastDisplayedValue || progress === 1) {
+                    lastDisplayedValue = currentValue;
+                    const intermediateGoal = { ...goal, current: currentValue };
+                    displayGoalText(intermediateGoal);
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    const finalGoal = { ...goal, current: toCount };
+                    displayGoalText(finalGoal);
+                    isAnimating = false;
+                    processAnimationQueue();
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function displayGoalText(goal) {
+            let displayText;
+            
+            if (goal.isMaxReached) {
+                displayText = goal.current.toString();
+            } else {
+                if (!goal.message || goal.message.trim() === '') {
+                    displayText = `${goal.current}/${goal.target}`;
+                } else {
+                    displayText = `${goal.current}/${goal.target} : ${goal.message}`;
+                }
+            }
+            
+            updateCounter(displayText);
+        }
+        
+        function processAnimationQueue() {
+            if (animationQueue.length > 0 && !isAnimating) {
+                const nextAnimation = animationQueue.shift();
+                isAnimating = true;
+                animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal);
+            }
+        }
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:8083');
+
+                ws.onopen = () => {
+                    console.log('âœ… ConnectÃ© au WebSocket (compteur)');
+                    reconnectAttempts = 0;
+                    fetchCurrentData();
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'follow_update' && data.goal) {
+                            updateFollowgoal(data.goal);
+                        }
+                    } catch (error) {
+                        console.error('âŒ Erreur parsing message:', error);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('âŒ Erreur WebSocket (compteur):', error);
+                };
+
+                ws.onclose = () => {
+                    console.log('ðŸ”Œ WebSocket compteur dÃ©connectÃ©, reconnexion dans 3s...');
+                    setTimeout(connectWebSocket, 3000);
+                };
+            } catch (error) {
+                console.error('âŒ Erreur connexion WebSocket:', error);
+                setTimeout(connectWebSocket, 3000);
+            }
+        }
+        
+        async function fetchCurrentData() {
+            try {
+                const cacheBuster = Date.now();
+                const response = await fetch(`http://localhost:8082/api/follow_goal?_=${cacheBuster}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateFollowgoal(data.goal);
+                }
+            } catch (error) {
+                console.error('âŒ Erreur rÃ©cupÃ©ration donnÃ©es FOLLOW goal:', error);
+            }
+        }
+        
+        function updateFollowgoal(goal) {
+            currentFollowgoal = goal;
+            
+            if (previousSubCount !== null && goal.current !== previousSubCount) {
+                animationDirection = goal.current > previousSubCount ? "down" : "up";
+                console.log(`ðŸ”„ Direction: ${animationDirection} (${previousSubCount} â†’ ${goal.current})`);
+                
+                animationQueue.push({
+                    from: previousSubCount,
+                    to: goal.current,
+                    goal: goal
+                });
+                
+                if (!isAnimating) {
+                    isAnimating = true;
+                    const animation = animationQueue.shift();
+                    animateCounterProgressive(animation.from, animation.to, animation.goal);
+                }
+            } else {
+                displayGoalText(goal);
+            }
+            
+            previousSubCount = goal.current;
+            console.log('ðŸ“Š Followgoal mis Ã  jour');
+        }
+        
+        function forceRecalculateDisplay() {
+            console.log(' Recalcul forcé des dimensions avec la police actuelle');
+            const currentDisplayText = currentText;
+            currentText = "";
+            counterEl.innerHTML = "";
+            void counterEl.offsetHeight;
+            updateCounter(currentDisplayText);
+        }
+        
+        connectWebSocket();
+        setTimeout(fetchCurrentData, 1000);
+        setTimeout(() => {
+            console.log('ðŸ”„ Refresh complet - recalcul des dimensions...');
+            forceRecalculateDisplay();
+        }, 15000);
+    </script>
 </body>
 </html>
+
+

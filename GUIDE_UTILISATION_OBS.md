@@ -120,39 +120,26 @@ Test-Path "obs\overlay_config_manager.py"
 
 ### ❌ L'overlay ne change pas de couleur
 
-**Cause** : Vous utilisez l'ancien overlay (non dynamique)
+**Cause** : Cache du navigateur OBS
 
 **Solution** :
-- Remplacer `subgoal_left.html` par `subgoal_left_dynamic.html` dans la source navigateur
+- Clic droit sur la source → Actualiser le cache du navigateur
+- Ou retirer et rajouter la source
 
 ---
 
 ## 📊 Résumé des fichiers
 
 ### Utilisés automatiquement :
-- ✅ `obs/obs_subcount_auto.py` - Script OBS (modifié)
-- ✅ `obs/overlay_config_manager.py` - Module Python
-- ✅ `obs/overlays/subgoal_left_dynamic.html` - Overlay dynamique
-- ✅ `server/server.js` - Serveur Node.js (modifié)
+- ✅ `obs/obs_subcount_auto.py` - Script OBS principal
+- ✅ `obs/overlay_config_manager.py` - Gestionnaire de configuration
+- ✅ `obs/overlays/*.html` - Overlays dynamiques (4 fichiers)
+- ✅ `server/server.js` - Serveur Node.js avec WebSocket
 - ✅ `config/overlay_config.json` - Configuration sauvegardée
 
 ### Pour information :
 - 📚 `docs/CONFIGURATION_DYNAMIQUE.md` - Documentation complète
-- 🧪 `scripts/test_dynamic_config.py` - Script de test
-
----
-
-## 🎯 Prochaines étapes (optionnel)
-
-### Convertir les autres overlays
-
-Pour avoir la configuration dynamique sur tous vos overlays :
-
-1. **Copier** `subgoal_left_dynamic.html`
-2. **Renommer** en `subgoal_right_dynamic.html`
-3. **Remplacer** les sources dans OBS
-
-Ou je peux le faire pour vous ! 😊
+- 📚 `CHANGELOG.md` - Historique des versions
 
 ---
 

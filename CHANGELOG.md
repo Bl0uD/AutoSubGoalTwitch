@@ -7,7 +7,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
-## [2.1.0] - 2024-01-12
+## [2.1.0] - 2024-01-13
 
 ### ✨ Nouveautés
 
@@ -17,6 +17,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - **Couleurs personnalisées** : Saisie CSS directe pour texte, ombre et contour
 - **WebSocket dédié** : Port 8084 pour la communication configuration en temps réel
 - **Mesure précise** : Calcul exact de la largeur des caractères avec tous les styles CSS appliqués
+- **Overlays unifiés** : Les overlays dynamiques sont maintenant les overlays par défaut (plus de duplication _dynamic)
 
 #### 📁 Structure Améliorée
 - Nouveau dossier `config/` pour stocker la configuration des overlays
@@ -54,13 +55,19 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 ### 📦 Fichiers Ajoutés
 - `config/overlay_config.json` - Configuration persistante des overlays
 - `obs/overlay_config_manager.py` - Gestionnaire de configuration Python
-- `obs/overlays/*_dynamic.html` (4 fichiers) - Overlays avec support temps réel
+- `obs/overlays/*.html` (4 fichiers) - Overlays dynamiques unifiés
 - `docs/NOUVEAU_SYSTEME_CONFIG_DYNAMIQUE.md` - Documentation du nouveau système
 - `CHANGELOG.md` - Ce fichier
+
+### 🔄 Fichiers Remplacés
+- Les anciens overlays HTML statiques ont été remplacés par leurs versions dynamiques
+- Plus besoin de maintenir deux versions (_dynamic et standard)
+- Tous les overlays supportent maintenant la configuration en temps réel
 
 ### 🧹 Nettoyage
 - Suppression des fichiers `__pycache__/`
 - Suppression des scripts de test (`test_*.py`)
+- Suppression des overlays statiques obsolètes
 - Suppression des backups de développement
 - Nettoyage des logs
 
