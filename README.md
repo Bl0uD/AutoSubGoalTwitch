@@ -1,84 +1,207 @@
 # AutoSubGoalTwitch
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.1.0)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.2.0)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.6+-yellow.svg)](https://www.python.org/)
-[![OBS](https://img.shields.io/badge/OBS-31.1.2+-purple.svg)](https://obsproject.com/)
+[![Python](https://img.shields.io/badge/python-3.6.8-yellow.svg)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/node.js-14+-green.svg)](https://nodejs.org/)
+[![OBS](https://img.shields.io/badge/OBS-27+-purple.svg)](https://obsproject.com/)
 
-## 📖 Description
-Application Python pour OBS Studio qui gère automatiquement les compteurs d'abonnés et de followers Twitch en temps réel avec mise à jour automatique.
-
-## ✨ Nouveautés v2.1.0
-- 🔄 Système de mise à jour automatique GitHub
-- 💾 Backups automatiques avant chaque mise à jour
-- 📊 Logs détaillés (update.log, error.log)
-- 🛡️ Gestion d'erreurs améliorée
-
-## 🚀 Installation rapide
-
-### Prérequis
-- Python 3.6+ 
-- Node.js 14+
-- OBS Studio 31.1.2+
-- Compte Twitch avec accès API
-
-### Installation
-
-1. **Téléchargez et extrayez** le projet
-2. **Exécutez** `INSTALLER.bat`
-3. **Configurez** `twitch_config.txt` (format: `client_id:client_secret:channel_name`)
-4. **Dans OBS** : Outils → Scripts → + → Sélectionnez `obs\obs_subcount_auto.py`
-5. **Ajoutez les overlays** : Source → Navigateur → `http://localhost:3000/subgoal-left` (ou `/subgoal-right`)
-
-## 📝 Utilisation
-
-### Boutons OBS
-- 🔄 **Refresh Server** : Redémarre le serveur
-- ⬆️ **Increment Sub** : +1 abonné (test)
-- ⬇️ **Decrement Sub** : -1 abonné (test)
-- 🔄 **Update Total** : Force sync Twitch
-- 🎯 **Update Sub Goal** : Change l'objectif
-
-### Configuration auto-update
-Éditez `obs/config/update_settings.json` :
-```json
-{
-  "auto_update_enabled": true,
-  "check_interval_hours": 6,
-  "backup_before_update": true
-}
-```
-
-## ⚠️ Dépannage
-
-### OBS crash (libcef.dll)
-```powershell
-.\scripts\fix_obs_browser_crash.ps1
-```
-
-### Port 3000 déjà utilisé
-```powershell
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-```
-
-### Erreur API Twitch
-Vérifiez `twitch_config.txt` et consultez `logs/error.log`
-
-### Windows Defender bloque
-Ajoutez le dossier aux exclusions : Sécurité Windows → Protection → Exclusions
-
-## 📊 Logs
-- `logs/update.log` : Opérations de mise à jour
-- `logs/error.log` : Erreurs critiques
-- Logs OBS : Aide → Fichiers journaux
-
-## 🔗 Liens
-- 📦 [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
-- 🐛 [Signaler un bug](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
-
-## 📄 License
-MIT License - Copyright (c) 2025 Bl0uD
+Système de compteurs Twitch pour OBS Studio avec **configuration dynamique en temps réel**.
 
 ---
-<div align="center">⭐ Star ce projet si il vous aide ! ⭐</div>
+
+## ✨ Fonctionnalités v2.2.0
+
+### 🎨 Configuration Dynamique
+- **Modification en temps réel** depuis OBS (police, couleurs, animations)
+- **50+ polices Windows** détectées automatiquement
+- **Couleurs personnalisées** CSS (texte, ombre, contour)
+- **Animations configurables** (vitesse et style)
+- **Pas de rechargement** de source nécessaire
+
+### 📊 Overlays
+- **4 overlays dynamiques** prêts à l'emploi
+- Compteurs subs (gauche/droite)
+- Compteurs follows (gauche/droite)
+- Support complet configuration temps réel
+
+### � Système
+- **Installation automatique** (Python, Node.js, dépendances)
+- **Mise à jour automatique** depuis GitHub
+- **Backups automatiques** des données
+- **3 WebSockets** (data, config, logs)
+- **3 interfaces web** (dashboard, config, admin)
+
+---
+
+## 🚀 Installation
+
+### 1. Télécharger
+Téléchargez la dernière version : [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
+
+### 2. Installer
+Double-cliquez sur **`INSTALLER.bat`** - Installation automatique (~5-10 min) :
+- ✅ Python 3.6.8
+- ✅ Node.js 14+
+- ✅ Toutes les dépendances
+- ✅ Structure des dossiers
+
+### 3. Configuration Twitch
+Éditez `data/twitch_config.txt` :
+```
+votre_client_id:votre_client_secret:votre_nom_de_chaine
+```
+
+**Obtenir les identifiants** : [Twitch Developer Console](https://dev.twitch.tv/console)
+
+### 4. Charger dans OBS
+1. **Outils → Scripts**
+2. **Cliquer sur "+"**
+3. **Sélectionner** `obs/obs_subcount_auto.py`
+
+Le serveur démarre automatiquement ! ✅
+
+### 5. Ajouter un overlay
+1. **Source → Navigateur**
+2. **Cocher** "Fichier local"
+3. **Parcourir** : `obs/overlays/subgoal_left.html` (ou autre)
+4. **Dimensions** : 800x600 (ajuster selon besoin)
+
+---
+
+## 🎨 Configuration dynamique
+
+### Dans OBS (script Python)
+
+#### Section "Configuration Overlays"
+- **Police** : Liste de toutes les polices Windows
+- **Taille** : 32px à 128px
+- **Couleurs** : Saisie CSS directe
+  - Texte : `white`, `#FF0000`, `rgb(255,0,0)`
+  - Ombre : `rgba(0,0,0,0.5)`
+  - Contour : `black`
+- **Animations** : Vitesse (Lent/Normal/Rapide) et style
+
+**Les changements sont instantanés** - Aucun rechargement nécessaire ! 🎉
+
+---
+
+## � Overlays disponibles
+
+| Fichier | Description |
+|---------|-------------|
+| `subgoal_left.html` | Compteur subs aligné à gauche |
+| `subgoal_right.html` | Compteur subs aligné à droite |
+| `followgoal_left.html` | Compteur follows aligné à gauche |
+| `followgoal_right.html` | Compteur follows aligné à droite |
+
+**Tous supportent la configuration dynamique** ✨
+
+---
+
+## 🌐 Interfaces web
+
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8082/dashboard.html` | Vue d'ensemble en temps réel |
+| `http://localhost:8082/config.html` | Modifier les objectifs |
+| `http://localhost:8082/admin.html` | Gestion avancée |
+
+---
+
+## 🔌 Architecture
+
+### Ports
+- **8082** : API REST
+- **8083** : WebSocket données (subs/follows)
+- **8084** : WebSocket configuration (styles)
+
+### Structure
+```
+SubcountAutomatic/
+├── INSTALLER.bat          # Installation automatique
+├── data/                  # Données utilisateur (compteurs, config Twitch)
+├── config/                # Configuration système
+├── obs/                   # Scripts OBS et overlays HTML
+├── server/                # Serveur Node.js
+├── web/                   # Interfaces web
+├── logs/                  # Logs système
+└── docs/                  # Documentation utilisateur
+```
+
+---
+
+## 📖 Documentation
+
+- **Guide complet** : [`docs/GUIDE_UTILISATEUR.md`](docs/GUIDE_UTILISATEUR.md)
+- **Release notes** : [`docs/RELEASE_v2.2.0.md`](docs/RELEASE_v2.2.0.md)
+- **Changelog** : [`CHANGELOG.md`](CHANGELOG.md)
+
+---
+
+## ⚙️ Prérequis
+
+- **OS** : Windows 10/11
+- **OBS Studio** : v27+ (avec support Python 3.6)
+- **Connexion internet** : Pour API Twitch
+
+Python et Node.js sont installés automatiquement par `INSTALLER.bat`
+
+---
+
+## 🐛 Dépannage
+
+### Le serveur ne démarre pas
+```powershell
+# Vérifier les ports
+netstat -ano | findstr "8082 8083 8084"
+```
+
+### L'overlay ne s'affiche pas
+1. Vérifier que le serveur est lancé (voyant vert dans OBS)
+2. Actualiser le cache : Clic droit sur source → Actualiser le cache
+3. Consulter les logs : `logs/obs_subcount_auto.log`
+
+### Les compteurs ne se mettent pas à jour
+1. Vérifier `data/twitch_config.txt`
+2. Consulter `logs/obs_subcount_auto.log`
+3. Redémarrer le serveur (bouton dans le script OBS)
+
+**Plus de solutions** : [`docs/GUIDE_UTILISATEUR.md`](docs/GUIDE_UTILISATEUR.md#dépannage)
+
+---
+
+## 🔗 Liens
+
+- 📦 [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
+- 📖 [Documentation complète](docs/GUIDE_UTILISATEUR.md)
+- 🐛 [Signaler un bug](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
+
+---
+
+## 📊 Statistiques v2.2.0
+
+- **Réduction code** : ~3100 lignes dupliquées éliminées
+- **Overlays** : 8 fichiers → 4 fichiers (-50%)
+- **Documentation** : Simplifiée (-71% de fichiers)
+- **Polices** : 500+ détectées → ~50-100 (filtrage intelligent)
+
+---
+
+## 📄 Licence
+
+MIT License - Copyright (c) 2025 Bl0uD
+
+Voir [`LICENSE`](LICENSE) pour plus de détails.
+
+---
+
+<div align="center">
+
+### 🎉 Configuration dynamique • Overlays unifiés • Interface redessinée
+
+**v2.2.0** - Prêt pour le stream ! ✨
+
+⭐ **Star ce projet si il vous aide !** ⭐
+
+</div>

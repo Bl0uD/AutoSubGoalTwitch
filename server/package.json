@@ -1,7 +1,7 @@
 {
   "name": "subcount-auto-device-code-grant",
-  "version": "1.0.0",
-  "description": "SubCount Auto avec Device Code Grant Flow pour Twitch",
+  "version": "2.2.0",
+  "description": "SubCount Auto avec configuration dynamique des overlays",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

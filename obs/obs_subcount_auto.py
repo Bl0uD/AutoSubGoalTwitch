@@ -13,8 +13,8 @@ Installation dans OBS :
 4. Le serveur se lancera automatiquement
 
 Auteur: Bl0uD
-Date: 11/11/2025
-Version: 2.1.0 (avec auto-update)
+Date: 13/11/2025
+Version: 2.2.0 (configuration dynamique complète)
 """
 
 import obspython as obs
@@ -70,7 +70,7 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # Variables globales
 server_process = None
