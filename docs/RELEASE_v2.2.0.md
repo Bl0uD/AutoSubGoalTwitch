@@ -65,7 +65,7 @@
 - **Impossible à louper** : Les utilisateurs verront immédiatement les nouvelles versions
 - **Commits** : d448759, 3701ccd, 51c8160
 
-Les utilisateurs en v2.1.0 verront une magnifique notification au démarrage d'OBS les informant de la disponibilité de v2.2.0 !
+Les utilisateurs en v2.2.0 verront une magnifique notification au démarrage d'OBS les informant de la disponibilité de v2.2.0 !
 
 ---
 

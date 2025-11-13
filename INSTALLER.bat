@@ -1,11 +1,11 @@
 @echo off
 REM ===================================================================
-REM  INSTALLEUR - AutoSubGoalTwitch v2.1.0
+REM  INSTALLEUR - AutoSubGoalTwitch v2.2.0
 REM ===================================================================
 
 echo.
 echo ===================================================================
-echo      INSTALLEUR AUTOSUBGOALTWITCH v2.1.0
+echo      INSTALLEUR AUTOSUBGOALTWITCH v2.2.0
 echo ===================================================================
 echo.
 echo Demarrage de l'installation...

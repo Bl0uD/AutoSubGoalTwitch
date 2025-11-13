@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script OBS pour SubCount Auto v2.1
+Script OBS pour SubCount Auto v2.2.0
 Démarre automatiquement le serveur SubCount Auto avec OBS
 et le ferme proprement à la fermeture d'OBS
 Inclut le système de vérification automatique des mises à jour
@@ -916,7 +916,7 @@ def reset_overlay_config(props, prop):
 # Fonctions OBS
 def script_description():
     """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.1</h2>"""
+    return """<h2>🎮 SubCount Auto v2.2.0</h2>"""
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
@@ -927,7 +927,7 @@ def script_load(settings):
     subcount_log_file = os.path.join(PROJECT_ROOT, 'logs', 'subcount_logs.txt')
     cleanup_log_file(subcount_log_file, max_size_mb=2, keep_lines=500)
     
-    log_message("🎬 Script OBS SubCount Auto v2.1 avec Auto-Update chargé", level="info")
+    log_message("🎬 Script OBS SubCount Auto v2.2.0 avec Auto-Update chargé", level="info")
     log_message(f"📂 Répertoire: {SCRIPT_DIR}", level="info")
     log_message(f"🚀 Fichier serveur: {START_SERVER_BAT}", level="info")
     log_message(f"📦 Version: {VERSION}", level="info")

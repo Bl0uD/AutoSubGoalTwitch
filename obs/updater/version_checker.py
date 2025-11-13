@@ -94,7 +94,7 @@ def check_for_updates():
         response.raise_for_status()
         latest_release = response.json()
         
-        # GitHub retourne tag_name comme "v2.1.0" ou "2.1.0"
+        # GitHub retourne tag_name comme "v2.2.0" ou "2.1.0"
         latest_version = latest_release.get('tag_name', '').lstrip('v')
         
         if not latest_version:
