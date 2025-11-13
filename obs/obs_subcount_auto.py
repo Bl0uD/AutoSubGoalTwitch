@@ -278,9 +278,23 @@ def check_for_updates_async():
         elif update_info.get('available'):
             latest = update_info.get('latest_version')
             
-            # Log simple dans OBS
-            message = f"🎉 Mise à jour v{latest} disponible ! Version actuelle: v{current_ver}. Téléchargez sur: https://github.com/Bl0uD/AutoSubGoalTwitch/releases"
-            log_message(message, "info", force_display=True)
+            # NOTIFICATION TRÈS VISIBLE de mise à jour disponible
+            log_message("", "info", force_display=True)
+            log_message("╔═══════════════════════════════════════════════════════════════════╗", "info", force_display=True)
+            log_message("║                                                                   ║", "info", force_display=True)
+            log_message("║          🎉 🎉 🎉  MISE À JOUR DISPONIBLE  🎉 🎉 🎉             ║", "info", force_display=True)
+            log_message("║                                                                   ║", "info", force_display=True)
+            log_message("╠═══════════════════════════════════════════════════════════════════╣", "info", force_display=True)
+            log_message(f"║   📦 Nouvelle version : v{latest:<42}║", "info", force_display=True)
+            log_message(f"║   📋 Version actuelle : v{current_ver:<42}║", "info", force_display=True)
+            log_message("║                                                                   ║", "info", force_display=True)
+            log_message("║   🔗 Téléchargement:                                              ║", "info", force_display=True)
+            log_message("║      https://github.com/Bl0uD/AutoSubGoalTwitch/releases          ║", "info", force_display=True)
+            log_message("║                                                                   ║", "info", force_display=True)
+            log_message("║   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !     ║", "info", force_display=True)
+            log_message("║                                                                   ║", "info", force_display=True)
+            log_message("╚═══════════════════════════════════════════════════════════════════╝", "info", force_display=True)
+            log_message("", "info", force_display=True)
         
     except Exception as e:
         print(f"ERROR: {e}")
