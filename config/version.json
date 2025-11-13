@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
-  "release_date": "2025-11-12",
+  "version": "2.2.0",
+  "release_date": "2025-11-13",
   "changelog": [
     "Système d'auto-update intégré avec vérification GitHub",
     "Notification popup visible dans OBS pour les mises à jour",
