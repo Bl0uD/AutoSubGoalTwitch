@@ -166,7 +166,9 @@ Tous les fichiers temporaires ont été supprimés, la structure est claire, l'i
 
 **Date de préparation** : 13 janvier 2024
 **Version** : 2.1.0
-**Commit** : (à venir après commit final)
+**Commits** :
+- `bf51b94` - Release initiale v2.1.0
+- `02058db` - Unification des overlays (suppression _dynamic)
 
 ---
 
