@@ -278,23 +278,26 @@ def check_for_updates_async():
         elif update_info.get('available'):
             latest = update_info.get('latest_version')
             
-            # NOTIFICATION TRÈS VISIBLE de mise à jour disponible
-            log_message("", "info", force_display=True)
-            log_message("=" * 70, "info", force_display=True)
-            log_message("", "info", force_display=True)
-            log_message("       🎉 🎉 🎉  MISE À JOUR DISPONIBLE  🎉 🎉 🎉", "info", force_display=True)
-            log_message("", "info", force_display=True)
-            log_message("=" * 70, "info", force_display=True)
-            log_message(f"   📦 Nouvelle version : v{latest}", "info", force_display=True)
-            log_message(f"   📋 Version actuelle : v{current_ver}", "info", force_display=True)
-            log_message("", "info", force_display=True)
-            log_message("   🔗 Téléchargement:", "info", force_display=True)
-            log_message("      https://github.com/Bl0uD/AutoSubGoalTwitch/releases", "info", force_display=True)
-            log_message("", "info", force_display=True)
-            log_message("   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !", "info", force_display=True)
-            log_message("", "info", force_display=True)
-            log_message("=" * 70, "info", force_display=True)
-            log_message("", "info", force_display=True)
+            # NOTIFICATION ULTRA-VISIBLE de mise à jour disponible
+            print("")  # Ligne vide
+            print("=" * 70)
+            print("")
+            print("       🎉 🎉 🎉  MISE À JOUR DISPONIBLE  🎉 🎉 🎉")
+            print("")
+            print("=" * 70)
+            print(f"   📦 Nouvelle version : v{latest}")
+            print(f"   📋 Version actuelle : v{current_ver}")
+            print("")
+            print("   🔗 Téléchargement:")
+            print("      https://github.com/Bl0uD/AutoSubGoalTwitch/releases")
+            print("")
+            print("   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !")
+            print("")
+            print("=" * 70)
+            print("")
+            
+            # Log simple pour le fichier de log
+            log_message(f"🎉 Mise à jour v{latest} disponible ! (actuelle: v{current_ver})", "info", force_display=True)
         
     except Exception as e:
         print(f"ERROR: {e}")
