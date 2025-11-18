@@ -251,6 +251,6 @@ Oui, automatiquement dans `data/*_backup.txt` et `backups/`.
 
 ## 🎉 Bon stream ! ✨
 
-**v2.2.0** - Avec configuration dynamique et mise à jour automatique
+**v2.2.1** - Avec configuration dynamique et mise à jour automatique
 
 </div>

@@ -11,7 +11,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### 📝 Documentation
 - **Simplification drastique** : 1 guide utilisateur complet (`docs/GUIDE_UTILISATEUR.md`)
-- **Note de release GitHub** : `docs/RELEASE_v2.2.0.md` (copier-coller direct)
+- **Note de release GitHub** : `docs/RELEASE_v2.2.1.md` (copier-coller direct)
 - **Suppression** : Toute documentation de développement et notes techniques
 - **Conservation** : README.md et CHANGELOG.md uniquement
 

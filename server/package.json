@@ -1,7 +1,7 @@
 {
   "name": "subcount-auto-device-code-grant",
-  "version": "2.2.0",
-  "description": "SubCount Auto avec configuration dynamique des overlays",
+  "version": "2.2.1",
+  "description": "SubCount Auto avec installeur robuste et guidage OBS amélioré",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

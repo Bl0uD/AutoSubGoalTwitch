@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script OBS pour SubCount Auto v2.2.0
+Script OBS pour SubCount Auto v2.2.1
 Démarre automatiquement le serveur SubCount Auto avec OBS
 et le ferme proprement à la fermeture d'OBS
 Inclut le système de vérification automatique des mises à jour
@@ -13,8 +13,8 @@ Installation dans OBS :
 4. Le serveur se lancera automatiquement
 
 Auteur: Bl0uD
-Date: 13/11/2025
-Version: 2.2.0 (configuration dynamique complète)
+Date: 18/11/2025
+Version: 2.2.1 (installeur robuste + guidage OBS amélioré)
 """
 
 import obspython as obs
@@ -916,7 +916,7 @@ def reset_overlay_config(props, prop):
 # Fonctions OBS
 def script_description():
     """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.2.0</h2>"""
+    return """<h2>🎮 SubCount Auto v2.2.1</h2>"""
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
@@ -927,7 +927,7 @@ def script_load(settings):
     subcount_log_file = os.path.join(PROJECT_ROOT, 'logs', 'subcount_logs.txt')
     cleanup_log_file(subcount_log_file, max_size_mb=2, keep_lines=500)
     
-    log_message("🎬 Script OBS SubCount Auto v2.2.0 avec Auto-Update chargé", level="info")
+    log_message("🎬 Script OBS SubCount Auto v2.2.1 avec Auto-Update chargé", level="info")
     log_message(f"📂 Répertoire: {SCRIPT_DIR}", level="info")
     log_message(f"🚀 Fichier serveur: {START_SERVER_BAT}", level="info")
     log_message(f"📦 Version: {VERSION}", level="info")
@@ -977,72 +977,47 @@ def script_defaults(settings):
 def script_properties():
     """Propriétés configurables du script"""
     props = obs.obs_properties_create()
-    
-    # ========== CONTRÔLES RAPIDES ==========
+
+	# ========== SECTION TWITCH (NOUVEAU) ==========
     obs.obs_properties_add_text(
-        props, "section_controls", 
-        "─────────────────────────────────────", 
+        props, "section_twitch", 
+        "────── 🟣 CONFIGURATION TWITCH 🟣 ───────", 
         obs.OBS_TEXT_INFO
     )
     
+    obs.obs_properties_add_button(
+        props, "connect_twitch", "🔗\tSe connecter à Twitch", 
+        lambda props, prop: connect_twitch()
+    )
+    
+    obs.obs_properties_add_button(
+        props, "disconnect_twitch", "🔌\tSe déconnecter de Twitch", 
+        lambda props, prop: disconnect_twitch()
+    )
+
+    # ========== SECTION SERVEUR ==========
     obs.obs_properties_add_text(
-        props, "header_controls", 
-        "🎛️  CONTRÔLES RAPIDES", 
+        props, "section_server", 
+        "\n───────── 📡 GESTION SERVEUR 📡 ─────────", 
         obs.OBS_TEXT_INFO
     )
     
     # Bouton Sync Twitch
     obs.obs_properties_add_button(
-        props, "sync_twitch", "🔄  Synchroniser avec Twitch", 
+        props, "sync_twitch", "🔄\tSynchro avec Twitch", 
         lambda props, prop: sync_with_twitch()
     )
     
-    # ========== FOLLOWS ==========
-    obs.obs_properties_add_text(
-        props, "spacer1", 
-        " ", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_text(
-        props, "section_follows", 
-        "👥  FOLLOWS", 
-        obs.OBS_TEXT_INFO
+    obs.obs_properties_add_button(
+        props, "restart_server", "⚙️\tRedémarrer le Serveur", 
+        lambda props, prop: restart_server()
     )
     
     obs.obs_properties_add_button(
-        props, "add_follow", "  ➕  Ajouter 1 Follow", 
-        lambda props, prop: add_follow()
+        props, "stop_server", "🔴\tArrêter le Serveur", 
+        lambda props, prop: stop_server()
     )
-    
-    obs.obs_properties_add_button(
-        props, "remove_follow", "  ➖  Retirer 1 Follow", 
-        lambda props, prop: remove_follow()
-    )
-    
-    # ========== SUBS ==========
-    obs.obs_properties_add_text(
-        props, "spacer2", 
-        " ", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_text(
-        props, "section_subs", 
-        "⭐  SUBS", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_button(
-        props, "add_sub", "  ➕  Ajouter 1 Sub (Tier 1)", 
-        lambda props, prop: add_sub()
-    )
-    
-    obs.obs_properties_add_button(
-        props, "remove_sub", "  ➖  Retirer 1 Sub", 
-        lambda props, prop: remove_sub()
-    )
-    
+
     # ========== CONFIGURATION OVERLAYS ==========
     if OVERLAY_CONFIG_AVAILABLE:
         obs.obs_properties_add_text(
@@ -1053,13 +1028,7 @@ def script_properties():
         
         obs.obs_properties_add_text(
             props, "separator_overlays", 
-            "─────────────────────────────────────", 
-            obs.OBS_TEXT_INFO
-        )
-        
-        obs.obs_properties_add_text(
-            props, "section_overlays", 
-            "🎨  CONFIGURATION OVERLAYS", 
+            "──────🎨 CONFIGURATION OVERLAYS 🎨──────", 
             obs.OBS_TEXT_INFO
         )
         
@@ -1119,7 +1088,7 @@ def script_properties():
         # Séparateur OU
         obs.obs_properties_add_text(
             props, "color_separator", 
-            "              ─────── OU ───────", 
+            "───────────────── OU ────────────────", 
             obs.OBS_TEXT_INFO
         )
         
@@ -1127,12 +1096,12 @@ def script_properties():
         custom_color = obs.obs_properties_add_text(
             props,
             "overlay_custom_color",
-            "  🎨  Code couleur CSS (validez avec Entrée)",
+            "  🎨  Code couleur CSS\n          (ex: #FFFFFF)",
             obs.OBS_TEXT_DEFAULT
         )
         obs.obs_property_set_long_description(
             custom_color,
-            "Ex: #FFF00, rgb(255,87,51), rgba(255,87,51,0.8)"
+            "Ex: #FF4578, rgb(255,87,51), rgba(255,87,51,0.8)"
         )
         
         obs.obs_property_set_modified_callback(custom_color, apply_custom_color)
@@ -1142,26 +1111,55 @@ def script_properties():
             props, "reset_overlay", "  🔄  Réinitialiser aux valeurs par défaut", 
             reset_overlay_config
         )
+
+    # ========== CONTRÔLES RAPIDES ==========
+    obs.obs_properties_add_text(
+        props, "section_controls", 
+        "\n────────🕹️ CONTRÔLES RAPIDES 🕹️─────────", 
+        obs.OBS_TEXT_INFO
+    )
+
+    # ========== FOLLOWS ==========
+    obs.obs_properties_add_text(
+        props, "section_follows", 
+        "👥  FOLLOWS", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    obs.obs_properties_add_button(
+        props, "add_follow", "  ➕  Ajouter 1 Follow", 
+        lambda props, prop: add_follow()
+    )
+    
+    obs.obs_properties_add_button(
+        props, "remove_follow", "  ➖  Retirer 1 Follow", 
+        lambda props, prop: remove_follow()
+    )
+    
+    # ========== SUBS ==========
+    obs.obs_properties_add_text(
+        props, "section_subs", 
+        "⭐  SUBS", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    obs.obs_properties_add_button(
+        props, "add_sub", "  ➕  Ajouter 1 Sub (Tier 1)", 
+        lambda props, prop: add_sub()
+    )
+    
+    obs.obs_properties_add_button(
+        props, "remove_sub", "  ➖  Retirer 1 Sub", 
+        lambda props, prop: remove_sub()
+    )
     
     # ========== INTERFACES WEB ==========
     obs.obs_properties_add_text(
-        props, "spacer4", 
-        " ", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_text(
         props, "separator_web", 
-        "─────────────────────────────────────", 
+        "\n─────────🌐 INTERFACES WEB 🌐──────────", 
         obs.OBS_TEXT_INFO
     )
-    
-    obs.obs_properties_add_text(
-        props, "section_web", 
-        "🌐  INTERFACES WEB", 
-        obs.OBS_TEXT_INFO
-    )
-    
+
     obs.obs_properties_add_button(
         props, "open_dashboard", "  🏠  Dashboard", 
         lambda props, prop: open_dashboard()
@@ -1175,40 +1173,6 @@ def script_properties():
     obs.obs_properties_add_button(
         props, "open_admin", "  🔧  Panel Admin", 
         lambda props, prop: open_admin()
-    )
-    
-    # ========== SECTION TWITCH (NOUVEAU) ==========
-    obs.obs_properties_add_text(
-        props, "section_twitch", 
-        "\n─────────────────────────────────────", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_button(
-        props, "connect_twitch", "🔗 Connecter Twitch", 
-        lambda props, prop: connect_twitch()
-    )
-    
-    obs.obs_properties_add_button(
-        props, "disconnect_twitch", "🔌 Déconnecter Twitch", 
-        lambda props, prop: disconnect_twitch()
-    )
-    
-    # ========== SECTION SERVEUR ==========
-    obs.obs_properties_add_text(
-        props, "section_server", 
-        "\n─────────────────────────────────────", 
-        obs.OBS_TEXT_INFO
-    )
-    
-    obs.obs_properties_add_button(
-        props, "restart_server", "    Redémarrer Serveur", 
-        lambda props, prop: restart_server()
-    )
-    
-    obs.obs_properties_add_button(
-        props, "stop_server", "⏹️ Arrêter Serveur", 
-        lambda props, prop: stop_server()
     )
     
     return props
