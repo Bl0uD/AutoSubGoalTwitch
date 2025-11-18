@@ -1,4 +1,4 @@
-# 🎉 AutoSubGoalTwitch v2.2.1
+# 🎉 AutoSubGoalTwitch v2.2.0
 
 **Configuration dynamique unifiée et structure optimisée**
 
@@ -65,7 +65,7 @@
 - **Impossible à louper** : Les utilisateurs verront immédiatement les nouvelles versions
 - **Commits** : d448759, 3701ccd, 51c8160
 
-Les utilisateurs en v2.2.1 verront une magnifique notification au démarrage d'OBS les informant de la disponibilité de v2.2.1 !
+Les utilisateurs en v2.2.0 verront une magnifique notification au démarrage d'OBS les informant de la disponibilité de v2.2.0 !
 
 ---
 
@@ -149,7 +149,7 @@ MIT License - Voir fichier `LICENSE`
 
 <div align="center">
 
-## 🎉 Bon stream avec v2.2.1 ! ✨
+## 🎉 Bon stream avec v2.2.0 ! ✨
 
 **Configuration dynamique • Overlays unifiés • Interface redessinée**
 

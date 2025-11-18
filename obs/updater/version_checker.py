@@ -113,7 +113,7 @@ def check_for_updates():
                     'published_at': latest_release.get('published_at', '')
                 }
             else:
-                print(f"✅ Vous avez la dernière version: {current_version}")
+                # Message visible pour version à jour (sera affiché à la fin)
                 return {
                     'available': False,
                     'current_version': current_version,

@@ -269,6 +269,13 @@ def check_for_updates_async():
         return
     
     try:
+        # Attendre que le serveur soit démarré avant d'afficher le message
+        max_wait = 10  # Attendre max 10 secondes
+        waited = 0
+        while not is_server_running and waited < max_wait:
+            time.sleep(0.5)
+            waited += 0.5
+        
         # Vérification silencieuse (pas de logs intermédiaires)
         current_ver = get_current_version()
         update_info = check_for_updates()
@@ -298,6 +305,14 @@ def check_for_updates_async():
             
             # Log simple pour le fichier de log
             log_message(f"🎉 Mise à jour v{latest} disponible ! (actuelle: v{current_ver})", "info", force_display=True)
+        else:
+            # MESSAGE VISIBLE pour version à jour - affiché APRÈS le démarrage du serveur
+            print("")
+            print("=" * 70)
+            print(f"   ✅ VOUS AVEZ LA DERNIÈRE VERSION: {current_ver}")
+            print("=" * 70)
+            print("")
+            log_message(f"✅ Version à jour: {current_ver}", "info", force_display=True)
         
     except Exception as e:
         print(f"ERROR: {e}")
