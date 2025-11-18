@@ -1,208 +1,75 @@
-# Release Notes - v2.2.1
+# 🎉 AutoSubGoalTwitch v2.2.1
 
-**Date de sortie** : 18 novembre 2025
+## 🐛 Corrections majeures
 
----
+### Structure du projet réorganisée
+- **Séparation claire** : Dossiers `obs/` (scripts OBS) et `app/` (serveur Node.js)
+- **package-lock.json** déplacé vers `app/server/`
+- **Tous les chemins corrigés** dans Python, Node.js et PowerShell
 
-## 🎯 Résumé
+### Corrections techniques
+- ✅ **INSTALLER.ps1** compatible PowerShell 5.1 (`Join-Path` enchaîné)
+- ✅ **Bouton "Se connecter à Twitch"** ouvre maintenant `/admin` au lieu de `/`
+- ✅ **Instructions overlays** corrigées (HTTP URLs uniquement, pas de `file://`)
+- ✅ **Warnings npm** supprimés si `node_modules` existe déjà
 
-Cette version corrige les problèmes d'installation sur les machines Windows neuves et améliore considérablement l'expérience utilisateur lors de la configuration initiale avec OBS.
+## 📁 Nouvelle structure
 
----
-
-## ✨ Nouvelles Fonctionnalités
-
-### 🔧 Installeur Robuste
-
-- **Installation Python améliorée** :
-  - Détection automatique de l'exécutable Python (`python` ou `py -3`)
-  - Vérification et installation de pip via `ensurepip` si nécessaire
-  - Mise à jour automatique de pip, setuptools et wheel
-  - Installation en mode `--user` avec fallback global
-  - Préférence pour les wheels binaires (`--prefer-binary`)
-  
-- **Messages d'erreur détaillés** :
-  - Guidance spécifique pour l'installation de `psutil`
-  - Liens vers Visual Studio Build Tools
-  - Liens vers PyPI pour téléchargement manuel de wheels
-
-### 🎨 Affichage du Chemin Python
-
-- **Détection automatique** du chemin d'installation Python
-- **Affichage clair** du dossier à copier dans OBS
-- **Trois méthodes de détection** pour maximiser la compatibilité :
-  - `where.exe python`
-  - `Get-Command python`
-  - `python -c "import sys; print(sys.executable)"`
-
-### 📋 Guidage Pas à Pas
-
-- **Pauses entre chaque étape** de configuration
-- **Instructions détaillées** pour :
-  1. Ouvrir OBS Studio
-  2. Configurer le chemin Python (Scripts > Paramètres Python)
-  3. Ajouter le script `obs_subcount_auto.py`
-  4. Redémarrer OBS
-  5. Se connecter à Twitch
-  6. Ajouter les overlays HTML
-  7. Démarrer le serveur
-
----
-
-## 🐛 Corrections de Bugs
-
-### Installation
-- ✅ **Fix installation psutil** sur machines Windows sans Build Tools
-- ✅ **Fix détection pip** avec tentative automatique d'installation
-- ✅ **Fix permissions** avec installation `--user` en priorité
-
-### Affichage
-- ✅ **Fix encodage** : Correction des caractères accentués (é, à, etc.)
-- ✅ **Fix affichage PowerShell** : Ajout de `$OutputEncoding`
-- ✅ **Fix messages** : Retrait des accents dans tous les messages
-
----
-
-## 📦 Fichiers Modifiés
-
-### Scripts d'Installation
-- `scripts/INSTALLER.ps1` - Logique d'installation complètement refactorisée
-- `INSTALLER.bat` - Mise à jour version
-
-### Script OBS
-- `obs/obs_subcount_auto.py` - Mise à jour version et date
-
-### Configuration
-- `server/package.json` - Version 2.2.1
-- `config/overlay_config.json` - Ajustements couleurs
-
----
-
-## 🔄 Mise à Jour depuis v2.2.0
-
-### Utilisateurs Existants
-
-Si vous avez déjà installé v2.2.0, vous pouvez :
-
-1. **Mise à jour simple** :
-   ```bash
-   git pull origin main
-   ```
-
-2. **Pas besoin de réinstaller** les dépendances si elles fonctionnent déjà
-
-### Nouvelles Installations
-
-Pour une nouvelle installation :
-
-1. **Télécharger** le projet depuis GitHub
-2. **Exécuter** `INSTALLER.bat`
-3. **Suivre** les instructions pas à pas affichées
-4. **Copier** le chemin Python affiché dans OBS
-
----
-
-## 🛠️ Détails Techniques
-
-### Améliorations de l'Installeur
-
-**Avant (v2.2.0)** :
-```powershell
-python -m pip install psutil
-# Échec sur machines sans Build Tools
+```
+Root/
+├── obs/                    (Scripts OBS)
+│   ├── obs_subcount_auto.py
+│   ├── updater/           (Système de mise à jour)
+│   ├── overlays/          (Fichiers HTML des overlays)
+│   └── data/              (twitch_config.txt, goals)
+│
+└── app/                    (Application serveur)
+    ├── server/            (Node.js + package.json)
+    ├── config/            (version.json, overlay_config.json)
+    ├── web/               (dashboard.html, admin.html, config.html)
+    ├── scripts/           (INSTALLER.ps1, START_SERVER.bat)
+    ├── logs/              (Fichiers de log)
+    ├── backups/           (Sauvegardes automatiques)
+    └── docs/              (Documentation utilisateur)
 ```
 
-**Après (v2.2.1)** :
-```powershell
-# 1. Détection Python
-$pythonExe = "python" ou "py -3"
+## 🚀 Installation
 
-# 2. Vérification pip
-pip --version || ensurepip
+1. **Téléchargez** le fichier ZIP ci-dessous
+2. **Extrayez** dans `Documents/StreamLabels/SubcountAutomatic`
+3. **Lancez** `INSTALLER.bat` en tant qu'administrateur
+4. **Suivez** les instructions dans OBS
 
-# 3. Upgrade dépendances
-pip install --upgrade pip setuptools wheel
+## 📖 Configuration des overlays
 
-# 4. Installation robuste
-pip install --user --prefer-binary psutil
-# Fallback si échec
-pip install --prefer-binary psutil
+⚠️ **IMPORTANT** : Les overlays doivent être ajoutés comme **Sources Navigateur** avec des URLs HTTP :
+
+```
+http://localhost:8082/obs/overlays/subgoal_left.html
+http://localhost:8082/obs/overlays/subgoal_right.html
+http://localhost:8082/obs/overlays/followgoal_left.html
+http://localhost:8082/obs/overlays/followgoal_right.html
 ```
 
-### Détection du Chemin Python
+❌ **N'utilisez JAMAIS "Fichier local"** - les overlays ne fonctionneront pas !
 
-```powershell
-# Méthode 1: where.exe
-$wherePython = where.exe python
+## ✨ Fonctionnalités (rappel)
 
-# Méthode 2: Get-Command
-$pythonCmd = Get-Command python
+- Configuration dynamique des overlays (police, couleurs, animations)
+- 50+ polices Windows disponibles
+- WebSocket temps réel (port 8084)
+- Interface OBS redessinée
+- Système de mise à jour automatique
+- Sauvegardes automatiques
 
-# Extraction du dossier
-$pythonDir = Split-Path -Parent $pythonPath
-# Exemple: C:\Users\BlouD\AppData\Local\Programs\Python\Python36
-```
+## 🔧 Prérequis
 
----
-
-## 📚 Documentation
-
-### Nouvelles Instructions OBS
-
-Le processus de configuration OBS est maintenant documenté en 7 étapes claires avec des pauses entre chaque étape pour permettre à l'utilisateur de suivre le rythme.
-
-### Messages d'Erreur Améliorés
-
-En cas d'échec d'installation de `psutil`, l'utilisateur reçoit :
-- Un message clair expliquant le problème
-- Un lien vers la documentation Visual Studio Build Tools
-- Un lien vers PyPI pour télécharger manuellement une wheel compatible
+- Windows 10/11
+- OBS Studio 28.0+
+- Python 3.6.8 (inclus dans OBS)
+- Node.js v20+ (installé automatiquement)
+- Git (installé automatiquement)
 
 ---
 
-## 🔗 Liens Utiles
-
-- **GitHub** : https://github.com/Bl0uD/AutoSubGoalTwitch
-- **Documentation** : README.md
-- **Issues** : https://github.com/Bl0uD/AutoSubGoalTwitch/issues
-- **Build Tools** : https://learn.microsoft.com/fr-fr/cpp/build/building-on-windows
-- **PyPI psutil** : https://pypi.org/project/psutil/#files
-
----
-
-## 👥 Contributeurs
-
-- **Bl0uD** - Développement et maintenance
-
----
-
-## 📝 Notes de Développement
-
-### Commits Principaux
-
-- `883ce21` - fix(installer): robustify Python modules installation
-- `8099752` - fix(installer): correct encoding issues and improve OBS setup instructions
-- `fe4db00` - feat(installer): add pause between each setup step for better guidance
-- `a40b811` - chore: bump version to 2.2.1
-
-### Tests Recommandés
-
-Avant de déployer en production, tester sur :
-- ✅ Machine Windows 10 neuve (sans Python)
-- ✅ Machine Windows 11 neuve (sans Python)
-- ✅ Machine avec Python déjà installé
-- ✅ Machine avec plusieurs versions Python
-
----
-
-## 🚀 Prochaines Étapes (v2.3.0)
-
-Fonctionnalités prévues pour la prochaine version :
-- Détection automatique Visual Studio Build Tools
-- Téléchargement automatique de wheels psutil
-- Interface web d'installation
-- Support multi-langue (EN/FR)
-
----
-
-**Merci d'utiliser AutoSubGoalTwitch !** 🎉
+**Note** : Cette version corrige tous les problèmes de chemins suite à la réorganisation du projet. Si vous rencontrez des problèmes, supprimez `app/server/node_modules/` et relancez `INSTALLER.bat`.
