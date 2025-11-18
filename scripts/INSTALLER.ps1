@@ -599,6 +599,63 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "         INSTALLATION TERMINEE AVEC SUCCES !" -ForegroundColor Green
     Write-Host "===================================================================" -ForegroundColor Green
     Write-Host ""
+    
+    # Afficher le chemin d'installation de Python pour OBS
+    Write-Host "===================================================================" -ForegroundColor Cyan
+    Write-Host "         CHEMIN D'INSTALLATION PYTHON (REQUIS POUR OBS)" -ForegroundColor Cyan
+    Write-Host "===================================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    try {
+        # Tenter de récupérer le chemin d'installation Python
+        $pythonPath = $null
+        
+        # Méthode 1: Utiliser where.exe (Windows)
+        $wherePython = where.exe python 2>$null
+        if ($wherePython -and $wherePython.Length -gt 0) {
+            $pythonPath = $wherePython[0]
+        }
+        
+        # Méthode 2: Utiliser Get-Command si where.exe échoue
+        if (-not $pythonPath) {
+            $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+            if ($pythonCmd) {
+                $pythonPath = $pythonCmd.Source
+            }
+        }
+        
+        # Méthode 3: Utiliser sys.executable depuis Python
+        if (-not $pythonPath) {
+            $pythonPath = python -c "import sys; print(sys.executable)" 2>$null
+        }
+        
+        if ($pythonPath) {
+            # Obtenir le dossier d'installation (sans python.exe)
+            $pythonDir = Split-Path -Parent $pythonPath
+            
+            Write-Host "Executable Python:" -ForegroundColor White
+            Write-Host "   $pythonPath" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "Dossier d'installation Python:" -ForegroundColor White
+            Write-Host "   $pythonDir" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "[IMPORTANT] Copiez le dossier ci-dessus pour OBS (etape 3)" -ForegroundColor Yellow
+        } else {
+            Write-Host "[ATTENTION] Impossible de detecter le chemin Python automatiquement" -ForegroundColor Yellow
+            Write-Host "Utilisez la commande suivante pour le trouver:" -ForegroundColor White
+            Write-Host "   where python" -ForegroundColor Cyan
+            Write-Host "   ou" -ForegroundColor White
+            Write-Host "   python -c `"import sys; print(sys.executable)`"" -ForegroundColor Cyan
+        }
+    } catch {
+        Write-Host "[ATTENTION] Erreur lors de la detection du chemin Python: $_" -ForegroundColor Yellow
+        Write-Host "Utilisez: where python" -ForegroundColor Cyan
+    }
+    
+    Write-Host ""
+    Write-Host "===================================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
     Write-Host "Prochaines etapes:" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "1. Configurer Twitch:" -ForegroundColor White
@@ -609,6 +666,8 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host ""
     Write-Host "3. Ajouter dans OBS:" -ForegroundColor White
     Write-Host "   Outils > Scripts > + > Selectionnez obs\obs_subcount_auto.py" -ForegroundColor Cyan
+    Write-Host "   IMPORTANT: Dans OBS Scripts > Proprietes Python" -ForegroundColor Yellow
+    Write-Host "   Collez le dossier d'installation Python affiche ci-dessus" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "4. Ajouter les overlays dans OBS:" -ForegroundColor White
     Write-Host "   Source > Navigateur > http://localhost:3000/subgoal-left" -ForegroundColor Cyan
