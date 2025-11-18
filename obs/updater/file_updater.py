@@ -33,7 +33,7 @@ def get_current_version():
     updater_dir = os.path.dirname(__file__)  # obs/updater/
     obs_dir = os.path.dirname(updater_dir)   # obs/
     project_root = os.path.dirname(obs_dir)  # racine
-    version_file_path = os.path.join(project_root, 'config', 'version.json')
+    version_file_path = os.path.join(project_root, 'app', 'config', 'version.json')
     
     with open(version_file_path, 'r') as version_file:
         version_data = json.load(version_file)

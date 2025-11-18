@@ -142,7 +142,7 @@ class OverlayConfigManager:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('success'):
-                    print(f"✅ Config overlay mise à jour: {updates}")
+                    # Succès silencieux - pas de log
                     return True
                 else:
                     print(f"❌ Erreur serveur: {result.get('error')}")

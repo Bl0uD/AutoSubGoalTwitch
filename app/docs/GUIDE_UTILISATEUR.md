@@ -1,4 +1,4 @@
-# 📖 Guide d'utilisation - SubcountAutomatic
+﻿# 📖 Guide d'utilisation - SubcountAutomatic
 
 Guide complet pour installer et utiliser SubcountAutomatic dans OBS Studio.
 
@@ -17,14 +17,14 @@ Double-cliquez sur `INSTALLER.bat` - L'installeur va automatiquement :
 - ✅ Installer Node.js (si nécessaire)  
 - ✅ Installer Git (si nécessaire)
 - ✅ Installer toutes les dépendances
-- ✅ Créer les dossiers nécessaires (`data/`, `logs/`, `backups/`, `config/`)
+- ✅ Créer les dossiers nécessaires (`obs/data/`, `app/logs/`, `app/backups/`, `app/config/`)
 - ✅ Créer les fichiers de configuration par défaut
 
 ⏱️ **Durée** : 5-10 minutes
 
 ### 3. Configuration Twitch
 
-Éditez le fichier `data/twitch_config.txt` :
+Éditez le fichier `obs/data/twitch_config.txt` :
 ```
 votre_client_id:votre_client_secret:votre_nom_de_chaine
 ```
@@ -51,16 +51,18 @@ Le serveur démarre automatiquement ! ✅
 
 1. **Ajouter une source** : `Source navigateur`
 2. **Nom** : `Subgoal Left` (exemple)
-3. **Cocher** : `Fichier local`
-4. **Parcourir** : `obs/overlays/subgoal_left.html`
-5. **Dimensions** : 800x600 (ajuster selon besoin)
+3. **URL** : `http://localhost:8082/obs/overlays/subgoal_left.html`
+4. **Dimensions** : 800x200 (ajuster selon besoin)
+5. **Cocher** : `Actualiser le navigateur lorsque la scène devient active`
 6. **OK**
 
-**Overlays disponibles :**
-- `subgoal_left.html` - Compteur subs aligné à gauche
-- `subgoal_right.html` - Compteur subs aligné à droite
-- `followgoal_left.html` - Compteur follows aligné à gauche
-- `followgoal_right.html` - Compteur follows aligné à droite
+> ⚠️ **IMPORTANT** : N'utilisez PAS "Fichier local" ! Les overlays doivent être chargés via HTTP pour que les WebSockets fonctionnent.
+
+**URLs disponibles :**
+- `http://localhost:8082/obs/overlays/subgoal_left.html` - Compteur subs gauche
+- `http://localhost:8082/obs/overlays/subgoal_right.html` - Compteur subs droite
+- `http://localhost:8082/obs/overlays/followgoal_left.html` - Compteur follows gauche
+- `http://localhost:8082/obs/overlays/followgoal_right.html` - Compteur follows droite
 
 ---
 
@@ -96,7 +98,7 @@ Dans le script OBS, section **"Configuration Overlays"** :
 - Ouvrir OBS → Le script démarre automatiquement le serveur
 
 **Option 2 - Manuel :**
-- Lancer `scripts/START_SERVER.bat`
+- Lancer `app/scripts/START_SERVER.bat`
 
 ### Modifier les objectifs
 
@@ -105,8 +107,8 @@ Dans le script OBS, section **"Configuration Overlays"** :
 - Section **"Follows"** → Modifier l'objectif
 
 **Ou manuellement :**
-- Éditer `data/total_subscriber_count_goal.txt`
-- Éditer `data/total_followers_count_goal.txt`
+- Éditer `obs/data/total_subscriber_count_goal.txt`
+- Éditer `obs/data/total_followers_count_goal.txt`
 
 ### Voir les compteurs actuels
 
@@ -114,8 +116,8 @@ Dans le script OBS, section **"Configuration Overlays"** :
 - Ouvrir : `http://localhost:8082/dashboard.html`
 
 **Option 2 - Fichiers :**
-- `data/total_subscriber_count.txt` - Nombre de subs actuel
-- `data/total_followers_count.txt` - Nombre de follows actuel
+- `obs/data/total_subscriber_count.txt` - Nombre de subs actuel
+- `obs/data/total_followers_count.txt` - Nombre de follows actuel
 
 ---
 
@@ -128,14 +130,14 @@ Dans le script OBS, section **"Configuration Overlays"** :
 netstat -ano | findstr "8082 8083 8084"
 ```
 
-**Si occupés**, modifier dans `server/server.js` (lignes ~30-35)
+**Si occupés**, modifier dans `app/server/server.js` (lignes ~30-35)
 
 ### L'overlay ne s'affiche pas
 
 1. **Vérifier que le serveur est lancé** (voyant vert dans le script OBS)
 2. **Actualiser le cache** : Clic droit sur la source → Actualiser le cache du navigateur
 3. **Vérifier le chemin** : Le fichier HTML doit être accessible
-4. **Consulter les logs** : `logs/obs_subcount_auto.log`
+4. **Consulter les logs** : `app/logs/obs_subcount_auto.log`
 
 ### Les changements de style ne s'appliquent pas
 
@@ -145,8 +147,8 @@ netstat -ano | findstr "8082 8083 8084"
 
 ### Les compteurs ne se mettent pas à jour
 
-1. **Vérifier Twitch config** : `data/twitch_config.txt` doit contenir vos vrais identifiants
-2. **Vérifier les logs** : `logs/obs_subcount_auto.log`
+1. **Vérifier Twitch config** : `obs/data/twitch_config.txt` doit contenir vos vrais identifiants
+2. **Vérifier les logs** : `app/logs/obs_subcount_auto.log`
 3. **Redémarrer le serveur** : Bouton dans le script OBS
 
 ---
@@ -169,7 +171,7 @@ Gestion avancée du système
 ### Créer un preset de style
 
 1. **Configurer** l'overlay comme désiré (police, couleurs, animations)
-2. **Sauvegarder** - La config est automatiquement sauvegardée dans `config/overlay_config.json`
+2. **Sauvegarder** - La config est automatiquement sauvegardée dans `app/config/overlay_config.json`
 3. **Créer un backup** : Copier `overlay_config.json` avec un nom (ex: `style_nuit.json`)
 4. **Restaurer** : Copier le backup sur `overlay_config.json` et relancer le serveur
 
@@ -234,7 +236,7 @@ Oui ! Les changements sont instantanés, sans recharger les sources OBS.
 Non, seulement OBS Studio (Python scripts non supportés par SLOBS).
 
 ### Les données sont-elles sauvegardées ?
-Oui, automatiquement dans `data/*_backup.txt` et `backups/`.
+Oui, automatiquement dans `obs/data/*_backup.txt` et `app/backups/`.
 
 ---
 
@@ -242,7 +244,7 @@ Oui, automatiquement dans `data/*_backup.txt` et `backups/`.
 
 **Problème non résolu ?**
 
-1. **Consulter les logs** : `logs/obs_subcount_auto.log`
+1. **Consulter les logs** : `app/logs/obs_subcount_auto.log`
 2. **Issues GitHub** : [github.com/Bl0uD/AutoSubGoalTwitch/issues](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
 
 ---

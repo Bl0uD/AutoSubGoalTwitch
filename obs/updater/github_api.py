@@ -25,7 +25,11 @@ def check_for_updates(current_version):
 
 def load_current_version():
     """Load the current version from the version.json file."""
-    version_file_path = os.path.join(os.path.dirname(__file__), '../config/version.json')
+    # Chemins mis à jour pour la nouvelle structure
+    updater_dir = os.path.dirname(__file__)  # obs/updater/
+    obs_dir = os.path.dirname(updater_dir)   # obs/
+    project_root = os.path.dirname(obs_dir)  # racine
+    version_file_path = os.path.join(project_root, 'app', 'config', 'version.json')
     with open(version_file_path, 'r') as f:
         version_info = json.load(f)
     return version_info.get('version')

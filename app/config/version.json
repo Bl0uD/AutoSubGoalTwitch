@@ -1,0 +1,28 @@
+{
+  "version": "2.2.1",
+  "release_date": "2025-11-19",
+  "changelog": [
+    "Réorganisation complète du projet (dossiers obs/ et app/)",
+    "Correction de tous les chemins (Python, Node.js, PowerShell)",
+    "Fix INSTALLER.ps1 pour PowerShell 5.1 (Join-Path enchaîné)",
+    "Fix bouton 'Se connecter à Twitch' (ouvre /admin)",
+    "Instructions overlays corrigées (HTTP URLs uniquement)",
+    "Suppression des warnings npm inutiles",
+    "Structure finale optimisée et professionnelle",
+    "Configuration dynamique complète des overlays",
+    "50+ polices Windows avec filtrage intelligent",
+    "WebSocket dédié (port 8084) pour configuration temps réel"
+  ],
+  "github_repo": "Bl0uD/AutoSubGoalTwitch",
+  "update_url": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
+  "check_interval_hours": 24,
+  "auto_download": false,
+  "critical_files": [
+    "obs_subcount_auto.py",
+    "server.js",
+    "config-crypto.js",
+    "package.json",
+    "INSTALLER.bat",
+    "START_SERVER.bat"
+  ]
+}

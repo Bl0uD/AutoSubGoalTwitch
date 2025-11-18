@@ -13,8 +13,8 @@ UPDATER_DIR = os.path.dirname(__file__)  # obs/updater/
 OBS_DIR = os.path.dirname(UPDATER_DIR)   # obs/
 PROJECT_ROOT = os.path.dirname(OBS_DIR)  # racine du projet
 
-VERSION_FILE = os.path.join(PROJECT_ROOT, 'config', 'version.json')
-UPDATE_CONFIG_FILE = os.path.join(PROJECT_ROOT, 'config', 'update_config.json')
+VERSION_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'version.json')
+UPDATE_CONFIG_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'update_config.json')
 
 # Import conditionnel de requests
 try:

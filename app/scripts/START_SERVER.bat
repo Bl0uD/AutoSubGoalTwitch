@@ -12,14 +12,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Aller dans le dossier parent du projet
-cd /d "%~dp0.."
+REM Aller dans le dossier racine du projet (2 niveaux au-dessus)
+cd /d "%~dp0..\.."
 
 echo Dossier projet: %CD%
 echo.
 
-REM Aller dans le dossier server
-cd server
+REM Aller dans le dossier app/server
+cd app\server
 
 REM Verifier si les dependances sont installees
 if not exist "node_modules" (

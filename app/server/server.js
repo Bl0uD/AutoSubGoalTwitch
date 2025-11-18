@@ -7,8 +7,8 @@ const fetch = require('node-fetch');
 const configCrypto = require('./config-crypto'); // Module de chiffrement sÃ©curisÃ©
 const crypto = require('crypto'); // Module natif pour gÃ©nÃ©ration sÃ©curisÃ©e
 
-// Dossier racine du projet (parent du dossier server)
-const ROOT_DIR = path.join(__dirname, '..');
+// Dossier racine du projet (2 niveaux au-dessus : app/server -> app -> racine)
+const ROOT_DIR = path.join(__dirname, '..', '..');
 
 // Fonction de logging centralisÃ©e
 function logEvent(level, message, data = null) {
@@ -23,7 +23,7 @@ function logEvent(level, message, data = null) {
     
     // Fichier de log
     try {
-        const logPath = path.join(ROOT_DIR, 'logs', 'subcount_logs.txt');
+        const logPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
         
         // Nettoyer le log si nÃ©cessaire avant d'Ã©crire
         cleanupLogFile(logPath);
@@ -661,7 +661,7 @@ async function canGrantSelfModerator() {
 // Sauvegarder le nombre de follows sur disque pour la persistence
 function saveFollowCountToFile(count) {
     try {
-        const backupPath = path.join(ROOT_DIR, 'data', 'followcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt');
         const timestamp = new Date().toISOString();
         const data = `${count}|${timestamp}`;
         fs.writeFileSync(backupPath, data, 'utf8');
@@ -674,7 +674,7 @@ function saveFollowCountToFile(count) {
 // Charger le nombre de follows depuis le disque
 function loadFollowCountFromFile() {
     try {
-        const backupPath = path.join(ROOT_DIR, 'data', 'followcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt');
         if (fs.existsSync(backupPath)) {
             const content = fs.readFileSync(backupPath, 'utf8').trim();
             const [count, timestamp] = content.split('|');
@@ -691,7 +691,7 @@ function loadFollowCountFromFile() {
 // Sauvegarder le nombre de subs sur disque pour la persistence
 function saveSubCountToFile(count) {
     try {
-        const backupPath = path.join(ROOT_DIR, 'data', 'subcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt');
         const timestamp = new Date().toISOString();
         const data = `${count}|${timestamp}`;
         fs.writeFileSync(backupPath, data, 'utf8');
@@ -704,7 +704,7 @@ function saveSubCountToFile(count) {
 // Charger le nombre de subs depuis le disque
 function loadSubCountFromFile() {
     try {
-        const backupPath = path.join(ROOT_DIR, 'data', 'subcount_backup.txt');
+        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt');
         if (fs.existsSync(backupPath)) {
             const content = fs.readFileSync(backupPath, 'utf8').trim();
             const [count, timestamp] = content.split('|');
@@ -1936,7 +1936,7 @@ async function syncTwitchSubs(reason = 'Synchronisation') {
 // Charger la configuration des objectifs pour les follows
 function loadFollowGoals() {
     try {
-        const configPath = path.join(ROOT_DIR, 'data', 'followgoal_config.txt');
+        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'followgoal_config.txt');
         if (fs.existsSync(configPath)) {
             const content = fs.readFileSync(configPath, 'utf8');
             const lines = content.split(/\r?\n/).filter(line => line.trim());
@@ -1969,7 +1969,7 @@ function loadFollowGoals() {
 // Charger la configuration des objectifs pour les subs
 function loadSubGoals() {
     try {
-        const configPath = path.join(ROOT_DIR, 'data', 'subgoals_config.txt');
+        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'subgoals_config.txt');
         if (fs.existsSync(configPath)) {
             const content = fs.readFileSync(configPath, 'utf8');
             const lines = content.split(/\r?\n/).filter(line => line.trim());
@@ -2007,8 +2007,8 @@ function loadGoals() {
 
 // Initialiser la surveillance des fichiers de configuration
 function setupConfigWatcher() {
-    const followConfigPath = path.join(ROOT_DIR, 'data', 'followgoal_config.txt');
-    const subConfigPath = path.join(ROOT_DIR, 'data', 'subgoals_config.txt');
+    const followConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'followgoal_config.txt');
+    const subConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'subgoals_config.txt');
     
     // ArrÃªter la surveillance prÃ©cÃ©dente si elle existe
     if (configWatcher) {
@@ -2366,10 +2366,10 @@ function updateFollowFiles(follows) {
     
     try {
         // Fichier pour les goals de follows
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_followers_count_goal.txt'), goalText);
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_followers_count_goal.txt'), goalText);
         
         // Fichier de base pour follows
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_followers_count.txt'), follows.toString());
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_followers_count.txt'), follows.toString());
         
         console.log(`ðŸ“Š Fichiers follows mis Ã  jour: ${follows} follows`);
     } catch (error) {
@@ -2399,10 +2399,10 @@ function updateSubFiles(subs) {
     
     try {
         // Fichier pour les goals de subs
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt'), goalText);
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), goalText);
         
         // Fichier de base pour subs
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count.txt'), subs.toString());
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), subs.toString());
         
         console.log(`ðŸ“Š Fichiers subs mis Ã  jour: ${subs} subs`);
     } catch (error) {
@@ -2482,7 +2482,7 @@ function broadcastUpdate() {
 // Charger la configuration Twitch
 function loadTwitchConfig() {
     try {
-        const configPath = path.join(ROOT_DIR, 'data', 'twitch_config.txt');
+        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'twitch_config.txt');
         if (fs.existsSync(configPath)) {
             // Chargement sÃ©curisÃ© avec dÃ©chiffrement automatique
             const content = configCrypto.loadEncrypted(configPath);
@@ -2538,7 +2538,7 @@ function loadTwitchConfig() {
 // Sauvegarder la configuration Twitch
 function saveTwitchConfig() {
     try {
-        const configPath = path.join(ROOT_DIR, 'data', 'twitch_config.txt');
+        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'twitch_config.txt');
         const configContent = [
             `CLIENT_ID=${twitchConfig.client_id || ''}`,
             `ACCESS_TOKEN=${twitchConfig.access_token || ''}`,
@@ -2557,15 +2557,15 @@ function saveTwitchConfig() {
 
 // Routes API
 app.get('/', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'web', 'dashboard.html'));
+    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'dashboard.html'));
 });
 
 app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'web', 'dashboard.html'));
+    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'dashboard.html'));
 });
 
 app.get('/config', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'web', 'config.html'));
+    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'config.html'));
 });
 
 app.get('/test', (req, res) => {
@@ -2577,7 +2577,7 @@ app.get('/test', (req, res) => {
 // ========================================
 
 app.get('/admin', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'web', 'admin.html'));
+    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'admin.html'));
 });
 
 // Route pour servir les overlays OBS
@@ -2586,8 +2586,8 @@ app.use('/obs/overlays', express.static(path.join(ROOT_DIR, 'obs', 'overlays')))
 app.get('/api/stats', (req, res) => {
     try {
         // Utiliser les variables globales pour les compteurs
-        const followGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'data', 'follower_goal.txt'), 'utf8')) || 0;
-        const subGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt'), 'utf8')) || 0;
+        const followGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8')) || 0;
+        const subGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8')) || 0;
         
         res.json({
             follows: currentFollows,
@@ -2725,7 +2725,7 @@ app.post('/admin/set-subs', (req, res) => {
 app.post('/admin/set-follow-goal', (req, res) => {
     try {
         const { goal } = req.body;
-        const goalPath = path.join(ROOT_DIR, 'follower_goal.txt');
+        const goalPath = path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt');
         
         fs.writeFileSync(goalPath, goal.toString(), 'utf8');
         
@@ -2751,7 +2751,7 @@ app.post('/admin/set-follow-goal', (req, res) => {
 app.post('/admin/set-sub-goal', (req, res) => {
     try {
         const { goal } = req.body;
-        const goalPath = path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt');
+        const goalPath = path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt');
         
         fs.writeFileSync(goalPath, goal.toString(), 'utf8');
         
@@ -2908,10 +2908,10 @@ app.get('/admin/test-polling', async (req, res) => {
 app.get('/admin/read-files', (req, res) => {
     try {
         const files = {
-            follows: fs.readFileSync(path.join(ROOT_DIR, 'follower_count.txt'), 'utf8'),
-            subs: fs.readFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count.txt'), 'utf8'),
-            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'follower_goal.txt'), 'utf8'),
-            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt'), 'utf8'),
+            follows: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'utf8'),
+            subs: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'utf8'),
+            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8'),
+            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8'),
             twitchConfig: twitchConfig
         };
         
@@ -2958,10 +2958,10 @@ app.get('/admin/backup-data', (req, res) => {
         
         const backupData = {
             timestamp: timestamp,
-            follows: fs.readFileSync(path.join(ROOT_DIR, 'follower_count.txt'), 'utf8'),
-            subs: fs.readFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count.txt'), 'utf8'),
-            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'follower_goal.txt'), 'utf8'),
-            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt'), 'utf8')
+            follows: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'utf8'),
+            subs: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'utf8'),
+            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8'),
+            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8')
         };
         
         const backupPath = path.join(backupDir, `backup_${timestamp}.json`);
@@ -3000,10 +3000,10 @@ app.get('/admin/restore-backup', (req, res) => {
         const latestBackup = path.join(backupDir, backups[0]);
         const backupData = JSON.parse(fs.readFileSync(latestBackup, 'utf8'));
         
-        fs.writeFileSync(path.join(ROOT_DIR, 'follower_count.txt'), backupData.follows, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count.txt'), backupData.subs, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'follower_goal.txt'), backupData.followGoal, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count_goal.txt'), backupData.subGoal, 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), backupData.follows, 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), backupData.subs, 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), backupData.followGoal, 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), backupData.subGoal, 'utf8');
         
         logEvent('INFO', `â†©ï¸ Admin: Backup restaurÃ© - ${backups[0]}`);
         res.json({ 
@@ -3020,8 +3020,8 @@ app.get('/admin/restore-backup', (req, res) => {
 // Corrupt Data Test
 app.get('/admin/corrupt-data', (req, res) => {
     try {
-        fs.writeFileSync(path.join(ROOT_DIR, 'follower_count.txt'), 'CORRUPTED_DATA', 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'data', 'total_subscriber_count.txt'), 'INVALID', 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'CORRUPTED_DATA', 'utf8');
+        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'INVALID', 'utf8');
         
         logEvent('WARN', 'ðŸ”¥ Admin: DonnÃ©es corrompues pour test');
         res.json({ 
@@ -3258,11 +3258,11 @@ app.get('/api/status', (req, res) => {
     const eventSubConnected = twitchEventSubWs && twitchEventSubWs.readyState === WebSocket.OPEN;
     
     // Backup info pour les follows
-    const followBackupExists = fs.existsSync(path.join(ROOT_DIR, 'data', 'followcount_backup.txt'));
+    const followBackupExists = fs.existsSync(path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt'));
     let followBackupInfo = null;
     if (followBackupExists) {
         try {
-            const content = fs.readFileSync(path.join(ROOT_DIR, 'data', 'followcount_backup.txt'), 'utf8');
+            const content = fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt'), 'utf8');
             const [count, timestamp] = content.split('|');
             followBackupInfo = {
                 count: parseInt(count) || 0,
@@ -3274,11 +3274,11 @@ app.get('/api/status', (req, res) => {
     }
     
     // Backup info pour les subs
-    const subBackupExists = fs.existsSync(path.join(ROOT_DIR, 'data', 'subcount_backup.txt'));
+    const subBackupExists = fs.existsSync(path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt'));
     let subBackupInfo = null;
     if (subBackupExists) {
         try {
-            const content = fs.readFileSync(path.join(ROOT_DIR, 'data', 'subcount_backup.txt'), 'utf8');
+            const content = fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt'), 'utf8');
             const [count, timestamp] = content.split('|');
             subBackupInfo = {
                 count: parseInt(count) || 0,
@@ -3325,7 +3325,7 @@ app.get('/api/logs-info', (req, res) => {
         const logsInfo = {};
         
         // Informations sur subcount_logs.txt
-        const subcountLogPath = path.join(ROOT_DIR, 'logs', 'subcount_logs.txt');
+        const subcountLogPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
         if (fs.existsSync(subcountLogPath)) {
             const stats = fs.statSync(subcountLogPath);
             logsInfo.subcountLogs = {
@@ -3367,7 +3367,7 @@ app.post('/api/clean-logs', (req, res) => {
         const { which = 'both' } = req.body; // 'subcount', 'obs', ou 'both'
         
         if (which === 'subcount' || which === 'both') {
-            const subcountLogPath = path.join(ROOT_DIR, 'logs', 'subcount_logs.txt');
+            const subcountLogPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
             if (fs.existsSync(subcountLogPath)) {
                 const originalSize = fs.statSync(subcountLogPath).size;
                 const header = `# Log nettoyÃ© manuellement via interface web - ${new Date().toISOString()}\n\n`;
@@ -3913,7 +3913,7 @@ function generateTestPage() {
 
 // Charger la configuration des overlays
 let overlayConfig = {};
-const overlayConfigPath = path.join(ROOT_DIR, 'config', 'overlay_config.json');
+const overlayConfigPath = path.join(ROOT_DIR, 'app', 'config', 'overlay_config.json');
 
 function loadOverlayConfig() {
     try {

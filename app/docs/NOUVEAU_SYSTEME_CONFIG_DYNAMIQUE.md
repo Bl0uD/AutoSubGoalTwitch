@@ -1,4 +1,4 @@
-# 🎉 SYSTÈME DE CONFIGURATION DYNAMIQUE DÉPLOYÉ !
+﻿# 🎉 SYSTÈME DE CONFIGURATION DYNAMIQUE DÉPLOYÉ !
 
 > **📢 Mise à jour v2.2.1** : Tous les overlays HTML sont maintenant dynamiques par défaut !  
 > Les fichiers `*_dynamic.html` ont été renommés pour remplacer les versions statiques.  
@@ -18,12 +18,12 @@ Vous pouvez maintenant **modifier en temps réel** la police, les couleurs et le
 
 ### 1. Configuration
 
-- **`config/overlay_config.json`**  
+- **`app/config/overlay_config.json`**  
   Stockage persistant de la configuration visuelle
 
 ### 2. Module Python
 
-- **`obs/overlay_config_manager.py`**  
+- **`app/scripts/overlay_config_manager.py`**  
   API Python complète pour modifier les overlays
 
 ### 3. Overlays HTML dynamiques (4 fichiers)
@@ -37,15 +37,15 @@ Tous avec support de configuration en temps réel intégré
 
 ### 4. Documentation
 
-- **`docs/CONFIGURATION_DYNAMIQUE.md`**  
+- **`app/docs/CONFIGURATION_DYNAMIQUE.md`**  
   Guide complet d'utilisation avec exemples
 
-- **`docs/CHANGEMENTS_DYNAMIC_CONFIG.md`**  
+- **`app/docs/CHANGEMENTS_DYNAMIC_CONFIG.md`**  
   Récapitulatif technique des modifications
 
 ### 5. Serveur modifié
 
-- **`server/server.js`**  
+- **`app/server/server.js`**  
   WebSocket Server (port 8084) + API REST ajoutés
 
 ---
@@ -155,7 +155,7 @@ def script_update(settings):
 
 ## 📚 Documentation complète
 
-Consultez **`docs/CONFIGURATION_DYNAMIQUE.md`** pour :
+Consultez **`app/docs/CONFIGURATION_DYNAMIQUE.md`** pour :
 - Architecture détaillée
 - Exemples de code complets
 - Guide d'intégration dans OBS
@@ -190,7 +190,7 @@ Consultez **`docs/CONFIGURATION_DYNAMIQUE.md`** pour :
 ## ✨ Avantages
 
 ✅ **Temps réel** : Changements instantanés sans rechargement OBS  
-✅ **Persistant** : Configuration sauvegardée dans `config/overlay_config.json`  
+✅ **Persistant** : Configuration sauvegardée dans `app/config/overlay_config.json`  
 ✅ **Simple** : API Python intuitive en 1 ligne de code  
 ✅ **Flexible** : Modification de n'importe quelle propriété CSS  
 ✅ **Sécurisé** : Backups automatiques avant toute modification  
@@ -287,7 +287,7 @@ config.update_full_config(
 ### En cas de problème :
 
 1. **Restaurer les backups** (voir section Backups)
-2. **Consulter** `docs/CONFIGURATION_DYNAMIQUE.md` (section Dépannage)
+2. **Consulter** `app/docs/CONFIGURATION_DYNAMIQUE.md` (section Dépannage)
 3. **Vérifier** que le serveur Node.js est démarré
 4. **Tester** avec `python scripts/test_dynamic_config.py`
 

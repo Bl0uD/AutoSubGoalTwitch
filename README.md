@@ -1,4 +1,4 @@
-# AutoSubGoalTwitch
+﻿# AutoSubGoalTwitch
 
 [![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.2.1)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -47,7 +47,7 @@ Double-cliquez sur **`INSTALLER.bat`** - Installation automatique (~5-10 min) :
 - ✅ Structure des dossiers
 
 ### 3. Configuration Twitch
-Éditez `data/twitch_config.txt` :
+Éditez `obs/data/twitch_config.txt` :
 ```
 votre_client_id:votre_client_secret:votre_nom_de_chaine
 ```
@@ -63,9 +63,11 @@ Le serveur démarre automatiquement ! ✅
 
 ### 5. Ajouter un overlay
 1. **Source → Navigateur**
-2. **Cocher** "Fichier local"
-3. **Parcourir** : `obs/overlays/subgoal_left.html` (ou autre)
-4. **Dimensions** : 800x600 (ajuster selon besoin)
+2. **URL** : `http://localhost:8082/obs/overlays/subgoal_left.html`
+3. **Dimensions** : 800x200 (ajuster selon besoin)
+4. **Cocher** : "Actualiser le navigateur lorsque la scène devient active"
+
+> ⚠️ **Important** : Utilisez l'URL HTTP (pas "Fichier local") pour que les WebSockets fonctionnent !
 
 ---
 
@@ -86,14 +88,14 @@ Le serveur démarre automatiquement ! ✅
 
 ---
 
-## � Overlays disponibles
+## 📺 Overlays disponibles
 
-| Fichier | Description |
-|---------|-------------|
-| `subgoal_left.html` | Compteur subs aligné à gauche |
-| `subgoal_right.html` | Compteur subs aligné à droite |
-| `followgoal_left.html` | Compteur follows aligné à gauche |
-| `followgoal_right.html` | Compteur follows aligné à droite |
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8082/obs/overlays/subgoal_left.html` | Compteur subs aligné à gauche |
+| `http://localhost:8082/obs/overlays/subgoal_right.html` | Compteur subs aligné à droite |
+| `http://localhost:8082/obs/overlays/followgoal_left.html` | Compteur follows aligné à gauche |
+| `http://localhost:8082/obs/overlays/followgoal_right.html` | Compteur follows aligné à droite |
 
 **Tous supportent la configuration dynamique** ✨
 
@@ -133,8 +135,8 @@ SubcountAutomatic/
 
 ## 📖 Documentation
 
-- **Guide complet** : [`docs/GUIDE_UTILISATEUR.md`](docs/GUIDE_UTILISATEUR.md)
-- **Release notes** : [`docs/RELEASE_v2.2.1.md`](docs/RELEASE_v2.2.1.md)
+- **Guide complet** : [`app/app/docs/GUIDE_UTILISATEUR.md`](app/app/docs/GUIDE_UTILISATEUR.md)
+- **Release notes** : [`app/app/docs/RELEASE_v2.2.1.md`](app/app/docs/RELEASE_v2.2.1.md)
 - **Changelog** : [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
@@ -160,21 +162,21 @@ netstat -ano | findstr "8082 8083 8084"
 ### L'overlay ne s'affiche pas
 1. Vérifier que le serveur est lancé (voyant vert dans OBS)
 2. Actualiser le cache : Clic droit sur source → Actualiser le cache
-3. Consulter les logs : `logs/obs_subcount_auto.log`
+3. Consulter les logs : `app/logs/obs_subcount_auto.log`
 
 ### Les compteurs ne se mettent pas à jour
-1. Vérifier `data/twitch_config.txt`
-2. Consulter `logs/obs_subcount_auto.log`
+1. Vérifier `obs/data/twitch_config.txt`
+2. Consulter `app/logs/obs_subcount_auto.log`
 3. Redémarrer le serveur (bouton dans le script OBS)
 
-**Plus de solutions** : [`docs/GUIDE_UTILISATEUR.md`](docs/GUIDE_UTILISATEUR.md#dépannage)
+**Plus de solutions** : [`app/app/docs/GUIDE_UTILISATEUR.md`](app/app/docs/GUIDE_UTILISATEUR.md#dépannage)
 
 ---
 
 ## 🔗 Liens
 
 - 📦 [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
-- 📖 [Documentation complète](docs/GUIDE_UTILISATEUR.md)
+- 📖 [Documentation complète](app/app/docs/GUIDE_UTILISATEUR.md)
 - 🐛 [Signaler un bug](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
 
 ---

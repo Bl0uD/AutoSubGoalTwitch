@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 Toutes les modifications notables de ce projet seront documentées dans ce fichier.
 
@@ -7,11 +7,42 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [2.2.1] - 2025-11-19
+
+### 🐛 Corrections
+- **Réorganisation complète du projet** : Séparation claire entre dossiers `obs/` et `app/`
+- **Correction des chemins** : Tous les chemins mis à jour dans Python, Node.js et PowerShell
+- **Fix INSTALLER.ps1** : Compatibilité PowerShell 5.1 (`Join-Path` enchaîné)
+- **Fix bouton Twitch** : Ouvre maintenant `/admin` au lieu de `/` 
+- **Overlays** : Instructions corrigées pour utiliser HTTP URLs uniquement
+- **Suppression warnings** : Plus de warning npm si `node_modules` existe
+- **package-lock.json** : Déplacé vers `app/server/`
+
+### 📁 Structure Finale
+```
+Root/
+├── obs/                    (Scripts OBS)
+│   ├── obs_subcount_auto.py
+│   ├── updater/
+│   ├── overlays/           (HTML overlays)
+│   └── data/               (Twitch config, goals)
+└── app/                    (Application serveur)
+    ├── server/             (Node.js + package.json)
+    ├── config/             (version.json, overlay_config.json)
+    ├── web/                (dashboard, admin, config)
+    ├── scripts/            (INSTALLER.ps1, START_SERVER.bat)
+    ├── logs/
+    ├── backups/
+    └── docs/
+```
+
+---
+
 ## [2.2.0] - 2024-01-13
 
 ### 📝 Documentation
-- **Simplification drastique** : 1 guide utilisateur complet (`docs/GUIDE_UTILISATEUR.md`)
-- **Note de release GitHub** : `docs/RELEASE_v2.2.1.md` (copier-coller direct)
+- **Simplification drastique** : 1 guide utilisateur complet (`app/app/docs/GUIDE_UTILISATEUR.md`)
+- **Note de release GitHub** : `app/app/docs/RELEASE_v2.2.1.md` (copier-coller direct)
 - **Suppression** : Toute documentation de développement et notes techniques
 - **Conservation** : README.md et CHANGELOG.md uniquement
 
@@ -40,8 +71,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - **Overlays unifiés** : Les overlays dynamiques sont maintenant les overlays par défaut (plus de duplication _dynamic)
 
 #### 📁 Structure Améliorée
-- Nouveau dossier `config/` pour stocker la configuration des overlays
-- Fichier `config/overlay_config.json` créé automatiquement avec valeurs par défaut
+- Nouveau dossier `app/config/` pour stocker la configuration des overlays
+- Fichier `app/config/overlay_config.json` créé automatiquement avec valeurs par défaut
 - Installeur amélioré : création automatique de tous les dossiers nécessaires
 
 #### 🖥️ Interface OBS Redessinée
@@ -63,7 +94,7 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - Polices prioritaires en tête de liste (SEA, Arial, Verdana, Times New Roman)
 
 #### Installeur
-- Création automatique du dossier `config/`
+- Création automatique du dossier `app/config/`
 - Génération de `overlay_config.json` avec configuration par défaut
 - Nettoyage amélioré des fichiers temporaires
 
@@ -73,10 +104,10 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - **Espacement** : Calcul précis de la largeur pour tous les types de polices
 
 ### 📦 Fichiers Ajoutés
-- `config/overlay_config.json` - Configuration persistante des overlays
-- `obs/overlay_config_manager.py` - Gestionnaire de configuration Python
+- `app/config/overlay_config.json` - Configuration persistante des overlays
+- `app/scripts/overlay_config_manager.py` - Gestionnaire de configuration Python
 - `obs/overlays/*.html` (4 fichiers) - Overlays dynamiques unifiés
-- `docs/NOUVEAU_SYSTEME_CONFIG_DYNAMIQUE.md` - Documentation du nouveau système
+- `app/app/docs/NOUVEAU_SYSTEME_CONFIG_DYNAMIQUE.md` - Documentation du nouveau système
 - `CHANGELOG.md` - Ce fichier
 
 ### 🔄 Fichiers Remplacés
@@ -105,6 +136,6 @@ Voir l'historique Git pour les versions antérieures.
 
 ## Liens
 
-- [Documentation](docs/)
+- [Documentation](app/docs/)
 - [Guide d'utilisation OBS](GUIDE_UTILISATION_OBS.md)
-- [Système de configuration dynamique](docs/NOUVEAU_SYSTEME_CONFIG_DYNAMIQUE.md)
+- [Système de configuration dynamique](app/app/docs/NOUVEAU_SYSTEME_CONFIG_DYNAMIQUE.md)

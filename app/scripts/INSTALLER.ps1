@@ -1,4 +1,4 @@
-# ===================================================================
+﻿# ===================================================================
 #  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.2.1
 # ===================================================================
 
@@ -14,8 +14,11 @@ Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.2.1" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Aller dans le dossier du projet (remonter d'un niveau depuis scripts/)
-$scriptDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# Aller dans le dossier racine du projet (remonter de 2 niveaux depuis app/scripts/)
+$scriptPath = $MyInvocation.MyCommand.Path
+$appScriptsDir = Split-Path -Parent $scriptPath
+$appDir = Split-Path -Parent $appScriptsDir
+$scriptDir = Split-Path -Parent $appDir
 Set-Location $scriptDir
 
 Write-Host "Dossier d'installation: $scriptDir" -ForegroundColor Yellow
@@ -281,7 +284,7 @@ function Install-NpmDependencies {
     Write-Host "=== INSTALLATION DES DEPENDANCES NPM ===" -ForegroundColor Cyan
     Write-Host ""
     
-    $serverPath = Join-Path $scriptDir "server"
+    $serverPath = Join-Path (Join-Path $scriptDir "app") "server"
     
     if (-not (Test-Path $serverPath)) {
         Write-Host "   [ERREUR] Dossier server/ introuvable" -ForegroundColor Red
@@ -431,16 +434,25 @@ function Create-Directories {
     Write-Host "=== CREATION DES DOSSIERS ===" -ForegroundColor Cyan
     Write-Host ""
     
-    $dirs = @("data", "logs", "backups", "config")
-    
-    foreach ($dir in $dirs) {
-        $dirPath = Join-Path $scriptDir $dir
+    # Dossiers dans app/
+    $appDirs = @("logs", "backups", "config")
+    foreach ($dir in $appDirs) {
+        $dirPath = Join-Path (Join-Path $scriptDir "app") $dir
         if (-not (Test-Path $dirPath)) {
             New-Item -ItemType Directory -Path $dirPath -Force | Out-Null
-            Write-Host "   [OK] Dossier cree: $dir" -ForegroundColor Green
+            Write-Host "   [OK] Dossier cree: app\$dir" -ForegroundColor Green
         } else {
-            Write-Host "   [SKIP] Dossier existe: $dir" -ForegroundColor Gray
+            Write-Host "   [SKIP] Dossier existe: app\$dir" -ForegroundColor Gray
         }
+    }
+    
+    # Dossier dans obs/
+    $obsDataPath = Join-Path (Join-Path $scriptDir "obs") "data"
+    if (-not (Test-Path $obsDataPath)) {
+        New-Item -ItemType Directory -Path $obsDataPath -Force | Out-Null
+        Write-Host "   [OK] Dossier cree: obs\data" -ForegroundColor Green
+    } else {
+        Write-Host "   [SKIP] Dossier existe: obs\data" -ForegroundColor Gray
     }
     
     return $true
@@ -454,8 +466,8 @@ function Create-ConfigFiles {
     Write-Host "=== CONFIGURATION INITIALE ===" -ForegroundColor Cyan
     Write-Host ""
     
-    $configPath = Join-Path $scriptDir "config"
-    $dataPath = Join-Path $scriptDir "data"
+    $configPath = Join-Path (Join-Path $scriptDir "app") "config"
+    $dataPath = Join-Path (Join-Path $scriptDir "obs") "data"
     
     # Copier les fichiers .example vers data/ s'ils n'existent pas
     $exampleFiles = Get-ChildItem -Path $configPath -Filter "*.example" -ErrorAction SilentlyContinue
@@ -702,11 +714,16 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     
     Write-Host "6. AJOUTER LES OVERLAYS:" -ForegroundColor White
     Write-Host "   a) Source > Navigateur" -ForegroundColor Cyan
-    Write-Host "   b) Les fichiers HTML sont dans: obs\overlays\" -ForegroundColor Green
-    Write-Host "      - subgoal_left.html (objectif Subs gauche)" -ForegroundColor Gray
-    Write-Host "      - subgoal_right.html (objectif Subs droite)" -ForegroundColor Gray
-    Write-Host "      - followgoal_left.html (objectif Follows gauche)" -ForegroundColor Gray
-    Write-Host "      - followgoal_right.html (objectif Follows droite)" -ForegroundColor Gray
+    Write-Host "   b) URL (PAS 'Fichier local') :" -ForegroundColor Yellow
+    Write-Host "      http://localhost:8082/obs/overlays/subgoal_left.html" -ForegroundColor Green
+    Write-Host "   c) Dimensions: 800x200" -ForegroundColor Cyan
+    Write-Host "   d) Cocher: 'Actualiser quand scene devient active'" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   URLS disponibles:" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/subgoal_left.html" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/subgoal_right.html" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/followgoal_left.html" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/followgoal_right.html" -ForegroundColor Gray
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow

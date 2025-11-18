@@ -1,6 +1,6 @@
 ﻿# Node modules
 node_modules/
-server/node_modules/
+app/server/node_modules/
 
 # Python
 __pycache__/
@@ -43,15 +43,15 @@ temp/
 # ============================================================
 
 # Scripts de test et développement
-scripts/test_*.py
-scripts/*test*.py
-scripts/debug_*.py
+app/scripts/test_*.py
+app/scripts/*test*.py
+app/scripts/debug_*.py
 
 # Scripts de restructuration/déploiement (déjà utilisés)
-scripts/restructure*.ps1
-scripts/update_paths.ps1
-scripts/deploy*.ps1
-scripts/fix_*.ps1
+app/scripts/restructure*.ps1
+app/scripts/update_paths.ps1
+app/scripts/deploy*.ps1
+app/scripts/fix_*.ps1
 
 # Fichiers de backup/corruption (debug uniquement)
 *.backup
@@ -65,9 +65,9 @@ scripts/fix_*.ps1
 debug_*.py
 
 # Documentation de développement
-docs/dev/
-docs/debug/
-docs/release/
+app/docs/dev/
+app/docs/debug/
+app/docs/release/
 DEVELOPMENT.md
 TODO.md
 

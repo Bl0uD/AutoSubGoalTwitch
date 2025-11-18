@@ -59,6 +59,11 @@ except ImportError:
 
 # Import du module de configuration dynamique des overlays
 try:
+    # Ajouter le dossier app/scripts au sys.path pour l'import
+    scripts_path = os.path.join(PROJECT_ROOT, "app", "scripts")
+    if scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
+    
     from overlay_config_manager import OverlayConfigManager
     overlay_config = OverlayConfigManager()
     OVERLAY_CONFIG_AVAILABLE = True
@@ -67,10 +72,10 @@ except ImportError:
     print("⚠️ Module overlay_config_manager non disponible - configuration dynamique désactivée")
 
 # Configuration
-START_SERVER_BAT = os.path.join(PROJECT_ROOT, "scripts", "START_SERVER.bat")
-LOG_FILE = os.path.join(PROJECT_ROOT, "logs", "obs_subcount_auto.log")
+START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
+LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 
 # Variables globales
 server_process = None
@@ -275,34 +280,6 @@ def check_for_updates_async():
             time.sleep(0.5)
             waited += 0.5
         
-        # SIMULATION TEST: Forcer une mise à jour disponible
-        TEST_MODE = True
-        if TEST_MODE:
-            current_ver = "2.2.0"
-            latest_ver = "2.3.0"
-            
-            # NOTIFICATION ULTRA-VISIBLE de mise à jour disponible
-            print("")  # Ligne vide
-            print("=" * 70)
-            print("")
-            print("       🎉 🎉 🎉  MISE À JOUR DISPONIBLE  🎉 🎉 🎉")
-            print("")
-            print("=" * 70)
-            print(f"   📦 Nouvelle version : v{latest_ver}")
-            print(f"   📋 Version actuelle : v{current_ver}")
-            print("")
-            print("   🔗 Téléchargement:")
-            print("      https://github.com/Bl0uD/AutoSubGoalTwitch/releases")
-            print("")
-            print("   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !")
-            print("")
-            print("=" * 70)
-            print("")
-            
-            # Log simple pour le fichier de log
-            log_message(f"🎉 Mise à jour v{latest_ver} disponible ! (actuelle: v{current_ver})", "info", force_display=True)
-            return
-        
         # Vérification silencieuse (pas de logs intermédiaires)
         current_ver = get_current_version()
         update_info = check_for_updates()
@@ -325,7 +302,7 @@ def check_for_updates_async():
             print("   🔗 Téléchargement:")
             print("      https://github.com/Bl0uD/AutoSubGoalTwitch/releases")
             print("")
-            print("   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !")
+            print("   ⚠️  Pensez à sauvegarder votre dossier 'obs/data/' avant MAJ !")
             print("")
             print("=" * 70)
             print("")
@@ -409,28 +386,28 @@ def check_dependencies():
             log_message(f"   ✅ npm {npm_version} installé", level="info")
         else:
             # npm non détecté mais vérifier si node_modules existe
-            node_modules_path = os.path.join(PROJECT_ROOT, 'server', 'node_modules')
+            node_modules_path = os.path.join(PROJECT_ROOT, 'app', 'server', 'node_modules')
             if os.path.exists(node_modules_path):
-                warnings.append("npm non détecté dans PATH mais node_modules présent")
-                log_message(f"   ⚠️  npm non détecté mais node_modules existe", level="warning")
+                # node_modules existe, npm n'est plus nécessaire
+                pass
             else:
                 errors.append("npm introuvable ou non fonctionnel")
                 log_message(f"   ❌ npm non détecté", level="error")
     except FileNotFoundError:
         # npm non trouvé, vérifier si node_modules existe déjà
-        node_modules_path = os.path.join(PROJECT_ROOT, 'server', 'node_modules')
+        node_modules_path = os.path.join(PROJECT_ROOT, 'app', 'server', 'node_modules')
         if os.path.exists(node_modules_path):
-            warnings.append("npm non détecté dans PATH mais node_modules présent")
-            log_message(f"   ⚠️  npm introuvable dans PATH (node_modules existe)", level="warning")
+            # node_modules existe, npm n'est plus nécessaire
+            pass
         else:
             errors.append("npm n'est pas installé ou pas dans PATH")
             log_message(f"   ❌ npm introuvable dans PATH", level="error")
     except Exception as e:
         # Erreur npm mais vérifier si node_modules existe
-        node_modules_path = os.path.join(PROJECT_ROOT, 'server', 'node_modules')
+        node_modules_path = os.path.join(PROJECT_ROOT, 'app', 'server', 'node_modules')
         if os.path.exists(node_modules_path):
-            warnings.append(f"Erreur vérification npm mais node_modules présent: {e}")
-            log_message(f"   ⚠️  Erreur npm: {e} (node_modules existe)", level="warning")
+            # node_modules existe, npm n'est plus nécessaire
+            pass
         else:
             errors.append(f"Erreur vérification npm: {e}")
             log_message(f"   ❌ Erreur: {e}", level="error")
@@ -461,10 +438,10 @@ def check_dependencies():
     log_message("5️⃣ Vérification des fichiers...", level="info")
     
     essential_files = {
-        'server/server.js': 'Serveur Node.js principal',
-        'server/package.json': 'Configuration npm',
-        'scripts/START_SERVER.bat': 'Script de démarrage',
-        'data/twitch_config.txt': 'Configuration Twitch'
+        'app/server/server.js': 'Serveur Node.js principal',
+        'app/server/package.json': 'Configuration npm',
+        'app/scripts/START_SERVER.bat': 'Script de démarrage',
+        'obs/data/twitch_config.txt': 'Configuration Twitch'
     }
     
     for file, description in essential_files.items():
@@ -477,7 +454,7 @@ def check_dependencies():
     
     # 6. Vérifier node_modules
     log_message("6️⃣ Vérification des dépendances Node.js...", level="info")
-    node_modules_path = os.path.join(PROJECT_ROOT, 'server', 'node_modules')
+    node_modules_path = os.path.join(PROJECT_ROOT, 'app', 'server', 'node_modules')
     if os.path.exists(node_modules_path):
         log_message(f"   ✅ Dossier node_modules présent", level="info")
         
@@ -520,12 +497,8 @@ def check_dependencies():
         return False, errors
     
     elif warnings:
-        log_message(f"⚠️  ATTENTION: {len(warnings)} avertissement(s)", level="warning")
-        for i, warning in enumerate(warnings, 1):
-            log_message(f"   {i}. {warning}", level="warning")
-        log_message("✅ Le serveur peut démarrer avec des fonctionnalités limitées", level="warning")
-        log_message("=" * 60, level="info")
-        
+        # Ne pas afficher les warnings si c'est juste npm manquant mais node_modules présent
+        # (le serveur fonctionne correctement)
         return True, warnings
     
     else:
@@ -605,9 +578,7 @@ def start_server():
             log_message("", level="error")
             return False
         
-        # Si des warnings mais pas d'erreurs, continuer
-        if deps_issues:
-            log_message("⚠️  Démarrage avec des fonctionnalités limitées...", level="warning")
+        # Si des warnings mais pas d'erreurs, continuer silencieusement
         
         # Vérifier que le fichier START_SERVER.bat existe
         if not os.path.exists(START_SERVER_BAT):
@@ -827,11 +798,11 @@ def connect_twitch():
     """Ouvre la page de configuration pour se connecter à Twitch"""
     try:
         webbrowser.open(f"{SERVER_URL}")
-        log_message("🔐 Page de connexion Twitch ouverte")
+        log_message("🔐 Page Admin Twitch ouverte")
         log_message("   Suivez les instructions pour vous connecter")
         return True
     except Exception as e:
-        log_message(f"❌ Erreur ouverture connexion Twitch: {e}")
+        log_message(f"❌ Erreur ouverture admin Twitch: {e}")
     return False
 
 def disconnect_twitch():
@@ -966,7 +937,7 @@ def script_load(settings):
     cleanup_log_file(LOG_FILE, max_size_mb=5, keep_lines=1000)
     
     # Nettoyer aussi le log du serveur Node.js
-    subcount_log_file = os.path.join(PROJECT_ROOT, 'logs', 'subcount_logs.txt')
+    subcount_log_file = os.path.join(PROJECT_ROOT, 'app', 'logs', 'subcount_logs.txt')
     cleanup_log_file(subcount_log_file, max_size_mb=2, keep_lines=500)
     
     log_message("🎬 Script OBS SubCount Auto v2.2.1 avec Auto-Update chargé", level="info")
