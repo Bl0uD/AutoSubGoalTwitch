@@ -333,31 +333,91 @@ function Install-PythonDependencies {
     
     # Liste des modules Python requis
     $pythonModules = @("psutil", "requests", "websocket-client")
-    
+
     Write-Host "   Installation des modules Python..." -ForegroundColor Yellow
     $allInstalled = $true
-    
-    foreach ($module in $pythonModules) {
-        Write-Host "   - Installation de $module..." -ForegroundColor Gray
+
+    # Détecter quel exécutable Python utiliser (python ou py)
+    $pythonExe = $null
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        $pythonExe = "python"
+    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
+        # Utiliser le launcher py pour forcer la version 3
+        $pythonExe = "py -3"
+    } else {
+        Write-Host "   [ERREUR] Python introuvable dans PATH. Installez Python 3.6+ puis relancez." -ForegroundColor Red
+        return $false
+    }
+
+    # S'assurer que pip est disponible
+    Write-Host "   Vérification de pip..." -ForegroundColor Gray
+    $pipOk = $true
+    try {
+        & $pythonExe -m pip --version > $null 2>&1
+        if ($LASTEXITCODE -ne 0) { throw 'pip non trouvé' }
+    } catch {
+        Write-Host "   pip introuvable - tentative d'installation via ensurepip..." -ForegroundColor Yellow
         try {
-            $output = python -m pip install $module 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "     [OK] $module installe" -ForegroundColor Green
-            } else {
-                Write-Host "     [ERREUR] Echec installation de $module" -ForegroundColor Red
-                $allInstalled = $false
-            }
+            & $pythonExe -m ensurepip --upgrade > $null 2>&1
+            & $pythonExe -m pip install --upgrade pip setuptools wheel > $null 2>&1
         } catch {
-            Write-Host "     [ERREUR] Erreur: $_" -ForegroundColor Red
+            Write-Host "   [ERREUR] Impossible d'installer pip automatiquement. Veuillez installer pip manuellement." -ForegroundColor Red
+            $pipOk = $false
+        }
+    }
+
+    if (-not $pipOk) {
+        return $false
+    }
+
+    # Mettre à jour pip/setuptools/wheel pour maximiser les chances d'obtenir des wheels binaires
+    Write-Host "   Mise à jour de pip, setuptools et wheel..." -ForegroundColor Gray
+    try {
+        & $pythonExe -m pip install --upgrade pip setuptools wheel > $null 2>&1
+    } catch {
+        Write-Host "   [WARN] Échec mise à jour pip (on continue)" -ForegroundColor Yellow
+    }
+
+    foreach ($module in $pythonModules) {
+        Write-Host "   - Installation de $module (préférence binaire, mode user)..." -ForegroundColor Gray
+        $installed = $false
+
+        # 1) Essayer d'installer en mode --user et privilégier les wheels précompilés
+        try {
+            & $pythonExe -m pip install --user --prefer-binary $module
+            if ($LASTEXITCODE -eq 0) { $installed = $true; Write-Host "     [OK] $module installe (user)" -ForegroundColor Green }
+        } catch {
+            Write-Host "     [WARN] Installation --user a échoué pour $module" -ForegroundColor Yellow
+        }
+
+        # 2) Si échec, essayer sans --user (peut nécessiter droits admin)
+        if (-not $installed) {
+            try {
+                & $pythonExe -m pip install --prefer-binary $module
+                if ($LASTEXITCODE -eq 0) { $installed = $true; Write-Host "     [OK] $module installe (global)" -ForegroundColor Green }
+            } catch {
+                Write-Host "     [WARN] Installation globale a échoué pour $module" -ForegroundColor Yellow
+            }
+        }
+
+        # 3) Si toujours échec et module est psutil, afficher aide spécifique
+        if (-not $installed) {
+            if ($module -ieq 'psutil') {
+                Write-Host "     [ERREUR] Impossible d'installer 'psutil'. Sur Windows, installez les 'Build Tools for Visual Studio' si nécessaire :" -ForegroundColor Red
+                Write-Host "       https://learn.microsoft.com/fr-fr/cpp/build/building-on-windows" -ForegroundColor Yellow
+                Write-Host "       Ou installez une roue binaire manuellement: https://pypi.org/project/psutil/#files" -ForegroundColor Yellow
+            } else {
+                Write-Host "     [ERREUR] Impossible d'installer '$module' via pip." -ForegroundColor Red
+            }
             $allInstalled = $false
         }
     }
-    
+
     if ($allInstalled) {
         Write-Host "   [OK] Tous les modules Python sont installes" -ForegroundColor Green
         return $true
     } else {
-        Write-Host "   [ATTENTION] Certains modules ont echoue" -ForegroundColor Yellow
+        Write-Host "   [ATTENTION] Certaines installations ont échoué. Voir les messages ci-dessus." -ForegroundColor Yellow
         return $false
     }
 }
