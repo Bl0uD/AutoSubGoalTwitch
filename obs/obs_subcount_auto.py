@@ -311,7 +311,7 @@ def check_for_updates_async():
             print(f"   ✅ VOUS AVEZ LA DERNIÈRE VERSION: {current_ver}")
             print("=" * 70)
             print("")
-            log_message(f"✅ Version à jour: {current_ver}", "info", force_display=True)
+            # Pas de log supplémentaire, le message encadré suffit
         
     except Exception as e:
         print(f"ERROR: {e}")
