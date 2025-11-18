@@ -664,8 +664,10 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "2. CONFIGUREZ PYTHON DANS OBS:" -ForegroundColor White
     Write-Host "   a) Allez dans: Outils > Scripts" -ForegroundColor Cyan
     Write-Host "   b) Onglet 'Parametres Python'" -ForegroundColor Cyan
-    Write-Host "   c) Collez le dossier Python affiche ci-dessus" -ForegroundColor Green
-    Write-Host "      (le chemin qui contient python.exe)" -ForegroundColor Gray
+    if ($pythonDir) {
+        Write-Host "   c) Faites 'Parcourir' collez ce chemin dans la barre de l'application:" -ForegroundColor Green
+        Write-Host "      $pythonDir" -ForegroundColor Red
+    }
     Write-Host ""
     
     pause
@@ -675,7 +677,8 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "   a) Toujours dans Outils > Scripts" -ForegroundColor Cyan
     Write-Host "   b) Onglet 'Scripts'" -ForegroundColor Cyan
     Write-Host "   c) Cliquez sur le bouton '+'" -ForegroundColor Cyan
-    Write-Host "   d) Selectionnez: obs\obs_subcount_auto.py" -ForegroundColor Green
+    Write-Host "   d) Selectionnez:"-ForegroundColor Green
+    Write-Host "      obs\obs_subcount_auto.py" -ForegroundColor Red
     Write-Host ""
     
     pause
@@ -700,10 +703,10 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "6. AJOUTER LES OVERLAYS:" -ForegroundColor White
     Write-Host "   a) Source > Navigateur" -ForegroundColor Cyan
     Write-Host "   b) Les fichiers HTML sont dans: obs\overlays\" -ForegroundColor Green
-    Write-Host "      - subgoal_left.html (objectif abonne gauche)" -ForegroundColor Gray
-    Write-Host "      - subgoal_right.html (objectif abonne droite)" -ForegroundColor Gray
-    Write-Host "      - followgoal_left.html (objectif follow gauche)" -ForegroundColor Gray
-    Write-Host "      - followgoal_right.html (objectif follow droite)" -ForegroundColor Gray
+    Write-Host "      - subgoal_left.html (objectif Subs gauche)" -ForegroundColor Gray
+    Write-Host "      - subgoal_right.html (objectif Subs droite)" -ForegroundColor Gray
+    Write-Host "      - followgoal_left.html (objectif Follows gauche)" -ForegroundColor Gray
+    Write-Host "      - followgoal_right.html (objectif Follows droite)" -ForegroundColor Gray
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow
@@ -726,5 +729,4 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host ""
 }
 
-Write-Host "Documentation complete: README.md" -ForegroundColor Gray
-Write-Host ""
+    pause
