@@ -4,8 +4,9 @@
 
 $ErrorActionPreference = "Continue"
 
-# Définir l'encodage pour l'affichage correct
+# Définir l'encodage UTF-8 pour éviter les problèmes d'affichage
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
@@ -350,11 +351,11 @@ function Install-PythonDependencies {
     }
 
     # S'assurer que pip est disponible
-    Write-Host "   Vérification de pip..." -ForegroundColor Gray
+    Write-Host "   Verification de pip..." -ForegroundColor Gray
     $pipOk = $true
     try {
         & $pythonExe -m pip --version > $null 2>&1
-        if ($LASTEXITCODE -ne 0) { throw 'pip non trouvé' }
+        if ($LASTEXITCODE -ne 0) { throw 'pip non trouve' }
     } catch {
         Write-Host "   pip introuvable - tentative d'installation via ensurepip..." -ForegroundColor Yellow
         try {
@@ -370,40 +371,40 @@ function Install-PythonDependencies {
         return $false
     }
 
-    # Mettre à jour pip/setuptools/wheel pour maximiser les chances d'obtenir des wheels binaires
-    Write-Host "   Mise à jour de pip, setuptools et wheel..." -ForegroundColor Gray
+    # Mettre a jour pip/setuptools/wheel pour maximiser les chances d'obtenir des wheels binaires
+    Write-Host "   Mise a jour de pip, setuptools et wheel..." -ForegroundColor Gray
     try {
         & $pythonExe -m pip install --upgrade pip setuptools wheel > $null 2>&1
     } catch {
-        Write-Host "   [WARN] Échec mise à jour pip (on continue)" -ForegroundColor Yellow
+        Write-Host "   [WARN] Echec mise a jour pip (on continue)" -ForegroundColor Yellow
     }
 
     foreach ($module in $pythonModules) {
-        Write-Host "   - Installation de $module (préférence binaire, mode user)..." -ForegroundColor Gray
+        Write-Host "   - Installation de $module (preference binaire, mode user)..." -ForegroundColor Gray
         $installed = $false
 
-        # 1) Essayer d'installer en mode --user et privilégier les wheels précompilés
+        # 1) Essayer d'installer en mode --user et privilegier les wheels precompiles
         try {
             & $pythonExe -m pip install --user --prefer-binary $module
             if ($LASTEXITCODE -eq 0) { $installed = $true; Write-Host "     [OK] $module installe (user)" -ForegroundColor Green }
         } catch {
-            Write-Host "     [WARN] Installation --user a échoué pour $module" -ForegroundColor Yellow
+            Write-Host "     [WARN] Installation --user a echoue pour $module" -ForegroundColor Yellow
         }
 
-        # 2) Si échec, essayer sans --user (peut nécessiter droits admin)
+        # 2) Si echec, essayer sans --user (peut necessiter droits admin)
         if (-not $installed) {
             try {
                 & $pythonExe -m pip install --prefer-binary $module
                 if ($LASTEXITCODE -eq 0) { $installed = $true; Write-Host "     [OK] $module installe (global)" -ForegroundColor Green }
             } catch {
-                Write-Host "     [WARN] Installation globale a échoué pour $module" -ForegroundColor Yellow
+                Write-Host "     [WARN] Installation globale a echoue pour $module" -ForegroundColor Yellow
             }
         }
 
-        # 3) Si toujours échec et module est psutil, afficher aide spécifique
+        # 3) Si toujours echec et module est psutil, afficher aide specifique
         if (-not $installed) {
             if ($module -ieq 'psutil') {
-                Write-Host "     [ERREUR] Impossible d'installer 'psutil'. Sur Windows, installez les 'Build Tools for Visual Studio' si nécessaire :" -ForegroundColor Red
+                Write-Host "     [ERREUR] Impossible d'installer 'psutil'. Sur Windows, installez les 'Build Tools for Visual Studio' si necessaire :" -ForegroundColor Red
                 Write-Host "       https://learn.microsoft.com/fr-fr/cpp/build/building-on-windows" -ForegroundColor Yellow
                 Write-Host "       Ou installez une roue binaire manuellement: https://pypi.org/project/psutil/#files" -ForegroundColor Yellow
             } else {
@@ -417,7 +418,7 @@ function Install-PythonDependencies {
         Write-Host "   [OK] Tous les modules Python sont installes" -ForegroundColor Green
         return $true
     } else {
-        Write-Host "   [ATTENTION] Certaines installations ont échoué. Voir les messages ci-dessus." -ForegroundColor Yellow
+        Write-Host "   [ATTENTION] Certaines installations ont echoue. Voir les messages ci-dessus." -ForegroundColor Yellow
         return $false
     }
 }
@@ -602,18 +603,22 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     
     # Afficher le chemin d'installation de Python pour OBS
     Write-Host "===================================================================" -ForegroundColor Cyan
-    Write-Host "         CHEMIN D'INSTALLATION PYTHON (REQUIS POUR OBS)" -ForegroundColor Cyan
+    Write-Host "     CHEMIN PYTHON POUR OBS (ETAPE IMPORTANTE)" -ForegroundColor Cyan
     Write-Host "===================================================================" -ForegroundColor Cyan
     Write-Host ""
     
     try {
-        # Tenter de récupérer le chemin d'installation Python
+        # Récupérer le chemin d'installation Python
         $pythonPath = $null
         
         # Méthode 1: Utiliser where.exe (Windows)
         $wherePython = where.exe python 2>$null
-        if ($wherePython -and $wherePython.Length -gt 0) {
-            $pythonPath = $wherePython[0]
+        if ($wherePython) {
+            if ($wherePython -is [array]) {
+                $pythonPath = $wherePython[0]
+            } else {
+                $pythonPath = $wherePython
+            }
         }
         
         # Méthode 2: Utiliser Get-Command si where.exe échoue
@@ -624,53 +629,64 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
             }
         }
         
-        # Méthode 3: Utiliser sys.executable depuis Python
-        if (-not $pythonPath) {
-            $pythonPath = python -c "import sys; print(sys.executable)" 2>$null
-        }
-        
         if ($pythonPath) {
             # Obtenir le dossier d'installation (sans python.exe)
             $pythonDir = Split-Path -Parent $pythonPath
             
-            Write-Host "Executable Python:" -ForegroundColor White
-            Write-Host "   $pythonPath" -ForegroundColor Green
+            Write-Host "Chemin complet Python:" -ForegroundColor White
+            Write-Host "  $pythonPath" -ForegroundColor Green
             Write-Host ""
-            Write-Host "Dossier d'installation Python:" -ForegroundColor White
-            Write-Host "   $pythonDir" -ForegroundColor Green
+            Write-Host "Dossier a copier pour OBS:" -ForegroundColor Yellow
+            Write-Host "  $pythonDir" -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "[IMPORTANT] Copiez le dossier ci-dessus pour OBS (etape 3)" -ForegroundColor Yellow
         } else {
-            Write-Host "[ATTENTION] Impossible de detecter le chemin Python automatiquement" -ForegroundColor Yellow
-            Write-Host "Utilisez la commande suivante pour le trouver:" -ForegroundColor White
-            Write-Host "   where python" -ForegroundColor Cyan
-            Write-Host "   ou" -ForegroundColor White
-            Write-Host "   python -c `"import sys; print(sys.executable)`"" -ForegroundColor Cyan
+            Write-Host "[ATTENTION] Impossible de detecter Python automatiquement" -ForegroundColor Yellow
+            Write-Host "Tapez 'where python' dans PowerShell pour le trouver" -ForegroundColor White
+            Write-Host ""
         }
     } catch {
-        Write-Host "[ATTENTION] Erreur lors de la detection du chemin Python: $_" -ForegroundColor Yellow
-        Write-Host "Utilisez: where python" -ForegroundColor Cyan
+        Write-Host "[ATTENTION] Erreur detection Python" -ForegroundColor Yellow
+        Write-Host "Tapez 'where python' dans PowerShell" -ForegroundColor White
+        Write-Host ""
     }
     
-    Write-Host ""
     Write-Host "===================================================================" -ForegroundColor Cyan
     Write-Host ""
     
-    Write-Host "Prochaines etapes:" -ForegroundColor Yellow
+    Write-Host "PROCHAINES ETAPES:" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "1. Configurer Twitch:" -ForegroundColor White
-    Write-Host "   Editez data\twitch_config.txt avec vos identifiants" -ForegroundColor Cyan
+    Write-Host "1. OUVRIR OBS STUDIO" -ForegroundColor White
     Write-Host ""
-    Write-Host "2. Demarrer le serveur:" -ForegroundColor White
-    Write-Host "   .\scripts\START_SERVER.bat" -ForegroundColor Cyan
+    Write-Host "2. CONFIGURER PYTHON DANS OBS:" -ForegroundColor White
+    Write-Host "   a) Allez dans: Outils > Scripts" -ForegroundColor Cyan
+    Write-Host "   b) Onglet 'Parametres Python'" -ForegroundColor Cyan
+    Write-Host "   c) Collez le dossier Python affiche ci-dessus" -ForegroundColor Green
+    Write-Host "      (le chemin qui contient python.exe)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "3. Ajouter dans OBS:" -ForegroundColor White
-    Write-Host "   Outils > Scripts > + > Selectionnez obs\obs_subcount_auto.py" -ForegroundColor Cyan
-    Write-Host "   IMPORTANT: Dans OBS Scripts > Proprietes Python" -ForegroundColor Yellow
-    Write-Host "   Collez le dossier d'installation Python affiche ci-dessus" -ForegroundColor Yellow
+    Write-Host "3. AJOUTER LE SCRIPT OBS:" -ForegroundColor White
+    Write-Host "   a) Toujours dans Outils > Scripts" -ForegroundColor Cyan
+    Write-Host "   b) Onglet 'Scripts'" -ForegroundColor Cyan
+    Write-Host "   c) Cliquez sur le bouton '+'" -ForegroundColor Cyan
+    Write-Host "   d) Selectionnez: obs\obs_subcount_auto.py" -ForegroundColor Green
     Write-Host ""
-    Write-Host "4. Ajouter les overlays dans OBS:" -ForegroundColor White
-    Write-Host "   Source > Navigateur > http://localhost:3000/subgoal-left" -ForegroundColor Cyan
+    Write-Host "4. REDEMARRER OBS" -ForegroundColor White
+    Write-Host "   (necessaire pour charger le script correctement)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "5. SE CONNECTER A TWITCH:" -ForegroundColor White
+    Write-Host "   a) Ouvrez: Outils > Scripts" -ForegroundColor Cyan
+    Write-Host "   b) Selectionnez le script obs_subcount_auto.py" -ForegroundColor Cyan
+    Write-Host "   c) Cliquez sur le bouton 'Se connecter a Twitch'" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "6. AJOUTER LES OVERLAYS:" -ForegroundColor White
+    Write-Host "   a) Source > Navigateur" -ForegroundColor Cyan
+    Write-Host "   b) Les fichiers HTML sont dans: obs\overlays\" -ForegroundColor Green
+    Write-Host "      - subgoal_left.html (objectif abonne gauche)" -ForegroundColor Gray
+    Write-Host "      - subgoal_right.html (objectif abonne droite)" -ForegroundColor Gray
+    Write-Host "      - followgoal_left.html (objectif follow gauche)" -ForegroundColor Gray
+    Write-Host "      - followgoal_right.html (objectif follow droite)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "7. DEMARRER LE SERVEUR:" -ForegroundColor White
+    Write-Host "   Executez: .\scripts\START_SERVER.bat" -ForegroundColor Cyan
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow
