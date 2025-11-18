@@ -275,6 +275,34 @@ def check_for_updates_async():
             time.sleep(0.5)
             waited += 0.5
         
+        # SIMULATION TEST: Forcer une mise à jour disponible
+        TEST_MODE = True
+        if TEST_MODE:
+            current_ver = "2.2.0"
+            latest_ver = "2.3.0"
+            
+            # NOTIFICATION ULTRA-VISIBLE de mise à jour disponible
+            print("")  # Ligne vide
+            print("=" * 70)
+            print("")
+            print("       🎉 🎉 🎉  MISE À JOUR DISPONIBLE  🎉 🎉 🎉")
+            print("")
+            print("=" * 70)
+            print(f"   📦 Nouvelle version : v{latest_ver}")
+            print(f"   📋 Version actuelle : v{current_ver}")
+            print("")
+            print("   🔗 Téléchargement:")
+            print("      https://github.com/Bl0uD/AutoSubGoalTwitch/releases")
+            print("")
+            print("   ⚠️  Pensez à sauvegarder votre dossier 'data/' avant MAJ !")
+            print("")
+            print("=" * 70)
+            print("")
+            
+            # Log simple pour le fichier de log
+            log_message(f"🎉 Mise à jour v{latest_ver} disponible ! (actuelle: v{current_ver})", "info", force_display=True)
+            return
+        
         # Vérification silencieuse (pas de logs intermédiaires)
         current_ver = get_current_version()
         update_info = check_for_updates()
