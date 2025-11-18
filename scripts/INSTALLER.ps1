@@ -655,28 +655,48 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     
     Write-Host "PROCHAINES ETAPES:" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "1. OUVRIR OBS STUDIO" -ForegroundColor White
+    Write-Host "1. OUVREZ OBS STUDIO" -ForegroundColor White
     Write-Host ""
-    Write-Host "2. CONFIGURER PYTHON DANS OBS:" -ForegroundColor White
+    
+    pause
+    Write-Host ""
+    
+    Write-Host "2. CONFIGUREZ PYTHON DANS OBS:" -ForegroundColor White
     Write-Host "   a) Allez dans: Outils > Scripts" -ForegroundColor Cyan
     Write-Host "   b) Onglet 'Parametres Python'" -ForegroundColor Cyan
     Write-Host "   c) Collez le dossier Python affiche ci-dessus" -ForegroundColor Green
     Write-Host "      (le chemin qui contient python.exe)" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "3. AJOUTER LE SCRIPT OBS:" -ForegroundColor White
+    
+    pause
+    Write-Host ""
+    
+    Write-Host "3. AJOUTEZ LE SCRIPT OBS:" -ForegroundColor White
     Write-Host "   a) Toujours dans Outils > Scripts" -ForegroundColor Cyan
     Write-Host "   b) Onglet 'Scripts'" -ForegroundColor Cyan
     Write-Host "   c) Cliquez sur le bouton '+'" -ForegroundColor Cyan
     Write-Host "   d) Selectionnez: obs\obs_subcount_auto.py" -ForegroundColor Green
     Write-Host ""
-    Write-Host "4. REDEMARRER OBS" -ForegroundColor White
+    
+    pause
+    Write-Host ""
+    
+    Write-Host "4. REDEMARREZ OBS" -ForegroundColor White
     Write-Host "   (necessaire pour charger le script correctement)" -ForegroundColor Gray
     Write-Host ""
+    
+    pause
+    Write-Host ""
+    
     Write-Host "5. SE CONNECTER A TWITCH:" -ForegroundColor White
     Write-Host "   a) Ouvrez: Outils > Scripts" -ForegroundColor Cyan
     Write-Host "   b) Selectionnez le script obs_subcount_auto.py" -ForegroundColor Cyan
     Write-Host "   c) Cliquez sur le bouton 'Se connecter a Twitch'" -ForegroundColor Green
     Write-Host ""
+    
+    pause
+    Write-Host ""
+    
     Write-Host "6. AJOUTER LES OVERLAYS:" -ForegroundColor White
     Write-Host "   a) Source > Navigateur" -ForegroundColor Cyan
     Write-Host "   b) Les fichiers HTML sont dans: obs\overlays\" -ForegroundColor Green
@@ -684,9 +704,6 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "      - subgoal_right.html (objectif abonne droite)" -ForegroundColor Gray
     Write-Host "      - followgoal_left.html (objectif follow gauche)" -ForegroundColor Gray
     Write-Host "      - followgoal_right.html (objectif follow droite)" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "7. DEMARRER LE SERVEUR:" -ForegroundColor White
-    Write-Host "   Executez: .\scripts\START_SERVER.bat" -ForegroundColor Cyan
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow
@@ -711,8 +728,3 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
 
 Write-Host "Documentation complete: README.md" -ForegroundColor Gray
 Write-Host ""
-
-pause
-Write-Host ""
-
-pause
