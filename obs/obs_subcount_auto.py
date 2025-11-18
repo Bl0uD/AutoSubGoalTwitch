@@ -116,8 +116,7 @@ def log_message(message, level="info", force_display=False):
         else:
             logging.info(f"[OBS SubCount Auto] {message}")
         
-        # Afficher aussi dans la console
-        print(f"[OBS SubCount Auto] {message}")
+        # Le StreamHandler affiche déjà dans la console, pas besoin de print()
 
 def get_windows_fonts():
     """
