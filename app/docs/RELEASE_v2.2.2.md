@@ -81,55 +81,6 @@ http://localhost:8082/obs/overlays/followgoal_right.html
 
 ---
 
-## 🔍 Détails techniques (pour développeurs)
-
-### Corrections appliquées dans `server.js`
-
-#### 1. Polling intelligent
-```javascript
-// AVANT : Probabiliste (33% seulement)
-if (sessionId && Math.random() > 0.33) return;
-
-// APRÈS : Constant (100% du temps)
-async function pollFollowCount() {
-    // Vérifie systématiquement toutes les 10s
-    const result = await getTwitchFollowCount();
-    if (newFollowCount !== lastKnownFollowCount) {
-        // Détecte TOUS les changements (+ et -)
-    }
-}
-```
-
-#### 2. Synchronisation lastKnownFollowCount
-```javascript
-// Ajouté dans flushFollowBatch()
-lastKnownFollowCount = currentFollows;
-
-// Ajouté dans updateFollowCount()
-lastKnownFollowCount = newCount;
-```
-
-#### 3. Result Pattern
-```javascript
-// getTwitchFollowCount() retourne maintenant :
-{
-    success: true|false,
-    data: followCount,
-    error: 'message',
-    code: 'NOT_CONFIGURED'|'TOKEN_EXPIRED'|'API_ERROR'|...
-}
-```
-
-#### 4. EventQueue thread-safe
-```javascript
-// Remplacement de eventBuffer par EventQueue
-eventQueue.add({
-    id: `follow-${Date.now()}`,
-    type: VALID_EVENT_TYPES.FOLLOW,
-    data: { count: 1 }
-});
-```
-
 ### Rate Limiting Twitch
 
 **Configuration actuelle** :
@@ -171,10 +122,8 @@ Root/
         ├── GUIDE_UTILISATEUR.md
         ├── RELEASE_v2.2.0.md
         ├── RELEASE_v2.2.1.md
-        ├── RELEASE_v2.2.2.md ← **Vous êtes ici**
-        ├── CORRECTIONS_APPLIQUEES.md
-        ├── CORRECTIONS_FINALES.md
-        └── FIX_UNFOLLOW_SYNC.md
+        └── RELEASE_v2.2.2.md ← **Vous êtes ici**
+
 ```
 
 ---
@@ -185,21 +134,14 @@ Root/
 - ✅ **Follows en temps réel** via EventSub WebSocket
 - ✅ **Unfollows détectés** via polling intelligent (10s max)
 - ✅ **Subs en temps réel** (Tier 1, 2, 3, Prime, Gifted)
-- ✅ **Bits** comptabilisés
 - ✅ **Synchronisation automatique** toutes les 10 secondes
-
-### Système de goals
-- ✅ **Follow goals** : 4 paliers configurables (par 100, 250, 500, 1000)
-- ✅ **Sub goals** : 5 paliers configurables (par 10, 25, 50, 100, 250)
-- ✅ **Progression visuelle** : Barre animée + pourcentage
-- ✅ **Réinitialisation automatique** au palier suivant
 
 ### Overlays configurables
 - ✅ **50+ polices Windows** détectées automatiquement
 - ✅ **Couleurs personnalisées** (texte, ombre, contour)
 - ✅ **Animations** : Fade, Slide, Bounce, Wave
 - ✅ **Configuration temps réel** sans recharger OBS
-- ✅ **WebSocket dédié** (port 8084)
+- ✅ **WebSocket dédié**
 
 ### Administration
 - ✅ **Dashboard complet** : Vue d'ensemble + graphiques
