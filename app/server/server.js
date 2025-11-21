@@ -1,40 +1,50 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const fetch = require('node-fetch');
-const configCrypto = require('./config-crypto'); // Module de chiffrement sÃ©curisÃ©
-const crypto = require('crypto'); // Module natif pour gÃ©nÃ©ration sÃ©curisÃ©e
+const configCrypto = require('./config-crypto'); // Module de chiffrement sécurisé
+const crypto = require('crypto'); // Module natif pour génération sécurisée
 
 // Dossier racine du projet (2 niveaux au-dessus : app/server -> app -> racine)
 const ROOT_DIR = path.join(__dirname, '..', '..');
 
-// Fonction de logging centralisÃ©e
+// Fonction de logging centralisée
 function logEvent(level, message, data = null) {
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] [${level}] ${message}`;
     
     // Console
     console.log(logMessage);
-    if (data) {
-        console.log('ðŸ“„ DonnÃ©es:', data);
+    
+    // Ne logger les données que si nécessaire et filtrées (pas de raw_event volumineux)
+    if (data && level !== 'INFO') {
+        const safeData = {};
+        if (data.user_name) safeData.user_name = data.user_name;
+        if (data.user_id) safeData.user_id = data.user_id;
+        if (data.count) safeData.count = data.count;
+        if (data.error) safeData.error = data.error;
+        if (data.tier) safeData.tier = data.tier;
+        if (data.reason) safeData.reason = data.reason;
+        // ❌ Jamais raw_event complet
+        console.log('📄 Données:', safeData);
     }
     
     // Fichier de log
     try {
         const logPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
         
-        // Nettoyer le log si nÃ©cessaire avant d'Ã©crire
+        // Nettoyer le log si nécessaire avant d'écrire
         cleanupLogFile(logPath);
         
         const logEntry = data ? 
-            `${logMessage}\nDonnÃ©es: ${JSON.stringify(data, null, 2)}\n---\n` : 
+            `${logMessage}\nDonnées: ${JSON.stringify(data, null, 2)}\n---\n` : 
             `${logMessage}\n`;
         
         fs.appendFileSync(logPath, logEntry, 'utf8');
     } catch (error) {
-        console.error('âŒ Erreur Ã©criture log:', error.message);
+        console.error('❌ Erreur écriture log:', error.message);
     }
 }
 
@@ -45,136 +55,96 @@ function cleanupLogFile(logFilePath, maxSizeMB = 2, keepLines = 500) {
             const stats = fs.statSync(logFilePath);
             const fileSizeMB = stats.size / (1024 * 1024);
             
-            // VÃ©rifier seulement toutes les 50 Ã©critures pour Ã©viter trop de vÃ©rifications
+            // Vérifier seulement toutes les 50 écritures pour éviter trop de vérifications
             if (!cleanupLogFile.counter) cleanupLogFile.counter = 0;
             cleanupLogFile.counter++;
             
             if (cleanupLogFile.counter % 50 === 0 && fileSizeMB > maxSizeMB) {
-                console.log(`ðŸ§¹ Nettoyage du log (${fileSizeMB.toFixed(2)}MB > ${maxSizeMB}MB)`);
+                console.log(`🧹 Nettoyage du log (${fileSizeMB.toFixed(2)}MB > ${maxSizeMB}MB)`);
                 
                 // Lire toutes les lignes
                 const content = fs.readFileSync(logFilePath, 'utf8');
                 const lines = content.split('\n');
                 
                 if (lines.length > keepLines) {
-                    // Garder seulement les derniÃ¨res lignes
+                    // Garder seulement les dernières lignes
                     const linesToKeep = lines.slice(-keepLines);
                     
                     // Header informatif
                     const header = [
-                        `# Log nettoyÃ© automatiquement - ${new Date().toISOString()}`,
-                        `# ConservÃ© les ${keepLines} derniÃ¨res lignes sur ${lines.length} total`,
+                        `# Log nettoyé automatiquement - ${new Date().toISOString()}`,
+                        `# Conservé les ${keepLines} dernières lignes sur ${lines.length} total`,
                         '',
                         ''
                     ];
                     
-                    // RÃ©Ã©crire le fichier
+                    // Réécrire le fichier
                     fs.writeFileSync(logFilePath, header.concat(linesToKeep).join('\n'), 'utf8');
-                    console.log(`âœ… Log nettoyÃ©: ${lines.length} â†’ ${linesToKeep.length} lignes`);
+                    console.log(`✅ Log nettoyé: ${lines.length} → ${linesToKeep.length} lignes`);
                 }
             }
         }
     } catch (error) {
-        console.error('âŒ Erreur nettoyage log:', error.message);
+        console.error('❌ Erreur nettoyage log:', error.message);
     }
 }
 
 const app = express();
 const PORT = 8082;
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ðŸ” SÃ‰CURITÃ‰ : LOCALHOST-ONLY (Simple et efficace)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Protection par CORS : seul localhost peut accÃ©der au serveur
-// Communication Twitch sÃ©curisÃ©e : tokens chiffrÃ©s AES-256-GCM machine-bound
-console.log('\nâ•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—');
-console.log('â•‘                    ï¿½ï¸  SERVEUR LOCALHOST SÃ‰CURISÃ‰                             â•‘');
-console.log('â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
-console.log('\nâœ… PROTECTION ACTIVE :');
-console.log('   â€¢ CORS restreint Ã  localhost uniquement');
-console.log('   â€¢ Tokens Twitch chiffrÃ©s AES-256-GCM (machine-bound)');
-console.log('   â€¢ Aucun accÃ¨s possible depuis l\'extÃ©rieur');
-console.log('\nðŸ’¡ ACCÃˆS :');
-console.log('   â€¢ Panel admin : http://localhost:8082/admin');
-console.log('   â€¢ API publique : http://localhost:8082/api/stats');
-console.log('\nâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n');
-
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ðŸ›¡ï¸ VALIDATION DES ENTRÃ‰ES UTILISATEUR
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 🔒 SÉCURITÉ : LOCALHOST-ONLY (Simple et efficace)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// Protection par CORS : seul localhost peut accéder au serveur
+// Communication Twitch sécurisée : tokens chiffrés AES-256-GCM machine-bound
+console.log('\n┌─────────────────────────────────────────────────────────────────────────────────────────────────┐');
+console.log('│                    🔒 SERVEUR LOCALHOST SÉCURISÉ                             │');
+console.log('└─────────────────────────────────────────────────────────────────────────────────────────────────┘');
+console.log('\n✅ PROTECTION ACTIVE :');
+console.log('   • CORS restreint à localhost uniquement');
+console.log('   • Tokens Twitch chiffrés AES-256-GCM (machine-bound)');
+console.log('   • Aucun accès possible depuis l\'extérieur');
+console.log('\n💡 ACCÈS :');
+console.log('   • Panel admin : http://localhost:8082/admin');
+console.log('   • API publique : http://localhost:8082/api/stats');
+console.log('\n═══════════════════════════════════════════════════════════════════════════════════════════════════════════\n');
 
 /**
  * Valide un entier positif avec limites
- * @param {*} value - Valeur Ã  valider
+ * @param {*} value - Valeur à valider
  * @param {string} fieldName - Nom du champ (pour erreurs)
- * @param {number} min - Valeur minimum (dÃ©faut: 0)
- * @param {number} max - Valeur maximum (dÃ©faut: 1000000)
- * @returns {number} Nombre validÃ©
- * @throws {Error} Si validation Ã©choue
+ * @param {number} min - Valeur minimum (défaut: 0)
+ * @param {number} max - Valeur maximum (défaut: 1000000)
+ * @returns {number} Nombre validé
+ * @throws {Error} Si validation échoue
  */
 function validatePositiveInt(value, fieldName = 'valeur', min = 0, max = 1000000) {
-    // VÃ©rifier que la valeur existe
     if (value === null || value === undefined) {
         throw new Error(`${fieldName} est requis`);
     }
     
-    // Convertir en nombre
     const num = Number(value);
     
-    // VÃ©rifier que c'est un nombre valide
     if (isNaN(num)) {
-        throw new Error(`${fieldName} doit Ãªtre un nombre (reÃ§u: ${typeof value})`);
+        throw new Error(`${fieldName} doit être un nombre (reçu: ${typeof value})`);
     }
     
-    // VÃ©rifier que c'est un entier
     if (!Number.isInteger(num)) {
-        throw new Error(`${fieldName} doit Ãªtre un entier (reÃ§u: ${num})`);
+        throw new Error(`${fieldName} doit être un entier (reçu: ${num})`);
     }
     
-    // VÃ©rifier les limites
     if (num < min) {
-        throw new Error(`${fieldName} doit Ãªtre >= ${min} (reÃ§u: ${num})`);
+        throw new Error(`${fieldName} doit être >= ${min} (reçu: ${num})`);
     }
     
     if (num > max) {
-        throw new Error(`${fieldName} doit Ãªtre <= ${max} (reÃ§u: ${num})`);
+        throw new Error(`${fieldName} doit être <= ${max} (reçu: ${num})`);
     }
     
     return num;
 }
 
-/**
- * Valide une chaÃ®ne de caractÃ¨res
- * @param {*} value - Valeur Ã  valider
- * @param {string} fieldName - Nom du champ
- * @param {number} maxLength - Longueur maximum (dÃ©faut: 1000)
- * @returns {string} ChaÃ®ne validÃ©e
- * @throws {Error} Si validation Ã©choue
- */
-function validateString(value, fieldName = 'valeur', maxLength = 1000) {
-    if (value === null || value === undefined) {
-        throw new Error(`${fieldName} est requis`);
-    }
-    
-    const str = String(value);
-    
-    if (str.length === 0) {
-        throw new Error(`${fieldName} ne peut pas Ãªtre vide`);
-    }
-    
-    if (str.length > maxLength) {
-        throw new Error(`${fieldName} trop long (max: ${maxLength} caractÃ¨res)`);
-    }
-    
-    // Bloquer caractÃ¨res dangereux
-    if (/[<>"]/.test(str)) {
-        throw new Error(`${fieldName} contient des caractÃ¨res non autorisÃ©s`);
-    }
-    
-    return str;
-}
-
-// Configuration CORS - RESTREINT Ã€ LOCALHOST UNIQUEMENT
+// Configuration CORS - RESTREINT À LOCALHOST UNIQUEMENT
 app.use(cors({
     origin: ['http://localhost:8082', 'http://127.0.0.1:8082'],
     methods: ['GET', 'POST', 'OPTIONS'],
@@ -185,69 +155,457 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Variables globales
-let currentFollows = 0; // Compteur follows
-let currentSubs = 0;    // Compteur subs
-let followGoals = new Map(); // Goals pour les follows
-let subGoals = new Map();    // Goals pour les subs
-let twitchEventSubWs = null;
-let sessionId = null;
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTES DE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+const VALID_EVENT_TYPES = Object.freeze({
+    FOLLOW: 'follow',
+    SUB: 'sub',
+    SUB_END: 'sub_end',
+    SYNC: 'sync',
+});
+
+const LIMITS = Object.freeze({
+    MAX_RECONNECT_ATTEMPTS: 10,
+    RECONNECT_DELAY: 5000,
+    ANIMATION_DURATION: 1000,
+    BATCH_DELAY: 100,
+    MAX_EVENTS_PER_BATCH: 10,
+    EVENT_PROCESSING_DELAY: 500,
+    MAX_LOG_SIZE_MB: 2,
+    LOG_KEEP_LINES: 500,
+    KEEPALIVE_TIMEOUT: 10,
+    WEBSOCKET_BUFFER_LIMIT: 1024 * 1024, // 1MB
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ÉTAT CENTRALISÉ DE L'APPLICATION
+// ═══════════════════════════════════════════════════════════════════════════════
+const appState = {
+    counters: {
+        follows: 0,
+        subs: 0,
+    },
+    goals: {
+        follow: new Map(),
+        sub: new Map(),
+    },
+    connections: {
+        twitchEventSubWs: null,
+        sessionId: null,
+    },
+    config: {
+        twitch: {
+            client_id: '8o91k8bmpi79inwkjj7sgggvpkavr5',
+            access_token: '',
+            refresh_token: '',
+            user_id: '',
+            username: '',
+            configured: false,
+        },
+        deviceCode: {
+            device_code: '',
+            user_code: '',
+            verification_uri: '',
+            expires_in: 0,
+            interval: 5,
+            expires_at: 0,
+        },
+        overlay: {},
+    },
+    flags: {
+        isInitializing: true,
+        isPollingActive: false,
+        reconnectAttempts: 0,
+    },
+    batching: {
+        follow: { count: 0, timer: null, isAnimating: false },
+        sub: { count: 0, timer: null, isAnimating: false, tiers: {} },
+    },
+    watchers: {
+        followConfig: null,
+        subConfig: null,
+    },
+    timers: {
+        followPolling: null,
+        deviceCodePolling: null,
+        subscription: null,
+        keepalive: null,
+        eventProcessing: null,
+    },
+    eventBuffer: {
+        queue: [],
+        isProcessing: false,
+        lastProcessTime: 0,
+    },
+    tracking: {
+        lastKnownFollowCount: 0,
+    },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ALIASES pour appState (éviter la duplication, juste des pointeurs)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Watchers et timers restent comme variables globales simples (non dupliquées)
 let configWatcher = null;
 let subConfigWatcher = null;
-let followPollingInterval = null;
-let lastKnownFollowCount = 0;
-let isPollingActive = false;
-let deviceCodePolling = null; // Pour le polling du Device Code Grant Flow
-let isInitializing = true;
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 10;
-let reconnectDelay = 5000;
-let subscriptionTimeout = null; // Timer pour les 10 secondes de l'EventSub
-let keepaliveTimeout = null; // Timer pour le keepalive
 
-// ðŸ”„ SYSTÃˆME DE TAMPON POUR LES Ã‰VÃ‰NEMENTS
-let eventBuffer = []; // Tampon pour stocker les Ã©vÃ©nements
-let isProcessingEvents = false; // Flag pour Ã©viter le traitement concurrent
-let lastEventProcessTime = 0; // Timestamp du dernier Ã©vÃ©nement traitÃ©
-let eventProcessingInterval = null; // Interval pour traiter les Ã©vÃ©nements
-const EVENT_PROCESSING_DELAY = 500; // DÃ©lai minimum entre traitements (ms)
+// Constantes dérivées des LIMITS
+const maxReconnectAttempts = LIMITS.MAX_RECONNECT_ATTEMPTS;
+const reconnectDelay = LIMITS.RECONNECT_DELAY;
+const ANIMATION_DURATION = LIMITS.ANIMATION_DURATION;
+const BATCH_DELAY = LIMITS.BATCH_DELAY;
+const MAX_EVENTS_PER_BATCH = LIMITS.MAX_EVENTS_PER_BATCH;
+const EVENT_PROCESSING_DELAY = LIMITS.EVENT_PROCESSING_DELAY;
 
-// âš¡ SYSTÃˆME DE BATCHING INTELLIGENT (Anti-spam)
-// File d'attente synchronisÃ©e avec les animations (1 seconde)
-let followBatch = { count: 0, timer: null, isAnimating: false };
-let subBatch = { count: 0, timer: null, isAnimating: false, tiers: {} };
-const ANIMATION_DURATION = 1000; // DurÃ©e d'une animation overlay : 1 seconde
-const BATCH_DELAY = 100; // Petit dÃ©lai pour capturer les events groupÃ©s
-const MAX_EVENTS_PER_BATCH = 10; // Nombre max d'Ã©vÃ©nements traitÃ©s par lot
+// ═══════════════════════════════════════════════════════════════════════════════
+// GETTERS/SETTERS pour compatibilité avec l'ancien code
+// Synchronisent automatiquement avec appState
+// ═══════════════════════════════════════════════════════════════════════════════
+Object.defineProperties(global, {
+    currentFollows: {
+        get: () => appState.counters.follows,
+        set: (val) => { appState.counters.follows = val; }
+    },
+    currentSubs: {
+        get: () => appState.counters.subs,
+        set: (val) => { appState.counters.subs = val; }
+    },
+    twitchEventSubWs: {
+        get: () => appState.connections.twitchEventSubWs,
+        set: (val) => { appState.connections.twitchEventSubWs = val; }
+    },
+    sessionId: {
+        get: () => appState.connections.sessionId,
+        set: (val) => { appState.connections.sessionId = val; }
+    },
+    isInitializing: {
+        get: () => appState.flags.isInitializing,
+        set: (val) => { appState.flags.isInitializing = val; }
+    },
+    isPollingActive: {
+        get: () => appState.flags.isPollingActive,
+        set: (val) => { appState.flags.isPollingActive = val; }
+    },
+    reconnectAttempts: {
+        get: () => appState.flags.reconnectAttempts,
+        set: (val) => { appState.flags.reconnectAttempts = val; }
+    },
+    lastKnownFollowCount: {
+        get: () => appState.tracking.lastKnownFollowCount,
+        set: (val) => { appState.tracking.lastKnownFollowCount = val; }
+    },
+    followGoals: {
+        get: () => appState.goals.follow,
+        set: (val) => { appState.goals.follow = val; }
+    },
+    subGoals: {
+        get: () => appState.goals.sub,
+        set: (val) => { appState.goals.sub = val; }
+    },
+    followBatch: {
+        get: () => appState.batching.follow,
+        set: (val) => { appState.batching.follow = val; }
+    },
+    subBatch: {
+        get: () => appState.batching.sub,
+        set: (val) => { appState.batching.sub = val; }
+    },
+    twitchConfig: {
+        get: () => appState.config.twitch,
+        set: (val) => { appState.config.twitch = val; }
+    },
+    deviceCodeData: {
+        get: () => appState.config.deviceCode,
+        set: (val) => { appState.config.deviceCode = val; }
+    },
+    followPollingInterval: {
+        get: () => appState.timers.followPolling,
+        set: (val) => { appState.timers.followPolling = val; }
+    },
+    deviceCodePolling: {
+        get: () => appState.timers.deviceCodePolling,
+        set: (val) => { appState.timers.deviceCodePolling = val; }
+    },
+    subscriptionTimeout: {
+        get: () => appState.timers.subscription,
+        set: (val) => { appState.timers.subscription = val; }
+    },
+    keepaliveTimeout: {
+        get: () => appState.timers.keepalive,
+        set: (val) => { appState.timers.keepalive = val; }
+    },
+    eventProcessingInterval: {
+        get: () => appState.timers.eventProcessing,
+        set: (val) => { appState.timers.eventProcessing = val; }
+    },
+    eventBuffer: {
+        get: () => appState.eventBuffer.queue,
+        set: (val) => { appState.eventBuffer.queue = val; }
+    },
+    isProcessingEvents: {
+        get: () => appState.eventBuffer.isProcessing,
+        set: (val) => { appState.eventBuffer.isProcessing = val; }
+    },
+    lastEventProcessTime: {
+        get: () => appState.eventBuffer.lastProcessTime,
+        set: (val) => { appState.eventBuffer.lastProcessTime = val; }
+    }
+});
 
-// Configuration Twitch pour Device Code Grant Flow (application publique)
-let twitchConfig = {
-    client_id: '8o91k8bmpi79inwkjj7sgggvpkavr5', // Application publique - pas besoin de client_secret
-    access_token: '',
-    refresh_token: '',
-    user_id: '',
-    username: '',
-    configured: false
-};
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITY CLASSES - Gestion avancée des événements et timers
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Variables pour Device Code Grant Flow
-let deviceCodeData = {
-    device_code: '',
-    user_code: '',
-    verification_uri: '',
-    expires_in: 0,
-    interval: 5,
-    expires_at: 0
-};
+/**
+ * EventQueue - File d'attente thread-safe pour les événements
+ * Résout les race conditions du buffer d'événements
+ */
+class EventQueue {
+    constructor() {
+        this.queue = [];
+        this.processing = false;
+    }
 
-// Fonction pour rÃ©initialiser le Device Code Grant Flow
+    async add(event) {
+        // Valider l'événement
+        if (!event || !event.type) {
+            logEvent('ERROR', '❌ Événement invalide ignoré', { event });
+            return false;
+        }
+
+        this.queue.push(event);
+        logEvent('INFO', `📦 Événement ajouté à la queue: ${event.type} (${this.queue.length} en attente)`);
+        
+        await this.process();
+        return true;
+    }
+
+    async process() {
+        if (this.processing || this.queue.length === 0) return;
+        
+        this.processing = true;
+        
+        try {
+            while (this.queue.length > 0) {
+                const batch = this.queue.splice(0, LIMITS.MAX_EVENTS_PER_BATCH);
+                await this.processBatch(batch);
+            }
+        } catch (error) {
+            logEvent('ERROR', '❌ Erreur traitement queue:', { error: error.message });
+        } finally {
+            this.processing = false;
+        }
+    }
+
+    async processBatch(batch) {
+        logEvent('INFO', `⚡ Traitement batch: ${batch.length} événements`);
+        
+        for (const event of batch) {
+            try {
+                await this.processEvent(event);
+            } catch (error) {
+                logEvent('ERROR', `❌ Erreur événement ${event.type}:`, { error: error.message });
+            }
+        }
+    }
+
+    async processEvent(event) {
+        switch (event.type) {
+            case VALID_EVENT_TYPES.FOLLOW:
+                handleFollowEvent(event.data);
+                break;
+            case VALID_EVENT_TYPES.SUB:
+                handleSubEvent(event.data);
+                break;
+            case VALID_EVENT_TYPES.SUB_END:
+                handleSubEndEvent(event.data);
+                break;
+            case VALID_EVENT_TYPES.SYNC:
+                await handleSyncEvent(event.data);
+                break;
+            default:
+                logEvent('WARN', `⚠️ Type événement inconnu: ${event.type}`);
+        }
+    }
+
+    clear() {
+        const count = this.queue.length;
+        this.queue = [];
+        logEvent('INFO', `🧹 Queue vidée: ${count} événements supprimés`);
+        return count;
+    }
+
+    size() {
+        return this.queue.length;
+    }
+}
+
+/**
+ * TimerRegistry - Registre centralisé des timers pour éviter les fuites mémoire
+ */
+class TimerRegistry {
+    constructor() {
+        this.timers = new Map();
+    }
+
+    setInterval(id, fn, ms) {
+        this.clearInterval(id);
+        const timer = setInterval(fn, ms);
+        this.timers.set(id, { type: 'interval', timer, fn, ms });
+        logEvent('INFO', `⏰ Interval créé: ${id} (${ms}ms)`);
+        return timer;
+    }
+
+    setTimeout(id, fn, ms) {
+        this.clearTimeout(id);
+        const timer = setTimeout(fn, ms);
+        this.timers.set(id, { type: 'timeout', timer, fn, ms });
+        logEvent('INFO', `⏰ Timeout créé: ${id} (${ms}ms)`);
+        return timer;
+    }
+
+    clearTimeout(id) {
+        const entry = this.timers.get(id);
+        if (entry) {
+            clearTimeout(entry.timer);
+            this.timers.delete(id);
+            logEvent('INFO', `⏹️ Timeout arrêté: ${id}`);
+        }
+    }
+
+    clearInterval(id) {
+        const entry = this.timers.get(id);
+        if (entry) {
+            clearInterval(entry.timer);
+            this.timers.delete(id);
+            logEvent('INFO', `⏹️ Interval arrêté: ${id}`);
+        }
+    }
+
+    clearAll() {
+        let count = 0;
+        this.timers.forEach((entry, id) => {
+            if (entry.type === 'interval') {
+                clearInterval(entry.timer);
+            } else {
+                clearTimeout(entry.timer);
+            }
+            count++;
+        });
+        this.timers.clear();
+        logEvent('INFO', `🧹 Tous les timers nettoyés: ${count} timers arrêtés`);
+        return count;
+    }
+
+    size() {
+        return this.timers.size;
+    }
+
+    list() {
+        const list = [];
+        this.timers.forEach((entry, id) => {
+            list.push({ id, type: entry.type, interval: entry.ms });
+        });
+        return list;
+    }
+}
+
+/**
+ * SimpleRateLimiter - Rate limiter simple pour les endpoints sensibles
+ */
+class SimpleRateLimiter {
+    constructor(maxCalls, windowMs) {
+        this.maxCalls = maxCalls;
+        this.windowMs = windowMs;
+        this.calls = [];
+    }
+
+    allow() {
+        const now = Date.now();
+        // Nettoyer les anciens appels
+        this.calls = this.calls.filter(time => now - time < this.windowMs);
+        
+        if (this.calls.length >= this.maxCalls) {
+            return false; // Rate limited
+        }
+        
+        this.calls.push(now);
+        return true;
+    }
+
+    reset() {
+        this.calls = [];
+    }
+
+    remaining() {
+        const now = Date.now();
+        this.calls = this.calls.filter(time => now - time < this.windowMs);
+        return Math.max(0, this.maxCalls - this.calls.length);
+    }
+
+    nextResetIn() {
+        if (this.calls.length === 0) return 0;
+        const now = Date.now();
+        const oldestCall = Math.min(...this.calls);
+        return Math.max(0, this.windowMs - (now - oldestCall));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Instanciation des singletons
+// ═══════════════════════════════════════════════════════════════════════════════
+const eventQueue = new EventQueue();
+const timerRegistry = new TimerRegistry();
+const syncLimiter = new SimpleRateLimiter(1, 60000); // 1 sync par minute
+const adminLimiter = new SimpleRateLimiter(10, 60000); // 10 actions admin par minute
+
+logEvent('INFO', '✅ Utility classes initialisées (EventQueue, TimerRegistry, RateLimiters)');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR HANDLING - Gestion d'erreurs cohérente
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Wrapper pour middleware Express avec gestion d'erreurs
+ * Permet de simplifier le try/catch dans les routes
+ */
+function asyncHandler(fn) {
+    return (req, res, next) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+}
+
+/**
+ * Middleware de gestion d'erreurs centralisé
+ * À placer à la fin de tous les app.use() et app.get/post()
+ */
+function handleError(err, req, res, next) {
+    logEvent('ERROR', `API Error: ${err.message}`, {
+        path: req.path,
+        method: req.method,
+        status: err.status || 500,
+    });
+
+    if (err.status === 401) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (err.status === 429) {
+        return res.status(429).json({ error: 'Rate limited' });
+    }
+
+    res.status(err.status || 500).json({ 
+        error: err.message || 'Internal server error' 
+    });
+}
+
+// Fonction pour réinitialiser le Device Code Grant Flow
 function resetDeviceCodeFlow() {
     try {
-        if (deviceCodePolling) {
-            clearInterval(deviceCodePolling);
-            deviceCodePolling = null;
-        }
-        deviceCodeData = {
+        timerRegistry.clearInterval('deviceCodePolling');
+        
+        appState.config.deviceCode = {
             device_code: '',
             user_code: '',
             verification_uri: '',
@@ -255,23 +613,23 @@ function resetDeviceCodeFlow() {
             interval: 5,
             expires_at: 0
         };
-        twitchConfig.access_token = '';
-        twitchConfig.refresh_token = '';
-        twitchConfig.user_id = '';
-        twitchConfig.username = '';
-        twitchConfig.configured = false;
-        logEvent('INFO', 'ðŸ”„ Device Code Grant Flow rÃ©initialisÃ©');
+        appState.config.twitch.access_token = '';
+        appState.config.twitch.refresh_token = '';
+        appState.config.twitch.user_id = '';
+        appState.config.twitch.username = '';
+        appState.config.twitch.configured = false;
+        logEvent('INFO', '📄 Device Code Grant Flow réinitialisé');
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur reset Device Code Flow:', error.message);
+        logEvent('ERROR', '❌ Erreur reset Device Code Flow:', error.message);
     }
 }
 
-// ðŸ”¥ DEVICE CODE GRANT FLOW - Ã‰tape 1: Initier l'authentification
+// 🔥 DEVICE CODE GRANT FLOW - Étape 1: Initier l'authentification
 async function initiateDeviceCodeFlow() {
     try {
-        console.log('ðŸš€ DÃ©marrage Device Code Grant Flow...');
+        console.log('🚀 Démarrage Device Code Grant Flow...');
         
-        // CrÃ©er un contrÃ´leur d'annulation pour timeout plus long
+        // Créer un contrôleur d'annulation pour timeout plus long
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes timeout
         
@@ -283,7 +641,7 @@ async function initiateDeviceCodeFlow() {
             },
             body: new URLSearchParams({
                 client_id: twitchConfig.client_id,
-                scopes: 'moderator:read:followers channel:read:subscriptions channel:manage:moderators moderation:read' // Scopes complets pour follows, subs et modÃ©ration
+                scopes: 'moderator:read:followers channel:read:subscriptions channel:manage:moderators moderation:read' // Scopes complets pour follows, subs et modération
             }),
             signal: controller.signal
         });
@@ -292,72 +650,72 @@ async function initiateDeviceCodeFlow() {
         
         if (!response.ok) {
             const errorText = await response.text();
-            logEvent('ERROR', `âŒ Erreur HTTP Device Code: ${response.status}`, { errorText });
+            logEvent('ERROR', `❌ Erreur HTTP Device Code: ${response.status}`, { errorText });
             throw new Error(`Erreur Device Code: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
         
-        // Validation des donnÃ©es reÃ§ues selon la documentation
+        // Validation des données reçues selon la documentation
         if (!data.device_code || !data.user_code || !data.verification_uri) {
-            logEvent('ERROR', 'âŒ RÃ©ponse incomplÃ¨te du serveur Twitch', data);
-            throw new Error('RÃ©ponse incomplÃ¨te du serveur Twitch');
+            logEvent('ERROR', '❌ Réponse incomplète du serveur Twitch', data);
+            throw new Error('Réponse incomplète du serveur Twitch');
         }
         
-        // Stocker les donnÃ©es du Device Code
+        // Stocker les données du Device Code
         deviceCodeData = {
             device_code: data.device_code,
             user_code: data.user_code,
             verification_uri: data.verification_uri,
-            expires_in: data.expires_in || 1800, // 30 minutes par dÃ©faut
-            interval: data.interval || 5, // 5 secondes par dÃ©faut
+            expires_in: data.expires_in || 1800, // 30 minutes par défaut
+            interval: data.interval || 5, // 5 secondes par défaut
             expires_at: Date.now() + ((data.expires_in || 1800) * 1000)
         };
         
-        logEvent('INFO', `âœ… Device Code gÃ©nÃ©rÃ©: ${deviceCodeData.user_code}`);
-        logEvent('INFO', `ðŸ”— URL de vÃ©rification: ${deviceCodeData.verification_uri}`);
-        logEvent('INFO', `â° Expire dans: ${deviceCodeData.expires_in} secondes`);
+        logEvent('INFO', `✅ Device Code généré: ${deviceCodeData.user_code}`);
+        logEvent('INFO', `📗 URL de vérification: ${deviceCodeData.verification_uri}`);
+        logEvent('INFO', `⏰ Expire dans: ${deviceCodeData.expires_in} secondes`);
         
-        // DÃ©marrer le polling
+        // Démarrer le polling
         startDeviceCodePolling();
         
         return deviceCodeData;
         
     } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('ERROR', 'âŒ Timeout Device Code Flow (15s)');
-            throw new Error('Timeout de connexion au serveur Twitch - VÃ©rifiez votre connexion internet');
+            logEvent('ERROR', '❌ Timeout Device Code Flow (15s)');
+            throw new Error('Timeout de connexion au serveur Twitch - Vérifiez votre connexion internet');
         }
         
-        logEvent('ERROR', 'âŒ Erreur Device Code Flow:', error.message);
+        logEvent('ERROR', '❌ Erreur Device Code Flow:', error.message);
         throw error;
     }
 }
 
-// ðŸ”¥ DEVICE CODE GRANT FLOW - Ã‰tape 2: Polling pour les tokens
+// 🔥 DEVICE CODE GRANT FLOW - Étape 2: Polling pour les tokens
 async function startDeviceCodePolling() {
     if (deviceCodePolling) {
         clearInterval(deviceCodePolling);
     }
     
-    logEvent('INFO', `ðŸ”„ DÃ©marrage polling toutes les ${deviceCodeData.interval} secondes...`);
+    logEvent('INFO', `📄 Démarrage polling toutes les ${deviceCodeData.interval} secondes...`);
     
-    deviceCodePolling = setInterval(async () => {
+    deviceCodePolling = timerRegistry.setInterval('deviceCodePolling', async () => {
         try {
-            // VÃ©rifier si le code n'a pas expirÃ©
+            // Vérifier si le code n'a pas expiré
             if (Date.now() > deviceCodeData.expires_at) {
-                logEvent('WARN', 'â° Device Code expirÃ©');
-                clearInterval(deviceCodePolling);
+                logEvent('WARN', '⏰ Device Code expiré');
+                timerRegistry.clearInterval('deviceCodePolling');
                 deviceCodePolling = null;
                 return;
             }
             
-            // CrÃ©er un contrÃ´leur d'annulation pour timeout plus long
+            // Créer un contrôleur d'annulation pour timeout plus long
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 secondes timeout
             
-            // RequÃªte conforme Ã  la documentation
+            // Requête conforme à la documentation
             const response = await fetch('https://id.twitch.tv/oauth2/token', {
                 method: 'POST',
                 headers: {
@@ -376,24 +734,24 @@ async function startDeviceCodePolling() {
             const tokenData = await response.json();
             
             if (response.ok) {
-                // SuccÃ¨s ! Tokens obtenus
-                logEvent('INFO', 'ðŸŽ‰ Authentification Device Code Grant rÃ©ussie !');
+                // Succès ! Tokens obtenus
+                logEvent('INFO', '🎉 Authentification Device Code Grant réussie !');
                 
-                // Validation des tokens reÃ§us
+                // Validation des tokens reçus
                 if (!tokenData.access_token) {
-                    throw new Error('Access token manquant dans la rÃ©ponse');
+                    throw new Error('Access token manquant dans la réponse');
                 }
                 
                 twitchConfig.access_token = tokenData.access_token;
                 twitchConfig.refresh_token = tokenData.refresh_token;
                 
-                // Log des scopes reÃ§us
+                // Log des scopes reçus
                 if (tokenData.scope && Array.isArray(tokenData.scope)) {
-                    logEvent('INFO', `ðŸ” Scopes accordÃ©s: ${tokenData.scope.join(', ')}`);
+                    logEvent('INFO', `🔐 Scopes accordés: ${tokenData.scope.join(', ')}`);
                 }
                 
-                // ArrÃªter le polling
-                clearInterval(deviceCodePolling);
+                // Arrêter le polling
+                timerRegistry.clearInterval('deviceCodePolling');
                 deviceCodePolling = null;
                 
                 // Obtenir les infos utilisateur
@@ -402,61 +760,61 @@ async function startDeviceCodePolling() {
                 // Sauvegarder la configuration
                 saveTwitchConfig();
                 
-                // DÃ©marrer EventSub avec dÃ©lai
-                setTimeout(() => {
+                // Démarrer EventSub avec délai
+                timerRegistry.setTimeout('startEventSubAfterAuth', () => {
                     connectTwitchEventSub();
                 }, 2000);
                 
             } else {
-                // GÃ©rer les diffÃ©rents types d'erreurs selon la documentation
+                // Gérer les différents types d'erreurs selon la documentation
                 switch (tokenData.error) {
                     case 'authorization_pending':
-                        logEvent('INFO', 'â³ En attente de l\'autorisation utilisateur...');
+                        logEvent('INFO', '⏳ En attente de l\'autorisation utilisateur...');
                         break;
                     case 'slow_down':
-                        logEvent('WARN', 'ðŸŒ Ralentissement du polling demandÃ© par Twitch');
+                        logEvent('WARN', '🌙 Ralentissement du polling demandé par Twitch');
                         deviceCodeData.interval += 5; // Augmenter l'intervalle
-                        clearInterval(deviceCodePolling);
-                        setTimeout(startDeviceCodePolling, deviceCodeData.interval * 1000);
+                        timerRegistry.clearInterval('deviceCodePolling');
+                        timerRegistry.setTimeout('restartDeviceCodePolling', startDeviceCodePolling, deviceCodeData.interval * 1000);
                         break;
                     case 'access_denied':
-                        logEvent('WARN', 'âŒ AccÃ¨s refusÃ© par l\'utilisateur');
-                        clearInterval(deviceCodePolling);
+                        logEvent('WARN', '❌ Accès refusé par l\'utilisateur');
+                        timerRegistry.clearInterval('deviceCodePolling');
                         deviceCodePolling = null;
                         break;
                     case 'expired_token':
-                        logEvent('WARN', 'â° Device Code expirÃ©');
-                        clearInterval(deviceCodePolling);
+                        logEvent('WARN', '⏰ Device Code expiré');
+                        timerRegistry.clearInterval('deviceCodePolling');
                         deviceCodePolling = null;
                         break;
                     default:
-                        logEvent('WARN', `âš ï¸ Erreur polling inconnue: ${tokenData.error} - ${tokenData.error_description || ''}`);
+                        logEvent('WARN', `⚠️ Erreur polling inconnue: ${tokenData.error} - ${tokenData.error_description || ''}`);
                 }
             }
             
         } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('WARN', 'â° Timeout polling tokens (20s) - polling continue...');
+            logEvent('WARN', '⏰ Timeout polling tokens (20s) - polling continue...');
             return; // Continuer le polling sans interrompre
-        }            // Gestion d'erreurs rÃ©seau - ne pas arrÃªter le polling
+        }            // Gestion d'erreurs réseau - ne pas arrêter le polling
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                logEvent('WARN', 'ðŸŒ Erreur rÃ©seau temporaire - polling continue...');
+                logEvent('WARN', '🌙 Erreur réseau temporaire - polling continue...');
                 return; // Continuer le polling
             }
             
             if (error.code === 'ENOTFOUND' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-                logEvent('WARN', `ðŸŒ Erreur connexion (${error.code}) - polling continue...`);
+                logEvent('WARN', `🌙 Erreur connexion (${error.code}) - polling continue...`);
                 return; // Continuer le polling
             }
             
-            logEvent('ERROR', 'âŒ Erreur polling tokens:', error.message);
+            logEvent('ERROR', '❌ Erreur polling tokens:', error.message);
             
-            // Pour toute autre erreur, continuer quand mÃªme le polling
-            // mais avec un intervalle plus long pour Ã©viter le spam
+            // Pour toute autre erreur, continuer quand même le polling
+            // mais avec un intervalle plus long pour éviter le spam
             if (deviceCodeData.interval < 10) {
                 deviceCodeData.interval = Math.min(deviceCodeData.interval + 2, 10);
-                logEvent('INFO', `ðŸ”„ Augmentation intervalle polling Ã  ${deviceCodeData.interval}s`);
+                logEvent('INFO', `📄 Augmentation intervalle polling à ${deviceCodeData.interval}s`);
             }
         }
     }, deviceCodeData.interval * 1000);
@@ -465,9 +823,9 @@ async function startDeviceCodePolling() {
 // Obtenir les informations utilisateur
 async function getUserInfo() {
     try {
-        console.log('ðŸ”„ RÃ©cupÃ©ration des informations utilisateur...');
+        console.log('📄 Récupération des informations utilisateur...');
         
-        // CrÃ©er un contrÃ´leur d'annulation pour timeout
+        // Créer un contrôleur d'annulation pour timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes timeout
         
@@ -482,7 +840,7 @@ async function getUserInfo() {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-            throw new Error('Erreur rÃ©cupÃ©ration utilisateur');
+            throw new Error('Erreur récupération utilisateur');
         }
         
         const userData = await response.json();
@@ -492,91 +850,96 @@ async function getUserInfo() {
         twitchConfig.username = user.login;
         twitchConfig.configured = true;
         
-        console.log(`ðŸ‘¤ ConnectÃ© en tant que: @${twitchConfig.username}`);
+        console.log(`👤 Connecté en tant que: @${twitchConfig.username}`);
         
-        // Sauvegarder immÃ©diatement aprÃ¨s rÃ©cupÃ©ration des infos utilisateur
+        // Sauvegarder immédiatement après récupération des infos utilisateur
         saveTwitchConfig();
         
-        // VÃ©rifier et accorder les privilÃ¨ges de modÃ©rateur si nÃ©cessaire
+        // Vérifier et accorder les privilèges de modérateur si nécessaire
         const hasModeratorPrivileges = await ensureModeratorPrivileges();
         
         if (!hasModeratorPrivileges) {
-            logEvent('INFO', 'ðŸ”„ PrivilÃ¨ges de modÃ©rateur non disponibles - dÃ©marrage du polling en mode fallback');
-            // DÃ©marrer le polling immÃ©diatement si pas de privilÃ¨ges EventSub
-            startFollowPolling(10); // VÃ©rifier toutes les 10 secondes
+            logEvent('INFO', '📄 Privilèges de modérateur non disponibles - démarrage du polling en mode fallback');
+            // Démarrer le polling immédiatement si pas de privilèges EventSub
+            startFollowPolling(10); // Vérifier toutes les 10 secondes
         }
         
-        // RÃ©cupÃ©rer le nombre de follows actuel au dÃ©marrage
+        // Récupérer le nombre de follows actuel au démarrage
         try {
-            console.log('ðŸ“Š RÃ©cupÃ©ration du nombre de follows initial...');
-            const followCount = await getTwitchFollowCount();
-            const oldCount = currentFollows;
-            currentFollows = followCount;
-            updateFiles(currentFollows);
-            broadcastUpdate();
+            console.log('📊 Récupération du nombre de follows initial...');
+            const result = await getTwitchFollowCount();
             
-            console.log(`ðŸ“Š Follows rÃ©cupÃ©rÃ©s au dÃ©marrage: ${oldCount} â†’ ${followCount}`);
-            
-            // Sauvegarder l'Ã©tat initial sur disque pour la persistence
-            saveFollowCountToFile(currentFollows);
+            if (result.success) {
+                const oldCount = currentFollows;
+                currentFollows = result.data;
+                updateFiles(currentFollows);
+                broadcastUpdate();
+                
+                console.log(`📊 Follows récupérés au démarrage: ${oldCount} → ${result.data}`);
+                
+                // Sauvegarder l'état initial sur disque pour la persistence
+                saveFollowCountToFile(currentFollows);
+            } else {
+                throw new Error(result.error);
+            }
             
         } catch (error) {
-            console.warn('âš ï¸ Impossible de rÃ©cupÃ©rer les follows au dÃ©marrage:', error.message);
-            // Charger depuis le fichier sauvegardÃ© si l'API Ã©choue
+            console.warn('⚠️ Impossible de récupérer les follows au démarrage:', error.message);
+            // Charger depuis le fichier sauvegardé si l'API échoue
             const savedCount = loadFollowCountFromFile();
             if (savedCount > 0) {
                 currentFollows = savedCount;
                 updateFiles(currentFollows);
                 broadcastUpdate();
-                console.log(`ðŸ“‚ Nombre de follows restaurÃ© depuis le fichier: ${savedCount}`);
+                console.log(`📂 Nombre de follows restauré depuis le fichier: ${savedCount}`);
             }
         }
         
     } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('ERROR', 'âŒ Timeout rÃ©cupÃ©ration infos utilisateur (10s)');
-            throw new Error('Timeout de connexion Ã  l\'API Twitch');
+            logEvent('ERROR', '❌ Timeout récupération infos utilisateur (10s)');
+            throw new Error('Timeout de connexion à l\'API Twitch');
         }
         
-        console.error('âŒ Erreur infos utilisateur:', error.message);
+        console.error('❌ Erreur infos utilisateur:', error.message);
         throw error;
     }
 }
 
-// VÃ©rifier et accorder les privilÃ¨ges de modÃ©rateur si nÃ©cessaire
+// Vérifier et accorder les privilèges de modérateur si nécessaire
 async function ensureModeratorPrivileges() {
     try {
-        logEvent('INFO', 'ðŸ” VÃ©rification des privilÃ¨ges de modÃ©rateur...');
+        logEvent('INFO', '🔐 Vérification des privilèges de modérateur...');
         
-        // D'abord, vÃ©rifier si l'utilisateur est dÃ©jÃ  modÃ©rateur de son propre canal
+        // D'abord, vérifier si l'utilisateur est déjà modérateur de son propre canal
         const isModerator = await checkIfModerator();
         
         if (isModerator) {
-            logEvent('INFO', 'âœ… Utilisateur dÃ©jÃ  modÃ©rateur de son propre canal');
+            logEvent('INFO', '✅ Utilisateur déjà modérateur de son propre canal');
             return true;
         }
         
-        // Si pas modÃ©rateur, essayer de s'auto-accorder les privilÃ¨ges
-        logEvent('INFO', 'ðŸ”§ Tentative d\'auto-attribution des privilÃ¨ges de modÃ©rateur...');
+        // Si pas modérateur, essayer de s'auto-accorder les privilèges
+        logEvent('INFO', '🔧 Tentative d\'auto-attribution des privilèges de modérateur...');
         const granted = await grantSelfModerator();
         
         if (granted) {
-            logEvent('INFO', 'âœ… PrivilÃ¨ges de modÃ©rateur accordÃ©s avec succÃ¨s');
+            logEvent('INFO', '✅ Privilèges de modérateur accordés avec succès');
             return true;
         } else {
-            logEvent('WARN', 'âš ï¸ Impossible d\'accorder les privilÃ¨ges de modÃ©rateur automatiquement');
-            logEvent('INFO', 'ðŸ“Œ Vous devrez peut-Ãªtre accorder manuellement les privilÃ¨ges de modÃ©rateur dans votre tableau de bord Twitch');
+            logEvent('WARN', '⚠️ Impossible d\'accorder les privilèges de modérateur automatiquement');
+            logEvent('INFO', '📌 Vous devrez peut-être accorder manuellement les privilèges de modérateur dans votre tableau de bord Twitch');
             return false;
         }
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur vÃ©rification privilÃ¨ges modÃ©rateur:', error.message);
+        logEvent('ERROR', '❌ Erreur vérification privilèges modérateur:', error.message);
         return false;
     }
 }
 
-// VÃ©rifier si l'utilisateur est modÃ©rateur de son propre canal
+// Vérifier si l'utilisateur est modérateur de son propre canal
 async function checkIfModerator() {
     try {
         const controller = new AbortController();
@@ -600,12 +963,12 @@ async function checkIfModerator() {
         return false;
         
     } catch (error) {
-        logEvent('WARN', 'âš ï¸ Erreur vÃ©rification statut modÃ©rateur:', error.message);
+        logEvent('WARN', '⚠️ Erreur vérification statut modérateur:', error.message);
         return false;
     }
 }
 
-// Tenter d'accorder les privilÃ¨ges de modÃ©rateur Ã  soi-mÃªme
+// Tenter d'accorder les privilèges de modérateur à soi-même
 async function grantSelfModerator() {
     try {
         const controller = new AbortController();
@@ -631,29 +994,29 @@ async function grantSelfModerator() {
             return true;
         } else {
             const errorText = await response.text();
-            logEvent('WARN', `âš ï¸ Ã‰chec auto-attribution modÃ©rateur: ${response.status} - ${errorText}`);
+            logEvent('WARN', `⚠️ Échec auto-attribution modérateur: ${response.status} - ${errorText}`);
             return false;
         }
         
     } catch (error) {
-        logEvent('WARN', 'âš ï¸ Erreur auto-attribution modÃ©rateur:', error.message);
+        logEvent('WARN', '⚠️ Erreur auto-attribution modérateur:', error.message);
         return false;
     }
 }
 
-// VÃ©rifier si l'utilisateur peut s'auto-attribuer les privilÃ¨ges modÃ©rateur
+// Vérifier si l'utilisateur peut s'auto-attribuer les privilèges modérateur
 async function canGrantSelfModerator() {
     try {
-        // VÃ©rifier si nous avons le scope nÃ©cessaire
+        // Vérifier si nous avons le scope nécessaire
         if (!twitchConfig.scope || !twitchConfig.scope.includes('channel:manage:moderators')) {
             return false;
         }
         
-        // Pour un broadcaster sur son propre canal, cette fonctionnalitÃ© devrait Ãªtre disponible
+        // Pour un broadcaster sur son propre canal, cette fonctionnalité devrait être disponible
         return true;
         
     } catch (error) {
-        logEvent('WARN', 'âš ï¸ Erreur vÃ©rification capacitÃ© auto-attribution modÃ©rateur:', error.message);
+        logEvent('WARN', '⚠️ Erreur vérification capacité auto-attribution modérateur:', error.message);
         return false;
     }
 }
@@ -665,9 +1028,9 @@ function saveFollowCountToFile(count) {
         const timestamp = new Date().toISOString();
         const data = `${count}|${timestamp}`;
         fs.writeFileSync(backupPath, data, 'utf8');
-        console.log(`ðŸ’¾ Sauvegarde compteur: ${count} follows Ã  ${timestamp.split('T')[1].split('.')[0]}`);
+        console.log(`💾 Sauvegarde compteur: ${count} follows à ${timestamp.split('T')[1].split('.')[0]}`);
     } catch (error) {
-        console.error('âŒ Erreur sauvegarde compteur follows:', error.message);
+        console.error('❌ Erreur sauvegarde compteur follows:', error.message);
     }
 }
 
@@ -679,11 +1042,11 @@ function loadFollowCountFromFile() {
             const content = fs.readFileSync(backupPath, 'utf8').trim();
             const [count, timestamp] = content.split('|');
             const followCount = parseInt(count) || 0;
-            console.log(`ðŸ“‚ Compteur restaurÃ©: ${followCount} follows (sauvegardÃ© le ${timestamp?.split('T')[0] || 'inconnu'})`);
+            console.log(`📂 Compteur restauré: ${followCount} follows (sauvegardé le ${timestamp?.split('T')[0] || 'inconnu'})`);
             return followCount;
         }
     } catch (error) {
-        console.error('âŒ Erreur chargement compteur follows sauvegardÃ©:', error.message);
+        console.error('❌ Erreur chargement compteur follows sauvegardé:', error.message);
     }
     return 0;
 }
@@ -695,9 +1058,9 @@ function saveSubCountToFile(count) {
         const timestamp = new Date().toISOString();
         const data = `${count}|${timestamp}`;
         fs.writeFileSync(backupPath, data, 'utf8');
-        console.log(`ðŸ’¾ Sauvegarde compteur: ${count} subs Ã  ${timestamp.split('T')[1].split('.')[0]}`);
+        console.log(`💾 Sauvegarde compteur: ${count} subs à ${timestamp.split('T')[1].split('.')[0]}`);
     } catch (error) {
-        console.error('âŒ Erreur sauvegarde compteur subs:', error.message);
+        console.error('❌ Erreur sauvegarde compteur subs:', error.message);
     }
 }
 
@@ -709,21 +1072,21 @@ function loadSubCountFromFile() {
             const content = fs.readFileSync(backupPath, 'utf8').trim();
             const [count, timestamp] = content.split('|');
             const subCount = parseInt(count) || 0;
-            console.log(`ðŸ“‚ Compteur restaurÃ©: ${subCount} subs (sauvegardÃ© le ${timestamp?.split('T')[0] || 'inconnu'})`);
+            console.log(`📂 Compteur restauré: ${subCount} subs (sauvegardé le ${timestamp?.split('T')[0] || 'inconnu'})`);
             return subCount;
         }
     } catch (error) {
-        console.error('âŒ Erreur chargement compteur subs sauvegardÃ©:', error.message);
+        console.error('❌ Erreur chargement compteur subs sauvegardé:', error.message);
     }
     return 0;
 }
 
-// Fonction pour renouveler automatiquement le token d'accÃ¨s
+// Fonction pour renouveler automatiquement le token d'accès
 async function refreshTwitchToken() {
     try {
-        console.log('ðŸ”„ Renouvellement du token Twitch...');
+        console.log('📄 Renouvellement du token Twitch...');
         
-        // CrÃ©er un contrÃ´leur d'annulation pour timeout
+        // Créer un contrôleur d'annulation pour timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes timeout
         
@@ -747,7 +1110,7 @@ async function refreshTwitchToken() {
         
         const tokenData = await response.json();
         
-        // Mettre Ã  jour la configuration
+        // Mettre à jour la configuration
         twitchConfig.access_token = tokenData.access_token;
         if (tokenData.refresh_token) {
             twitchConfig.refresh_token = tokenData.refresh_token;
@@ -756,107 +1119,130 @@ async function refreshTwitchToken() {
         // Sauvegarder la nouvelle configuration
         saveTwitchConfig();
         
-        console.log('âœ… Token Twitch renouvelÃ© avec succÃ¨s');
+        console.log('✅ Token Twitch renouvelé avec succès');
         return true;
         
     } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('ERROR', 'âŒ Timeout renouvellement token (10s)');
+            logEvent('ERROR', '❌ Timeout renouvellement token (10s)');
             return false;
         }
         
-        console.error('âŒ Erreur renouvellement token:', error.message);
+        console.error('❌ Erreur renouvellement token:', error.message);
         return false;
     }
 }
 
-// Obtenir le nombre de follows depuis Twitch
+// Obtenir le nombre de follows depuis Twitch (Result Pattern)
 async function getTwitchFollowCount() {
-    if (!twitchConfig.access_token || !twitchConfig.user_id) {
-        const error = `Configuration Twitch incomplÃ¨te - Token: ${!!twitchConfig.access_token}, UserID: ${!!twitchConfig.user_id}`;
-        logEvent('ERROR', error);
-        throw new Error(error);
+    if (!appState.config.twitch.access_token || !appState.config.twitch.user_id) {
+        const message = `Configuration Twitch incomplète - Token: ${!!appState.config.twitch.access_token}, UserID: ${!!appState.config.twitch.user_id}`;
+        logEvent('ERROR', message);
+        return {
+            success: false,
+            error: message,
+            code: 'NOT_CONFIGURED'
+        };
     }
     
     try {
-        const apiUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${twitchConfig.user_id}`;
-        logEvent('INFO', `ðŸ” Appel API Twitch Follows: ${apiUrl}`);
-        logEvent('INFO', `ðŸ”‘ User ID: ${twitchConfig.user_id}`);
+        const apiUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${appState.config.twitch.user_id}`;
+        logEvent('INFO', `🔐 Appel API Twitch Follows: ${apiUrl}`);
+        logEvent('INFO', `🔑 User ID: ${appState.config.twitch.user_id}`);
         
-        // CrÃ©er un contrÃ´leur d'annulation pour timeout
+        // Créer un contrôleur d'annulation pour timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes timeout
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         
         const response = await fetch(apiUrl, {
             headers: {
-                'Authorization': `Bearer ${twitchConfig.access_token}`,
-                'Client-Id': twitchConfig.client_id
+                'Authorization': `Bearer ${appState.config.twitch.access_token}`,
+                'Client-Id': appState.config.twitch.client_id
             },
             signal: controller.signal
         });
         
         clearTimeout(timeoutId);
         
-        logEvent('INFO', `ðŸ“¡ RÃ©ponse API Twitch: Status ${response.status}`);
+        logEvent('INFO', `📡 Réponse API Twitch: Status ${response.status}`);
         
         if (!response.ok) {
             if (response.status === 401) {
-                logEvent('WARN', 'ðŸ” Token expirÃ©, tentative de renouvellement...');
-                // Token expirÃ©, essayer de le renouveler
-                const refreshed = await refreshTwitchToken();
-                if (refreshed) {
-                    logEvent('INFO', 'âœ… Token renouvelÃ©, nouvelle tentative...');
-                    // Retry with new token
+                logEvent('WARN', '🔐 Token expiré, tentative de renouvellement...');
+                const refreshResult = await refreshTwitchToken();
+                
+                if (refreshResult && refreshResult.success) {
+                    logEvent('INFO', '✅ Token renouvelé, nouvelle tentative...');
                     return await getTwitchFollowCount();
-                } else {
-                    throw new Error('Ã‰chec du renouvellement du token');
                 }
+                
+                return {
+                    success: false,
+                    error: 'Token expiré et échec du renouvellement',
+                    code: 'TOKEN_EXPIRED'
+                };
             }
             
             const errorText = await response.text();
-            logEvent('ERROR', `âŒ Erreur API Twitch: ${response.status} - ${errorText}`);
-            throw new Error(`Erreur API Twitch: ${response.status} - ${errorText}`);
+            logEvent('ERROR', `❌ Erreur API Twitch: ${response.status} - ${errorText}`);
+            return {
+                success: false,
+                error: `Erreur API Twitch (${response.status})`,
+                code: 'API_ERROR',
+                details: errorText
+            };
         }
         
         const data = await response.json();
         const followCount = data.total || 0;
         
-        logEvent('SUCCESS', `ðŸ“Š âœ… API Twitch Follows: ${followCount} follows rÃ©cupÃ©rÃ©s`);
+        logEvent('SUCCESS', `📊 ✅ API Twitch Follows: ${followCount} follows récupérés`);
         
-        // Log supplÃ©mentaire pour validation
+        // Log supplémentaire pour validation
         if (data.data && data.data.length > 0) {
-            logEvent('INFO', `ðŸ‘¥ DÃ©tails: ${data.data.length} follows dans la rÃ©ponse`);
+            logEvent('INFO', `👥 Détails: ${data.data.length} follows dans la réponse`);
         }
         
-        return followCount;
+        return {
+            success: true,
+            data: followCount
+        };
         
     } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('ERROR', 'âŒ Timeout API Twitch Follows (15s) - connexion lente');
-            throw new Error('Timeout de connexion Ã  l\'API Twitch');
+            logEvent('ERROR', '❌ Timeout API Twitch Follows (15s) - connexion lente');
+            return {
+                success: false,
+                error: 'Timeout de connexion à l\'API Twitch',
+                code: 'TIMEOUT'
+            };
         }
         
-        logEvent('ERROR', 'âŒ Erreur rÃ©cupÃ©ration follows Twitch:', error.message);
-        throw error;
+        logEvent('ERROR', '❌ Erreur récupération follows Twitch:', error.message);
+        return {
+            success: false,
+            error: error.message,
+            code: 'NETWORK_ERROR'
+        };
     }
 }
 
 // Obtenir le nombre de subs depuis Twitch
 async function getTwitchSubCount() {
     if (!twitchConfig.access_token || !twitchConfig.user_id) {
-        const error = `Configuration Twitch incomplÃ¨te - Token: ${!!twitchConfig.access_token}, UserID: ${!!twitchConfig.user_id}`;
+        const error = `Configuration Twitch incomplète - Token: ${!!twitchConfig.access_token}, UserID: ${!!twitchConfig.user_id}`;
         logEvent('ERROR', error);
         throw new Error(error);
     }
     
     try {
         const apiUrl = `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${twitchConfig.user_id}`;
-        logEvent('INFO', `ðŸ” Appel API Twitch Subs: ${apiUrl}`);
-        logEvent('INFO', `ðŸ”‘ User ID: ${twitchConfig.user_id}`);
+        logEvent('INFO', `🔐 Appel API Twitch Subs: ${apiUrl}`);
+        logEvent('INFO', `🔑 User ID: ${twitchConfig.user_id}`);
         
-        // CrÃ©er un contrÃ´leur d'annulation pour timeout
+        // Créer un contrôleur d'annulation pour timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 secondes timeout
         
@@ -870,71 +1256,112 @@ async function getTwitchSubCount() {
         
         clearTimeout(timeoutId);
         
-        logEvent('INFO', `ðŸ“¡ RÃ©ponse API Twitch Subs: Status ${response.status}`);
+        logEvent('INFO', `📡 Réponse API Twitch Subs: Status ${response.status}`);
         
         if (!response.ok) {
             if (response.status === 401) {
-                logEvent('WARN', 'ðŸ” Token expirÃ©, tentative de renouvellement...');
-                // Token expirÃ©, essayer de le renouveler
+                logEvent('WARN', '🔐 Token expiré, tentative de renouvellement...');
+                // Token expiré, essayer de le renouveler
                 const refreshed = await refreshTwitchToken();
                 if (refreshed) {
-                    logEvent('INFO', 'âœ… Token renouvelÃ©, nouvelle tentative...');
+                    logEvent('INFO', '✅ Token renouvelé, nouvelle tentative...');
                     // Retry with new token
                     return await getTwitchSubCount();
                 } else {
-                    throw new Error('Ã‰chec du renouvellement du token');
+                    throw new Error('Échec du renouvellement du token');
                 }
             }
             
             const errorText = await response.text();
-            logEvent('ERROR', `âŒ Erreur API Twitch Subs: ${response.status} - ${errorText}`);
+            logEvent('ERROR', `❌ Erreur API Twitch Subs: ${response.status} - ${errorText}`);
             throw new Error(`Erreur API Twitch subs: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
         const subCount = data.total || 0;
         
-        logEvent('SUCCESS', `ðŸ“Š âœ… API Twitch Subs: ${subCount} subs rÃ©cupÃ©rÃ©s`);
+        logEvent('SUCCESS', `📊 ✅ API Twitch Subs: ${subCount} subs récupérés`);
         
-        // Log supplÃ©mentaire pour validation
+        // Log supplémentaire pour validation
         if (data.data && data.data.length > 0) {
-            logEvent('INFO', `ðŸ‘¥ DÃ©tails: ${data.data.length} subs dans la rÃ©ponse`);
+            logEvent('INFO', `👥 Détails: ${data.data.length} subs dans la réponse`);
         }
         
         return subCount;
         
     } catch (error) {
-        // Gestion spÃ©cifique des erreurs timeout
+        // Gestion spécifique des erreurs timeout
         if (error.name === 'AbortError') {
-            logEvent('ERROR', 'âŒ Timeout API Twitch Subs (15s) - connexion lente');
-            throw new Error('Timeout de connexion Ã  l\'API Twitch pour les subs');
+            logEvent('ERROR', '❌ Timeout API Twitch Subs (15s) - connexion lente');
+            throw new Error('Timeout de connexion à l\'API Twitch pour les subs');
         }
         
-        logEvent('ERROR', 'âŒ Erreur rÃ©cupÃ©ration subs Twitch:', error.message);
+        logEvent('ERROR', '❌ Erreur récupération subs Twitch:', { error: error.message });
         throw error;
     }
 }
 
-// ðŸ”„ SYSTÃˆME DE POLLING POUR LES FOLLOWS (Alternative Ã  EventSub)
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🚀 INITIALISATION DU COMPTEUR DE SUBS (AU DÉMARRAGE UNIQUEMENT)
+// ═══════════════════════════════════════════════════════════════════════════════
+async function initializeSubCounter() {
+    try {
+        logEvent('INFO', '📊 Initialisation du compteur de subs...');
+        
+        if (!twitchConfig.access_token || !twitchConfig.user_id) {
+            logEvent('WARN', '⚠️ Tokens manquants, chargement depuis fichier');
+            const savedCount = loadSubCountFromFile();
+            currentSubs = savedCount;
+            appState.counters.subs = savedCount;
+            updateSubFiles(savedCount);
+            return { success: true, data: savedCount, source: 'file' };
+        }
+        
+        const subCount = await getTwitchSubCount();
+        
+        currentSubs = subCount;
+        appState.counters.subs = subCount;
+        updateSubFiles(subCount);
+        broadcastSubUpdate();
+        saveSubCountToFile(subCount);
+        
+        logEvent('SUCCESS', `✅ Compteur subs initialisé: ${subCount}`);
+        
+        return { success: true, data: subCount, source: 'api' };
+        
+    } catch (error) {
+        logEvent('ERROR', '❌ Erreur initialisation subs:', { error: error.message });
+        
+        // Charger depuis le fichier sauvegardé
+        const savedCount = loadSubCountFromFile();
+        currentSubs = savedCount;
+        appState.counters.subs = savedCount;
+        updateSubFiles(savedCount);
+        
+        return { success: false, error: error.message, data: savedCount, source: 'file' };
+    }
+}
+
+// 📄 SYSTÈME DE POLLING POUR LES FOLLOWS (Alternative à EventSub)
 function startFollowPolling(intervalSeconds = 10) {
     if (followPollingInterval) {
-        clearInterval(followPollingInterval);
+        timerRegistry.clearInterval('followPolling');
     }
     
     if (!twitchConfig.configured) {
-        logEvent('WARN', 'âš ï¸ Configuration Twitch manquante - polling non dÃ©marrÃ©');
+        logEvent('WARN', '⚠️ Configuration Twitch manquante - polling non démarré');
         return;
     }
     
-    logEvent('INFO', `ðŸ”„ DÃ©marrage du polling intelligent des follows (toutes les ${intervalSeconds}s)`);
-    logEvent('INFO', `ðŸ“¡ Mode: ${sessionId ? 'BACKUP EventSub' : 'PRINCIPAL (EventSub inactif)'}`);
+    logEvent('INFO', `📄 Démarrage du polling intelligent des follows (toutes les ${intervalSeconds}s)`);
+    logEvent('INFO', `📡 Mode: ${sessionId ? 'BACKUP EventSub' : 'PRINCIPAL (EventSub inactif)'}`);
     isPollingActive = true;
     
-    // PremiÃ¨re vÃ©rification immÃ©diate
+    // Première vérification immédiate
     pollFollowCount();
     
-    // Puis vÃ©rifications pÃ©riodiques
-    followPollingInterval = setInterval(async () => {
+    // Puis vérifications périodiques
+    followPollingInterval = timerRegistry.setInterval('followPolling', async () => {
         await pollFollowCount();
     }, intervalSeconds * 1000);
 }
@@ -943,190 +1370,95 @@ async function pollFollowCount() {
     try {
         if (!isPollingActive) return;
         
-        // Si EventSub est actif, faire un polling moins frÃ©quent (juste pour synchronisation)
-        if (sessionId) {
-            // Ne vÃ©rifier qu'une fois sur 3 (soit toutes les 30s si interval=10s)
-            if (Math.random() > 0.33) {
-                return;
-            }
-            logEvent('INFO', 'ðŸ”„ VÃ©rification de synchronisation (EventSub actif)');
+        const result = await getTwitchFollowCount();
+        
+        if (!result.success) {
+            logEvent('ERROR', `❌ Erreur polling follows: ${result.error} (${result.code})`);
+            return;
         }
         
-        const newFollowCount = await getTwitchFollowCount();
+        const newFollowCount = result.data;
         
-        // Si c'est la premiÃ¨re fois ou s'il y a un changement
+        // Si c'est la première fois ou s'il y a un changement
         if (lastKnownFollowCount === 0) {
             lastKnownFollowCount = newFollowCount;
             updateFollowCount(newFollowCount);
-            logEvent('INFO', `ðŸ“Š Count initial: ${newFollowCount} follows`);
+            logEvent('INFO', `📊 Count initial: ${newFollowCount} follows`);
         } else if (newFollowCount !== lastKnownFollowCount) {
             const difference = newFollowCount - lastKnownFollowCount;
             const source = sessionId ? '(synchronisation API)' : '(polling)';
-            logEvent('INFO', `ðŸŽ‰ Follow count mis Ã  jour ${source}: ${lastKnownFollowCount} â†’ ${newFollowCount} (${difference > 0 ? '+' : ''}${difference})`);
+            logEvent('INFO', `🎉 Follow count mis à jour ${source}: ${lastKnownFollowCount} → ${newFollowCount} (${difference > 0 ? '+' : ''}${difference})`);
             
             lastKnownFollowCount = newFollowCount;
             updateFollowCount(newFollowCount);
             
             // Sauvegarder le nouveau count
             saveFollowBackup();
+        } else if (sessionId) {
+            // Si EventSub actif et pas de changement, log de confirmation occasionnel
+            if (Math.random() > 0.9) {
+                logEvent('INFO', `✅ Synchronisation OK: ${newFollowCount} follows`);
+            }
         }
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur lors du polling des follows:', error.message);
+        logEvent('ERROR', '❌ Erreur lors du polling des follows:', error.message);
     }
 }
 
 function stopFollowPolling() {
     if (followPollingInterval) {
-        clearInterval(followPollingInterval);
+        timerRegistry.clearInterval('followPolling');
         followPollingInterval = null;
         isPollingActive = false;
-        logEvent('INFO', 'â¹ï¸ Polling des follows arrÃªtÃ©');
+        logEvent('INFO', '⏹️ Polling des follows arrêté');
     }
 }
 
-// ðŸ”„ SYSTÃˆME DE TAMPON POUR LES Ã‰VÃ‰NEMENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔥 NOUVEAU SYSTÈME D'ÉVÉNEMENTS - EventQueue (Thread-Safe)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Note: L'ancien système eventBuffer a été remplacé par EventQueue
+// Toutes les fonctions utilisent maintenant eventQueue.add()
 
-// Ajouter un Ã©vÃ©nement au tampon
-function addEventToBuffer(eventType, data) {
-    const event = {
-        id: Date.now() + Math.random(), // ID unique
-        type: eventType,
-        data: data,
-        timestamp: Date.now()
-    };
-    
-    eventBuffer.push(event);
-    logEvent('INFO', `ðŸ“¥ Ã‰vÃ©nement ajoutÃ© au tampon: ${eventType} (${eventBuffer.length} en attente)`);
-    
-    // DÃ©marrer le traitement si pas dÃ©jÃ  en cours
-    if (!isProcessingEvents) {
-        startEventProcessing();
-    }
-}
-
-// DÃ©marrer le traitement des Ã©vÃ©nements
-function startEventProcessing() {
-    if (isProcessingEvents) {
-        return; // DÃ©jÃ  en cours
-    }
-    
-    isProcessingEvents = true;
-    logEvent('INFO', 'ðŸ”„ DÃ©marrage traitement des Ã©vÃ©nements');
-    
-    // Traiter immÃ©diatement puis dÃ©marrer l'interval
-    processEventBatch();
-    
-    eventProcessingInterval = setInterval(() => {
-        if (eventBuffer.length > 0) {
-            processEventBatch();
-        } else {
-            // ArrÃªter le traitement si plus d'Ã©vÃ©nements
-            stopEventProcessing();
-        }
-    }, EVENT_PROCESSING_DELAY);
-}
-
-// ArrÃªter le traitement des Ã©vÃ©nements
-function stopEventProcessing() {
-    if (eventProcessingInterval) {
-        clearInterval(eventProcessingInterval);
-        eventProcessingInterval = null;
-    }
-    isProcessingEvents = false;
-    logEvent('INFO', 'â¹ï¸ ArrÃªt traitement des Ã©vÃ©nements');
-}
-
-// Traiter un lot d'Ã©vÃ©nements
-function processEventBatch() {
-    if (eventBuffer.length === 0) {
-        return;
-    }
-    
-    // Prendre les Ã©vÃ©nements les plus anciens
-    const eventsToProcess = eventBuffer.splice(0, MAX_EVENTS_PER_BATCH);
-    
-    logEvent('INFO', `âš¡ Traitement de ${eventsToProcess.length} Ã©vÃ©nement(s)`);
-    
-    try {
-        // Traiter chaque Ã©vÃ©nement sÃ©quentiellement pour Ã©viter les conflits
-        eventsToProcess.forEach((event, index) => {
-            try {
-                logEvent('INFO', `ðŸ“‹ Traitement Ã©vÃ©nement ${index + 1}/${eventsToProcess.length}: ${event.type}`);
-                processEvent(event);
-            } catch (eventError) {
-                logEvent('ERROR', `âŒ Erreur traitement Ã©vÃ©nement individuel ${event.type}:`, eventError.message);
-                // Continuer avec les autres Ã©vÃ©nements mÃªme si l'un Ã©choue
-            }
-        });
-        
-        lastEventProcessTime = Date.now();
-        logEvent('INFO', `âœ… Lot d'Ã©vÃ©nements traitÃ© avec succÃ¨s`);
-        
-    } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur traitement lot d\'Ã©vÃ©nements:', error.message);
-        
-        // En cas d'erreur critique, remettre les Ã©vÃ©nements dans le tampon pour retry
-        logEvent('WARN', 'ðŸ”„ Remise des Ã©vÃ©nements dans le tampon pour retry...');
-        eventBuffer.unshift(...eventsToProcess);
-    }
-}
-
-// Traiter un Ã©vÃ©nement individuel
-function processEvent(event) {
-    try {
-        switch (event.type) {
-            case 'follow':
-                handleFollowEvent(event.data);
-                break;
-            case 'sub':
-                handleSubEvent(event.data);
-                break;
-            case 'sync':
-                handleSyncEvent(event.data);
-                break;
-            default:
-                logEvent('WARN', `âš ï¸ Type d'Ã©vÃ©nement inconnu: ${event.type}`);
-        }
-    } catch (error) {
-        logEvent('ERROR', `âŒ Erreur traitement Ã©vÃ©nement ${event.type}:`, error.message);
-    }
-}
-
-// GÃ©rer un Ã©vÃ©nement de follow
+// Gérer un événement de follow
 function handleFollowEvent(data) {
     try {
         const followerName = data.user_name || 'Utilisateur inconnu';
         const followerId = data.user_id || 'ID inconnu';
         
-        logEvent('FOLLOW', `ðŸ‘¥ Ã‰vÃ©nement follow reÃ§u: ${followerName} (${followerId})`);
+        logEvent('FOLLOW', `👥 Événement follow reçu: ${followerName} (${followerId})`);
         
-        // Utiliser le systÃ¨me de batching au lieu d'incrementer directement
+        // Utiliser le système de batching au lieu d'incrémenter directement
         addFollowToBatch(1);
         
         // Affichage console pour debug
-        console.log(`ðŸŽ‰ FOLLOW AJOUTÃ‰ AU BATCH: ${followerName}`);
-        console.log(`ðŸ“Š Batch actuel: ${followBatch.count} follow(s) en attente`);
+        console.log(`🎉 FOLLOW AJOUTÉ AU BATCH: ${followerName}`);
+        console.log(`📊 Batch actuel: ${followBatch.count} follow(s) en attente`);
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur gestion Ã©vÃ©nement follow:', error.message);
-        logEvent('ERROR', 'ðŸ“„ Stack trace:', error.stack);
+        logEvent('ERROR', '❌ Erreur gestion événement follow:', error.message);
+        logEvent('ERROR', '📄 Stack trace:', error.stack);
         
-        // En cas d'erreur, forcer une synchronisation
+        // En cas d'erreur, forcer une synchronisation via EventQueue
         try {
-            logEvent('INFO', 'ðŸ”„ Ajout synchronisation de rÃ©cupÃ©ration...');
-            addEventToBuffer('sync', {
-                reason: 'Synchronisation aprÃ¨s erreur follow',
-                error: error.message,
+            logEvent('INFO', '📄 Ajout synchronisation de récupération...');
+            eventQueue.add({
+                id: `sync-error-${Date.now()}`,
+                type: VALID_EVENT_TYPES.SYNC,
+                data: {
+                    reason: 'Synchronisation après erreur follow',
+                    error: error.message
+                },
                 timestamp: Date.now()
             });
-        } catch (bufferError) {
-            logEvent('CRITICAL', 'âŒ Erreur critique ajout synchronisation:', bufferError.message);
+        } catch (queueError) {
+            logEvent('CRITICAL', '❌ Erreur critique ajout synchronisation:', queueError.message);
         }
     }
 }
 
-// GÃ©rer un Ã©vÃ©nement de sub
+// Gérer un événement de sub
 function handleSubEvent(data) {
     try {
         const userName = data.user_name || 'Utilisateur inconnu';
@@ -1134,63 +1466,63 @@ function handleSubEvent(data) {
         const subType = data.type || 'unknown';
         const tier = data.tier || '1000';
         
-        logEvent('SUB', `â­ Ã‰vÃ©nement sub reÃ§u: ${userName} (Type: ${subType})`);
+        logEvent('SUB', `⭐ Événement sub reçu: ${userName} (Type: ${subType})`);
         
-        // Traitement selon le type d'Ã©vÃ©nement sub
+        // Traitement selon le type d'événement sub
         switch (subType) {
             case 'new_sub':
                 addSubToBatch(1, tier);
-                console.log(`ðŸŽ‰ NOUVEL ABONNEMENT AJOUTÃ‰ AU BATCH: ${userName} (Tier ${tier})`);
+                console.log(`🎉 NOUVEL ABONNEMENT AJOUTÉ AU BATCH: ${userName} (Tier ${tier})`);
                 break;
                 
             case 'gift_sub':
                 const giftCount = data.gifted_count || 1;
                 addSubToBatch(giftCount, tier);
-                console.log(`ðŸŽ SUBS OFFERTS AJOUTÃ‰S AU BATCH: ${userName} a offert ${giftCount} subs (Tier ${tier})`);
+                console.log(`🎁 SUBS OFFERTS AJOUTÉS AU BATCH: ${userName} a offert ${giftCount} subs (Tier ${tier})`);
                 break;
                 
             case 'end_sub':
-                // Pour les fins d'abonnement, retirer immÃ©diatement (pas de batching nÃ©gatif)
+                // Pour les fins d'abonnement, retirer immédiatement (pas de batching négatif)
                 currentSubs = Math.max(0, currentSubs - 1);
                 updateSubFiles(currentSubs);
                 broadcastSubUpdate(1);
-                console.log(`â¹ï¸ FIN D'ABONNEMENT: ${userName}`);
+                console.log(`⏹️ FIN D'ABONNEMENT: ${userName}`);
                 break;
                 
             default:
-                logEvent('WARN', `âš ï¸ Type de sub inconnu: ${subType}`);
+                logEvent('WARN', `⚠️ Type de sub inconnu: ${subType}`);
                 return;
         }
         
-        console.log(`ðŸ“Š Batch actuel: ${subBatch.count} sub(s) en attente`);
+        console.log(`📊 Batch actuel: ${subBatch.count} sub(s) en attente`);
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur gestion Ã©vÃ©nement sub:', error.message);
-        logEvent('ERROR', 'ðŸ“„ Stack trace:', error.stack);
+        logEvent('ERROR', '❌ Erreur gestion événement sub:', error.message);
+        logEvent('ERROR', '📄 Stack trace:', error.stack);
         
         // En cas d'erreur, pas de synchronisation pour les subs (pas d'API disponible)
-        logEvent('WARN', 'âš ï¸ Pas de synchronisation auto pour les subs');
+        logEvent('WARN', '⚠️ Pas de synchronisation auto pour les subs');
     }
 }
 
-// GÃ©rer un Ã©vÃ©nement de synchronisation
+// Gérer un événement de synchronisation
 async function handleSyncEvent(data) {
     try {
-        logEvent('INFO', `ðŸ”„ Ã‰vÃ©nement synchronisation: ${data.reason || 'Non spÃ©cifiÃ©'}`);
+        logEvent('INFO', `📄 Événement synchronisation: ${data.reason || 'Non spécifié'}`);
         
-        // ExÃ©cuter une synchronisation complÃ¨te avec l'API Twitch
+        // Exécuter une synchronisation complète avec l'API Twitch
         await syncTwitchFollows(data.reason || 'Synchronisation depuis tampon');
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur gestion Ã©vÃ©nement sync:', error.message);
+        logEvent('ERROR', '❌ Erreur gestion événement sync:', error.message);
     }
 }
 
-// Version sÃ©curisÃ©e de updateFollowCount avec protection contre les erreurs
+// Version sécurisée de updateFollowCount avec protection contre les erreurs
 function updateFollowCountSafe(newCount) {
     try {
         if (typeof newCount !== 'number' || newCount < 0) {
-            logEvent('WARN', `âš ï¸ Nombre de follows invalide: ${newCount}`);
+            logEvent('WARN', `⚠️ Nombre de follows invalide: ${newCount}`);
             return;
         }
         
@@ -1198,29 +1530,32 @@ function updateFollowCountSafe(newCount) {
         saveFollowBackup();
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur mise Ã  jour compteur:', error.message);
+        logEvent('ERROR', '❌ Erreur mise à jour compteur:', error.message);
     }
 }
 
-// Mettre Ã  jour le count de follows et les fichiers
+// Mettre à jour le count de follows et les fichiers
 function updateFollowCount(newCount) {
     const oldCount = currentFollows;
     currentFollows = newCount;
     
-    // Mettre Ã  jour les fichiers
+    // Synchroniser lastKnownFollowCount pour éviter désynchronisation avec le polling
+    lastKnownFollowCount = newCount;
+    
+    // Mettre à jour les fichiers
     updateFollowFiles(currentFollows);
     
     // Diffuser aux clients WebSocket
     broadcastFollowUpdate();
     
-    logEvent('INFO', `ðŸ“Š Follow count mis Ã  jour: ${oldCount} â†’ ${newCount}`);
+    logEvent('INFO', `📊 Follow count mis à jour: ${oldCount} → ${newCount}`);
 }
 
-// Version sÃ©curisÃ©e de updateSubCount avec protection contre les erreurs
+// Version sécurisée de updateSubCount avec protection contre les erreurs
 function updateSubCountSafe(newCount) {
     try {
         if (typeof newCount !== 'number' || newCount < 0) {
-            logEvent('WARN', `âš ï¸ Nombre de subs invalide: ${newCount}`);
+            logEvent('WARN', `⚠️ Nombre de subs invalide: ${newCount}`);
             return;
         }
         
@@ -1228,63 +1563,61 @@ function updateSubCountSafe(newCount) {
         saveSubCountToFile(newCount);
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur mise Ã  jour compteur subs:', error.message);
+        logEvent('ERROR', '❌ Erreur mise à jour compteur subs:', error.message);
     }
 }
 
-// Mettre Ã  jour le count de subs et les fichiers
+// Mettre à jour le count de subs et les fichiers
 function updateSubCount(newCount) {
     const oldCount = currentSubs;
     currentSubs = newCount;
     
-    // Mettre Ã  jour les fichiers
+    // Mettre à jour les fichiers
     updateSubFiles(currentSubs);
     
     // Diffuser aux clients WebSocket
     broadcastSubUpdate();
     
-    logEvent('INFO', `ðŸ“Š Sub count mis Ã  jour: ${oldCount} â†’ ${newCount}`);
+    logEvent('INFO', `📊 Sub count mis à jour: ${oldCount} → ${newCount}`);
 }
 
 // Sauvegarder les follows en backup
 function saveFollowBackup() {
     try {
         saveFollowCountToFile(currentFollows);
-        logEvent('INFO', `ðŸ’¾ Backup sauvegardÃ©: ${currentFollows} follows`);
+        logEvent('INFO', `💾 Backup sauvegardé: ${currentFollows} follows`);
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur sauvegarde backup:', error.message);
+        logEvent('ERROR', '❌ Erreur sauvegarde backup:', error.message);
     }
 }
 
 // Reset du timer keepalive selon la documentation Twitch
 function resetKeepaliveTimer(timeoutSeconds = 10) {
-    if (keepaliveTimeout) {
-        clearTimeout(keepaliveTimeout);
-    }
+    timerRegistry.clearTimeout('keepalive');
     
     // Selon la documentation: Si pas de message dans keepalive_timeout_seconds, reconnecter
-    keepaliveTimeout = setTimeout(() => {
-        logEvent('WARN', `â° Keepalive timeout (${timeoutSeconds}s) - reconnexion nÃ©cessaire`);
+    keepaliveTimeout = timerRegistry.setTimeout('keepalive', () => {
+        logEvent('WARN', `⏰ Keepalive timeout (${timeoutSeconds}s) - reconnexion nécessaire`);
         
         if (twitchEventSubWs) {
             twitchEventSubWs.close();
         }
         
-        // Reconnexion aprÃ¨s timeout
-        setTimeout(connectTwitchEventSub, 2000);
+        // Reconnexion après timeout
+        timerRegistry.setTimeout('reconnectAfterKeepalive', connectTwitchEventSub, 2000);
     }, timeoutSeconds * 1000);
 }
 
 // Gestion de la reconnexion avec URL fournie (conforme documentation)
 async function handleReconnect(reconnectUrl) {
     try {
-        logEvent('INFO', 'ðŸ”„ DÃ©but processus de reconnexion avec URL fournie');
+        logEvent('INFO', '📄 Début processus de reconnexion avec URL fournie');
         
-        // CrÃ©er nouvelle connexion AVANT de fermer l'ancienne (selon doc)
+        // Créer nouvelle connexion AVANT de fermer l'ancienne (selon doc)
         const newWs = new WebSocket(reconnectUrl);
         
         newWs.on('open', () => {
-            logEvent('INFO', 'âœ… Nouvelle connexion EventSub Ã©tablie');
+            logEvent('INFO', '✅ Nouvelle connexion EventSub établie');
         });
         
         newWs.on('message', async (data) => {
@@ -1293,7 +1626,7 @@ async function handleReconnect(reconnectUrl) {
                 
                 // Attendre le welcome de la nouvelle connexion
                 if (message.metadata?.message_type === 'session_welcome') {
-                    logEvent('INFO', 'ðŸŽ‰ Welcome reÃ§u sur nouvelle connexion - fermeture ancienne connexion');
+                    logEvent('INFO', '🎉 Welcome reçu sur nouvelle connexion - fermeture ancienne connexion');
                     
                     // Fermer l'ancienne connexion seulement maintenant
                     if (twitchEventSubWs) {
@@ -1318,20 +1651,20 @@ async function handleReconnect(reconnectUrl) {
         newWs.on('error', (error) => {
             logEvent('ERROR', 'Erreur nouvelle connexion EventSub:', error.message);
             // En cas d'erreur, retomber sur une reconnexion normale
-            setTimeout(connectTwitchEventSub, 5000);
+            timerRegistry.setTimeout('reconnectOnError', connectTwitchEventSub, 5000);
         });
         
     } catch (error) {
         logEvent('ERROR', 'Erreur gestion reconnexion:', error.message);
         // Fallback vers reconnexion normale
-        setTimeout(connectTwitchEventSub, 5000);
+        timerRegistry.setTimeout('reconnectOnError', connectTwitchEventSub, 5000);
     }
 }
 
-// Configurer les handlers WebSocket (pour Ã©viter duplication)
+// Configurer les handlers WebSocket (pour éviter duplication)
 function setupWebSocketHandlers(ws) {
     ws.on('close', (code, reason) => {
-        logEvent('INFO', `ðŸ”Œ WebSocket EventSub fermÃ©: ${code} - ${reason || 'Raison inconnue'}`);
+        logEvent('INFO', `📌 WebSocket EventSub fermé: ${code} - ${reason || 'Raison inconnue'}`);
         
         // Clear des timers
         if (keepaliveTimeout) clearTimeout(keepaliveTimeout);
@@ -1339,7 +1672,7 @@ function setupWebSocketHandlers(ws) {
         
         // Reconnexion automatique avec backoff exponentiel (sauf si code 4000-4007)
         if (code >= 4000 && code <= 4007) {
-            logEvent('ERROR', `âŒ Erreur WebSocket critique (${code}) - pas de reconnexion automatique`);
+            logEvent('ERROR', `❌ Erreur WebSocket critique (${code}) - pas de reconnexion automatique`);
             return;
         }
         
@@ -1347,13 +1680,13 @@ function setupWebSocketHandlers(ws) {
             const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts), 60000);
             reconnectAttempts++;
             
-            logEvent('INFO', `ðŸ”„ Reconnexion programmÃ©e dans ${delay/1000}s (tentative ${reconnectAttempts}/${maxReconnectAttempts})`);
+            logEvent('INFO', `📄 Reconnexion programmée dans ${delay/1000}s (tentative ${reconnectAttempts}/${maxReconnectAttempts})`);
             
-            setTimeout(() => {
+            timerRegistry.setTimeout('reconnectScheduled', () => {
                 connectTwitchEventSub();
             }, delay);
         } else if (reconnectAttempts >= maxReconnectAttempts) {
-            logEvent('ERROR', `âŒ Ã‰chec de reconnexion aprÃ¨s ${maxReconnectAttempts} tentatives`);
+            logEvent('ERROR', `❌ Échec de reconnexion après ${maxReconnectAttempts} tentatives`);
         }
     });
     
@@ -1362,14 +1695,14 @@ function setupWebSocketHandlers(ws) {
     });
 }
 
-// ðŸ”¥ Connexion WebSocket EventSub Twitch
+// 🔥 Connexion WebSocket EventSub Twitch
 async function connectTwitchEventSub() {
     if (!twitchConfig.configured) {
-        console.log('âš ï¸ Configuration Twitch requise pour EventSub');
+        console.log('⚠️ Configuration Twitch requise pour EventSub');
         return;
     }
 
-    console.log(`ðŸ”Œ Connexion WebSocket EventSub Twitch... (Tentative ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+    console.log(`📌 Connexion WebSocket EventSub Twitch... (Tentative ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
     
     try {
         // Fermer la connexion existante si elle existe
@@ -1388,66 +1721,70 @@ async function connectTwitchEventSub() {
         twitchEventSubWs = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
         
         twitchEventSubWs.on('open', () => {
-            logEvent('INFO', 'âœ… WebSocket EventSub connectÃ© !');
-            reconnectAttempts = 0; // Reset du compteur lors d'une connexion rÃ©ussie
+            logEvent('INFO', '✅ WebSocket EventSub connecté !');
+            reconnectAttempts = 0; // Reset du compteur lors d'une connexion réussie
         });
         
         twitchEventSubWs.on('message', async (data) => {
             try {
                 const rawMessage = data.toString();
-                console.log('ðŸ” Message WebSocket RAW reÃ§u:', rawMessage.substring(0, 500) + (rawMessage.length > 500 ? '...' : ''));
+                console.log('🔐 Message WebSocket RAW reçu:', rawMessage.substring(0, 500) + (rawMessage.length > 500 ? '...' : ''));
                 
                 const message = JSON.parse(rawMessage);
-                console.log('ðŸ“¦ Message WebSocket parsÃ©:', JSON.stringify(message, null, 2));
+                console.log('📦 Message WebSocket parsé:', JSON.stringify(message, null, 2));
                 
                 await handleEventSubMessage(message);
             } catch (parseError) {
                 logEvent('ERROR', 'Erreur parsing message EventSub:', parseError.message);
-                console.error('ðŸ“„ Message problÃ©matique:', data.toString().substring(0, 500));
+                console.error('📄 Message problématique:', data.toString().substring(0, 500));
                 
                 // Ne pas faire crasher le serveur, juste loguer l'erreur
                 try {
-                    // Ajouter une synchronisation de sÃ©curitÃ© en cas d'erreur de parsing
-                    addEventToBuffer('sync', {
-                        reason: 'Synchronisation aprÃ¨s erreur parsing EventSub',
-                        error: parseError.message,
+                    // Ajouter une synchronisation de sécurité en cas d'erreur de parsing via EventQueue
+                    eventQueue.add({
+                        id: `sync-parse-error-${Date.now()}`,
+                        type: VALID_EVENT_TYPES.SYNC,
+                        data: {
+                            reason: 'Synchronisation après erreur parsing EventSub',
+                            error: parseError.message
+                        },
                         timestamp: Date.now()
                     });
-                } catch (bufferError) {
-                    console.error('âŒ Erreur ajout Ã©vÃ©nement de sÃ©curitÃ©:', bufferError.message);
+                } catch (queueError) {
+                    console.error('❌ Erreur ajout événement de sécurité:', queueError.message);
                 }
             }
         });
         
-        // Utiliser les handlers centralisÃ©s
+        // Utiliser les handlers centralisés
         setupWebSocketHandlers(twitchEventSubWs);
         
     } catch (error) {
-        console.error('âŒ Erreur connexion EventSub:', error.message);
+        console.error('❌ Erreur connexion EventSub:', error.message);
         
-        // Retry aprÃ¨s un dÃ©lai
+        // Retry après un délai
         if (reconnectAttempts < maxReconnectAttempts) {
             const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts), 60000);
             reconnectAttempts++;
             
-            setTimeout(() => {
+            timerRegistry.setTimeout('reconnectOnClose', () => {
                 connectTwitchEventSub();
             }, delay);
         }
     }
 }
 
-// GÃ©rer les messages EventSub
+// Gérer les messages EventSub
 async function handleEventSubMessage(message) {
     try {
         const messageType = message.metadata?.message_type;
         
         if (!messageType) {
-            console.warn('âš ï¸ Message EventSub sans type:', message);
+            console.warn('⚠️ Message EventSub sans type:', message);
             return;
         }
         
-        console.log(`ðŸ“¨ Message EventSub reÃ§u: ${messageType}`);
+        console.log(`📨 Message EventSub reçu: ${messageType}`);
         
         switch (messageType) {
             case 'session_welcome':
@@ -1455,45 +1792,43 @@ async function handleEventSubMessage(message) {
                 const keepaliveTimeout = message.payload?.session?.keepalive_timeout_seconds || 10;
                 
                 if (sessionId) {
-                    logEvent('INFO', `ðŸŽ‰ Session EventSub Ã©tablie: ${sessionId}`);
-                    logEvent('INFO', `â° Keepalive timeout: ${keepaliveTimeout}s`);
+                    logEvent('INFO', `🎉 Session EventSub établie: ${sessionId}`);
+                    logEvent('INFO', `⏰ Keepalive timeout: ${keepaliveTimeout}s`);
                     
                     // Reset du timer keepalive
                     resetKeepaliveTimer(keepaliveTimeout);
                     
-                    // IMPORTANT: S'abonner aux Ã©vÃ©nements dans les 10 secondes
-                    if (subscriptionTimeout) {
-                        clearTimeout(subscriptionTimeout);
-                    }
+                    // IMPORTANT: S'abonner aux événements dans les 10 secondes
+                    timerRegistry.clearTimeout('subscriptionSetup');
                     
-                    subscriptionTimeout = setTimeout(async () => {
+                    subscriptionTimeout = timerRegistry.setTimeout('subscriptionSetup', async () => {
                         try {
                             await subscribeToChannelFollow();
                             await subscribeToChannelSubscription();
                             await subscribeToChannelSubscriptionGift();
                             await subscribeToChannelSubscriptionEnd();
-                            logEvent('INFO', 'âœ… Abonnements EventSub (Follow, Sub, Gift, End) crÃ©Ã©s dans les temps');
+                            logEvent('INFO', '✅ Abonnements EventSub (Follow, Sub, Gift, End) créés dans les temps');
                             
-                            // DÃ©marrer le polling en mode backup (synchronisation)
-                            // Il vÃ©rifiera l'API de temps en temps pour s'assurer qu'EventSub n'a pas manquÃ© d'Ã©vÃ©nements
-                            startFollowPolling(10); // Toutes les 10s, mais vÃ©rifiera seulement ~33% du temps si EventSub actif
+                            // Démarrer le polling en mode backup (synchronisation)
+                            // Il vérifiera l'API de temps en temps pour s'assurer qu'EventSub n'a pas manqué d'événements
+                            startFollowPolling(10); // Toutes les 10s, mais vérifiera seulement ~33% du temps si EventSub actif
                             
                         } catch (error) {
-                            logEvent('ERROR', 'âŒ Ã‰chec crÃ©ation abonnements EventSub:', error.message);
-                            logEvent('INFO', 'ðŸ”„ Basculement sur le systÃ¨me de polling...');
+                            logEvent('ERROR', '❌ Échec création abonnements EventSub:', error.message);
+                            logEvent('INFO', '📄 Basculement sur le système de polling...');
                             
-                            // Si EventSub Ã©choue, dÃ©marrer le polling en fallback (mode principal)
-                            startFollowPolling(10); // VÃ©rifier toutes les 10 secondes
+                            // Si EventSub échoue, démarrer le polling en fallback (mode principal)
+                            startFollowPolling(10); // Vérifier toutes les 10 secondes
                         }
-                    }, 1000); // S'abonner aprÃ¨s 1 seconde
+                    }, 1000); // S'abonner après 1 seconde
                     
                 } else {
-                    console.error('âŒ Session ID manquant dans le message welcome');
+                    console.error('❌ Session ID manquant dans le message welcome');
                 }
                 break;
                 
             case 'session_keepalive':
-                logEvent('INFO', 'ðŸ’“ Keepalive reÃ§u');
+                logEvent('INFO', '📗 Keepalive reçu');
                 // Reset du timer keepalive selon la documentation
                 resetKeepaliveTimer();
                 break;
@@ -1505,74 +1840,74 @@ async function handleEventSubMessage(message) {
                 break;
                 
             case 'session_reconnect':
-                logEvent('INFO', 'ðŸ”„ Reconnexion EventSub requise');
+                logEvent('INFO', '📄 Reconnexion EventSub requise');
                 const reconnectUrl = message.payload?.session?.reconnect_url;
                 
                 if (reconnectUrl) {
-                    logEvent('INFO', `ðŸ”— URL de reconnexion fournie: ${reconnectUrl}`);
+                    logEvent('INFO', `📗 URL de reconnexion fournie: ${reconnectUrl}`);
                     // Selon la documentation, utiliser l'URL fournie
                     await handleReconnect(reconnectUrl);
                 } else {
-                    logEvent('WARN', 'âš ï¸ Reconnexion demandÃ©e sans URL, utilisation URL standard');
-                    setTimeout(connectTwitchEventSub, 1000);
+                    logEvent('WARN', '⚠️ Reconnexion demandée sans URL, utilisation URL standard');
+                    timerRegistry.setTimeout('reconnectNoUrl', connectTwitchEventSub, 1000);
                 }
                 break;
                 
             case 'revocation':
-                // Nouveau: Gestion des rÃ©vocations selon la documentation
+                // Nouveau: Gestion des révocations selon la documentation
                 const subscriptionType = message.metadata?.subscription_type;
                 const revocationReason = message.payload?.subscription?.status;
                 
-                logEvent('WARN', `âŒ Abonnement rÃ©voquÃ©: ${subscriptionType}, raison: ${revocationReason}`);
+                logEvent('WARN', `❌ Abonnement révoqué: ${subscriptionType}, raison: ${revocationReason}`);
                 
-                // Actions selon le type de rÃ©vocation
+                // Actions selon le type de révocation
                 switch (revocationReason) {
                     case 'authorization_revoked':
-                        logEvent('ERROR', 'ðŸ” Autorisation rÃ©voquÃ©e - rÃ©authentification nÃ©cessaire');
+                        logEvent('ERROR', '🔐 Autorisation révoquée - réauthentification nécessaire');
                         // Fermer la connexion et demander une nouvelle auth
                         if (twitchEventSubWs) {
                             twitchEventSubWs.close();
                         }
                         break;
                     case 'user_removed':
-                        logEvent('ERROR', 'ðŸ‘¤ Utilisateur supprimÃ© - impossible de continuer');
+                        logEvent('ERROR', '👤 Utilisateur supprimé - impossible de continuer');
                         break;
                     case 'version_removed':
-                        logEvent('ERROR', 'ðŸ“¡ Version d\'Ã©vÃ©nement obsolÃ¨te - mise Ã  jour nÃ©cessaire');
+                        logEvent('ERROR', '📡 Version d\'événement obsolète - mise à jour nécessaire');
                         break;
                     default:
-                        logEvent('WARN', `â“ RÃ©vocation inconnue: ${revocationReason}`);
+                        logEvent('WARN', `❓ Révocation inconnue: ${revocationReason}`);
                 }
                 break;
                 
             default:
-                console.log('ðŸ“¨ Message EventSub non gÃ©rÃ©:', messageType);
-                console.log('ðŸ” Contenu du message:', JSON.stringify(message, null, 2));
+                console.log('📨 Message EventSub non géré:', messageType);
+                console.log('🔐 Contenu du message:', JSON.stringify(message, null, 2));
         }
         
     } catch (error) {
-        console.error('âŒ Erreur handleEventSubMessage:', error.message);
-        console.error('ðŸ“„ Message problÃ©matique:', JSON.stringify(message, null, 2));
+        console.error('❌ Erreur handleEventSubMessage:', error.message);
+        console.error('📄 Message problématique:', JSON.stringify(message, null, 2));
     }
 }
 
-// GÃ©rer les notifications d'Ã©vÃ©nements
+// Gérer les notifications d'événements
 async function handleEventSubNotification(message) {
     try {
         const eventType = message.metadata?.subscription_type;
         const eventData = message.payload?.event;
         
-        logEvent('NOTIFICATION', `ðŸ”” Notification reÃ§ue - Type: ${eventType}`, {
-            metadata: message.metadata,
-            payload: message.payload
+        logEvent('NOTIFICATION', `📣 Notification reçue - Type: ${eventType}`, {
+            user_name: eventData?.user_name,
+            tier: eventData?.tier,
         });
         
         if (!eventType || !eventData) {
-            logEvent('WARN', 'âš ï¸ Notification EventSub incomplÃ¨te:', message);
+            logEvent('WARN', '⚠️ Notification EventSub incomplète');
             return;
         }
         
-        logEvent('INFO', `ðŸ”” Ã‰vÃ©nement reÃ§u: ${eventType}`);
+        logEvent('INFO', `📣 Événement reçu: ${eventType}`);
         
         switch (eventType) {
             case 'channel.follow':
@@ -1580,138 +1915,149 @@ async function handleEventSubNotification(message) {
                 const followerId = eventData.user_id || 'ID inconnu';
                 const followedAt = eventData.followed_at || new Date().toISOString();
                 
-                logEvent('Ã‰VÃ‰NEMENT', `ðŸ‘¤ Nouveau follow: ${followerName} (${followerId})`, {
+                logEvent('ÉVÉNEMENT', `👤 Nouveau follow: ${followerName}`, {
                     user_name: followerName,
                     user_id: followerId,
-                    followed_at: followedAt,
-                    raw_data: eventData
                 });
                 
-                console.log('ðŸŽ‰ NOUVEAU FOLLOW DÃ‰TECTÃ‰ !');
-                console.log(`ðŸ‘¤ Utilisateur: ${followerName}`);
-                console.log(`ðŸ†” ID: ${followerId}`);
-                console.log(`â° Moment: ${followedAt}`);
+                console.log('🎉 NOUVEAU FOLLOW DÉTECTÉ !');
+                console.log(`👤 Utilisateur: ${followerName}`);
+                console.log(`🆔 ID: ${followerId}`);
                 
-                // Ajouter au tampon avec plus de dÃ©tails
-                addEventToBuffer('follow', {
-                    user_name: followerName,
-                    user_id: followerId,
-                    followed_at: followedAt,
-                    timestamp: Date.now(),
-                    raw_event: eventData
+                // Ajouter au buffer d'événements via EventQueue
+                eventQueue.add({
+                    id: `follow-${Date.now()}`,
+                    type: VALID_EVENT_TYPES.FOLLOW,
+                    data: {
+                        user_name: followerName,
+                        user_id: followerId,
+                        followed_at: followedAt
+                    },
+                    timestamp: Date.now()
                 });
                 
-                // DÃ©clencher aussi une synchronisation pour vÃ©rifier le dÃ©compte
-                addEventToBuffer('sync', {
-                    reason: 'Synchronisation aprÃ¨s Ã©vÃ©nement follow',
-                    trigger: 'follow_event',
+                // Synchronisation pour vérifier le décompte via EventQueue
+                eventQueue.add({
+                    id: `sync-follow-${Date.now()}`,
+                    type: VALID_EVENT_TYPES.SYNC,
+                    data: {
+                        reason: 'Synchronisation après follow',
+                        trigger: 'follow_event'
+                    },
                     timestamp: Date.now()
                 });
                 break;
                 
+            // ✅ GESTION CORRECTE DES SUBS - Selon documentation Twitch
             case 'channel.subscribe':
+                // ✅ Cet event couvre:
+                // - Nouveaux subs (normal, Prime, Tier 1/2/3)
+                // - Subs offerts reçus (côté receveur)
+                // - Upgrades de gift → sub normal
+                // ❌ NE couvre PAS les resubs (c'est bon, on ne les compte pas)
+                
                 const subUserName = eventData.user_name || 'Utilisateur inconnu';
                 const subUserId = eventData.user_id || 'ID inconnu';
                 const subTier = eventData.tier || '1000';
+                const isGiftReceived = eventData.is_gift; // true si reçu en gift
                 
-                logEvent('Ã‰VÃ‰NEMENT', `â­ Nouvel abonnement: ${subUserName} (Tier ${subTier})`, {
+                logEvent('ÉVÉNEMENT', `⭐ Nouveau sub: ${subUserName} (Tier ${subTier}${isGiftReceived ? ', gift reçu' : ''})`, {
                     user_name: subUserName,
                     user_id: subUserId,
                     tier: subTier,
-                    raw_data: eventData
                 });
                 
-                console.log('ðŸŽ‰ NOUVEL ABONNEMENT DÃ‰TECTÃ‰ !');
-                console.log(`ðŸ‘¤ Utilisateur: ${subUserName}`);
-                console.log(`â­ Tier: ${subTier}`);
+                console.log('🎉 NOUVEL ABONNEMENT DÉTECTÉ !');
+                console.log(`👤 Utilisateur: ${subUserName}`);
+                console.log(`⭐ Tier: ${subTier}`);
+                console.log(`🎁 Gift reçu: ${isGiftReceived ? 'Oui' : 'Non'}`);
                 
-                addEventToBuffer('sub', {
-                    user_name: subUserName,
-                    user_id: subUserId,
-                    tier: subTier,
-                    type: 'new_sub',
-                    timestamp: Date.now(),
-                    raw_event: eventData
-                });
+                // Incrémenter le compteur via batching
+                addSubToBatch(1, subTier);
                 break;
                 
+            // ✅ FIN DE SUB
+            case 'channel.subscription.end':
+                // ✅ Cet event couvre:
+                // - Annulation volontaire
+                // - Expiration normale
+                // - Fin d'un gift reçu
+                // - Fin d'un Prime
+                // - Fin d'un upgrade
+                
+                const endUserName = eventData.user_name || 'Utilisateur inconnu';
+                const endUserId = eventData.user_id || 'ID inconnu';
+                const endTier = eventData.tier || '1000';
+                
+                logEvent('ÉVÉNEMENT', `⏹️ Fin d'abonnement: ${endUserName} (Tier ${endTier})`, {
+                    user_name: endUserName,
+                    user_id: endUserId,
+                    tier: endTier,
+                });
+                
+                console.log('⏹️ FIN D\'ABONNEMENT DÉTECTÉE !');
+                console.log(`👤 Utilisateur: ${endUserName}`);
+                console.log(`⭐ Tier: ${endTier}`);
+                
+                // Décrémenter immédiatement (pas de batching pour les fins)
+                currentSubs = Math.max(0, currentSubs - 1);
+                appState.counters.subs = currentSubs;
+                updateSubFiles(currentSubs);
+                broadcastSubUpdate(-1);
+                saveSubCountToFile(currentSubs);
+                break;
+                
+            // ❌ NE PAS GÉRER channel.subscription.renew
+            // Les resubs NE changent PAS le compteur total
+            // (le viewer était déjà sub, reste sub, nombre total = même)
+            
+            // ⚠️ channel.subscription.gift est géré différemment
+            // C'est l'acte d'offrir des subs, pas de les recevoir
             case 'channel.subscription.gift':
                 const gifterName = eventData.user_name || 'Utilisateur inconnu';
                 const giftedCount = eventData.total || 1;
                 const giftTier = eventData.tier || '1000';
                 
-                logEvent('Ã‰VÃ‰NEMENT', `ðŸŽ Abonnements offerts: ${gifterName} a offert ${giftedCount} subs (Tier ${giftTier})`, {
+                logEvent('ÉVÉNEMENT', `🎁 Subs offerts: ${gifterName} a offert ${giftedCount} subs (Tier ${giftTier})`, {
                     user_name: gifterName,
-                    total_gifted: giftedCount,
+                    count: giftedCount,
                     tier: giftTier,
-                    raw_data: eventData
                 });
                 
-                console.log('ðŸŽ ABONNEMENTS OFFERTS DÃ‰TECTÃ‰S !');
-                console.log(`ðŸ‘¤ Gifter: ${gifterName}`);
-                console.log(`ðŸ“Š Nombre: ${giftedCount}`);
-                console.log(`â­ Tier: ${giftTier}`);
+                console.log('🎁 ABONNEMENTS OFFERTS DÉTECTÉS !');
+                console.log(`👤 Gifter: ${gifterName}`);
+                console.log(`📊 Nombre: ${giftedCount}`);
+                console.log(`⭐ Tier: ${giftTier}`);
                 
-                addEventToBuffer('sub', {
-                    user_name: gifterName,
-                    gifted_count: giftedCount,
-                    tier: giftTier,
-                    type: 'gift_sub',
-                    timestamp: Date.now(),
-                    raw_event: eventData
-                });
-                break;
-                
-            case 'channel.subscription.end':
-                const endUserName = eventData.user_name || 'Utilisateur inconnu';
-                const endUserId = eventData.user_id || 'ID inconnu';
-                const endTier = eventData.tier || '1000';
-                
-                logEvent('Ã‰VÃ‰NEMENT', `â¹ï¸ Fin d'abonnement: ${endUserName} (Tier ${endTier})`, {
-                    user_name: endUserName,
-                    user_id: endUserId,
-                    tier: endTier,
-                    raw_data: eventData
-                });
-                
-                console.log('â¹ï¸ FIN D\'ABONNEMENT DÃ‰TECTÃ‰E !');
-                console.log(`ðŸ‘¤ Utilisateur: ${endUserName}`);
-                console.log(`â­ Tier: ${endTier}`);
-                
-                addEventToBuffer('sub', {
-                    user_name: endUserName,
-                    user_id: endUserId,
-                    tier: endTier,
-                    type: 'end_sub',
-                    timestamp: Date.now(),
-                    raw_event: eventData
-                });
+                // Ajouter au batch
+                addSubToBatch(giftedCount, giftTier);
                 break;
                 
             default:
-                logEvent('INFO', `ðŸ”” Ã‰vÃ©nement non gÃ©rÃ©: ${eventType}`);
-                logEvent('INFO', 'ðŸ“„ DonnÃ©es de l\'Ã©vÃ©nement:', eventData);
+                logEvent('INFO', `📣 Événement non géré: ${eventType}`);
         }
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur handleEventSubNotification:', error.message);
-        logEvent('ERROR', 'ðŸ“„ Notification problÃ©matique:', JSON.stringify(message, null, 2));
+        logEvent('ERROR', '❌ Erreur handleEventSubNotification:', { error: error.message });
         
-        // En cas d'erreur, ajouter une synchronisation de sÃ©curitÃ© au tampon
+        // Synchronisation de sécurité via EventQueue
         try {
-            logEvent('INFO', 'ðŸ”„ Ajout synchronisation de sÃ©curitÃ© au tampon...');
-            addEventToBuffer('sync', { 
-                reason: 'Synchronisation aprÃ¨s erreur EventSub',
-                error: error.message,
+            eventQueue.add({
+                id: `sync-eventsub-error-${Date.now()}`,
+                type: VALID_EVENT_TYPES.SYNC,
+                data: { 
+                    reason: 'Synchronisation après erreur EventSub',
+                    error: error.message
+                },
                 timestamp: Date.now()
             });
-        } catch (bufferError) {
-            logEvent('ERROR', 'âŒ Ã‰chec ajout Ã©vÃ©nement de sÃ©curitÃ© au tampon:', bufferError.message);
+        } catch (queueError) {
+            logEvent('ERROR', '❌ Échec ajout sync de sécurité:', { error: queueError.message });
         }
     }
 }
 
-// S'abonner aux Ã©vÃ©nements de follow
+// S'abonner aux événements de follow
 async function subscribeToChannelFollow() {
     if (!sessionId || !twitchConfig.user_id) {
         throw new Error('Session ID ou User ID manquant');
@@ -1740,16 +2086,16 @@ async function subscribeToChannelFollow() {
         });
         
         if (response.ok) {
-            console.log('âœ… Abonnement aux Ã©vÃ©nements de follow activÃ©');
+            console.log('✅ Abonnement aux événements de follow activé');
             return true;
         } else {
             const error = await response.text();
-            console.error('âŒ Erreur abonnement EventSub follow:', error);
-            throw new Error(`Ã‰chec abonnement EventSub: ${response.status} - ${error}`);
+            console.error('❌ Erreur abonnement EventSub follow:', error);
+            throw new Error(`Échec abonnement EventSub: ${response.status} - ${error}`);
         }
     } catch (error) {
-        console.error('âŒ Erreur souscription follow:', error);
-        throw error; // Re-lancer l'erreur pour que le code appelant la gÃ¨re
+        console.error('❌ Erreur souscription follow:', error);
+        throw error; // Re-lancer l'erreur pour que le code appelant la gère
     }
 }
 
@@ -1779,13 +2125,13 @@ async function subscribeToChannelSubscription() {
         });
         
         if (response.ok) {
-            console.log('âœ… Abonnement aux nouveaux abonnements activÃ©');
+            console.log('✅ Abonnement aux nouveaux abonnements activé');
         } else {
             const error = await response.text();
-            console.error('âŒ Erreur abonnement EventSub subscription:', error);
+            console.error('❌ Erreur abonnement EventSub subscription:', error);
         }
     } catch (error) {
-        console.error('âŒ Erreur souscription subscription:', error);
+        console.error('❌ Erreur souscription subscription:', error);
     }
 }
 
@@ -1815,13 +2161,13 @@ async function subscribeToChannelSubscriptionGift() {
         });
         
         if (response.ok) {
-            console.log('âœ… Abonnement aux dons d\'abonnements activÃ©');
+            console.log('✅ Abonnement aux dons d\'abonnements activé');
         } else {
             const error = await response.text();
-            console.error('âŒ Erreur abonnement EventSub gift:', error);
+            console.error('❌ Erreur abonnement EventSub gift:', error);
         }
     } catch (error) {
-        console.error('âŒ Erreur souscription gift:', error);
+        console.error('❌ Erreur souscription gift:', error);
     }
 }
 
@@ -1851,85 +2197,138 @@ async function subscribeToChannelSubscriptionEnd() {
         });
         
         if (response.ok) {
-            console.log('âœ… Abonnement aux fins d\'abonnements activÃ©');
+            console.log('✅ Abonnement aux fins d\'abonnements activé');
         } else {
             const error = await response.text();
-            console.error('âŒ Erreur abonnement EventSub end:', error);
+            console.error('❌ Erreur abonnement EventSub end:', error);
         }
     } catch (error) {
-        console.error('âŒ Erreur souscription end:', error);
+        console.error('❌ Erreur souscription end:', error);
     }
 }
 
-// Synchroniser le nombre de follows depuis Twitch
+// Synchroniser le nombre de follows depuis Twitch (Result Pattern)
 async function syncTwitchFollows(reason = 'Synchronisation') {
     try {
-        console.log(`ðŸ”„ ${reason} - RÃ©cupÃ©ration du nombre de follows...`);
-        // VÃ©rifier et relancer l'authentification si nÃ©cessaire
+        console.log(`📄 ${reason} - Récupération du nombre de follows...`);
+        
+        // Vérifier l'authentification
         if (!twitchConfig.access_token) {
-            console.log('âš ï¸ Token manquant, lancement de l\'authentification...');
-            await initiateDeviceCodeFlow();
+            return { 
+                success: false, 
+                error: 'Not authenticated', 
+                code: 'NOT_AUTH',
+                data: currentFollows 
+            };
         }
-        const followCount = await getTwitchFollowCount();
+        
+        const result = await getTwitchFollowCount();
+        
+        if (!result.success) {
+            return { 
+                success: false, 
+                error: result.error, 
+                code: result.code,
+                data: currentFollows 
+            };
+        }
+        
+        const followCount = result.data;
         const oldCount = currentFollows;
         currentFollows = followCount;
-        // Mettre Ã  jour les fichiers et diffuser
-        updateFiles(currentFollows);
-        broadcastUpdate();
+        appState.counters.follows = followCount;
+        
+        // Mettre à jour les fichiers et diffuser
+        updateFollowFiles(currentFollows);
+        broadcastFollowUpdate();
+        
         // Sauvegarder automatiquement sur disque
         saveFollowCountToFile(currentFollows);
+        
         const diff = followCount - oldCount;
         const diffText = diff > 0 ? `(+${diff})` : diff < 0 ? `(${diff})` : '(=)';
-        logEvent('SYNC', `ðŸ“Š ${reason}: ${oldCount} â†’ ${followCount} ${diffText}`);
+        logEvent('SYNC', `📊 ${reason}: ${oldCount} → ${followCount} ${diffText}`);
+        
         // Log additionnel pour les changements significatifs
         if (Math.abs(diff) > 0) {
-            logEvent('INFO', `ðŸŽ¯ Changement dÃ©tectÃ© ! Mise Ã  jour complÃ¨te effectuÃ©e.`);
+            logEvent('INFO', `🎯 Changement détecté ! Mise à jour complète effectuée.`);
         }
-        return followCount;
-    } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur sync follows:', error.message);
-        // En cas d'erreur, ne pas perdre les donnÃ©es actuelles
-        logEvent('INFO', `ðŸ’¾ Conservation des donnÃ©es actuelles: ${currentFollows} follows`);
         
-        // Ne pas relancer l'erreur pour Ã©viter le crash du serveur
-        // Retourner le compteur actuel Ã  la place
-        return currentFollows;
+        return { 
+            success: true, 
+            data: followCount,
+            diff: diff,
+            oldValue: oldCount
+        };
+        
+    } catch (error) {
+        logEvent('ERROR', '❌ Erreur sync follows:', { error: error.message });
+        // En cas d'erreur, ne pas perdre les données actuelles
+        logEvent('INFO', `💾 Conservation des données actuelles: ${currentFollows} follows`);
+        
+        return { 
+            success: false, 
+            error: error.message, 
+            code: 'API_ERROR',
+            data: currentFollows 
+        };
     }
 }
 
-// Synchroniser le nombre de subs depuis Twitch
+// Synchroniser le nombre de subs depuis Twitch (Result Pattern)
 async function syncTwitchSubs(reason = 'Synchronisation') {
     try {
-        console.log(`ðŸ”„ ${reason} - RÃ©cupÃ©ration du nombre de subs...`);
-        // VÃ©rifier et relancer l'authentification si nÃ©cessaire
+        console.log(`📄 ${reason} - Récupération du nombre de subs...`);
+        
+        // Vérifier l'authentification
         if (!twitchConfig.access_token) {
-            console.log('âš ï¸ Token manquant, lancement de l\'authentification...');
-            await initiateDeviceCodeFlow();
+            return { 
+                success: false, 
+                error: 'Not authenticated', 
+                code: 'NOT_AUTH',
+                data: currentSubs 
+            };
         }
+        
         const subCount = await getTwitchSubCount();
         const oldCount = currentSubs;
         currentSubs = subCount;
-        // Mettre Ã  jour les fichiers et diffuser
+        appState.counters.subs = subCount;
+        
+        // Mettre à jour les fichiers et diffuser
         updateSubFiles(currentSubs);
         broadcastSubUpdate();
+        
         // Sauvegarder automatiquement sur disque
         saveSubCountToFile(currentSubs);
+        
         const diff = subCount - oldCount;
         const diffText = diff > 0 ? `(+${diff})` : diff < 0 ? `(${diff})` : '(=)';
-        logEvent('SYNC', `ðŸ“Š ${reason} subs: ${oldCount} â†’ ${subCount} ${diffText}`);
+        logEvent('SYNC', `📊 ${reason} subs: ${oldCount} → ${subCount} ${diffText}`);
+        
         // Log additionnel pour les changements significatifs
         if (Math.abs(diff) > 0) {
-            logEvent('INFO', `ðŸŽ¯ Changement subs dÃ©tectÃ© ! Mise Ã  jour complÃ¨te effectuÃ©e.`);
+            logEvent('INFO', `🎯 Changement subs détecté ! Mise à jour complète effectuée.`);
         }
-        return subCount;
-    } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur sync subs:', error.message);
-        // En cas d'erreur, ne pas perdre les donnÃ©es actuelles
-        logEvent('INFO', `ðŸ’¾ Conservation des donnÃ©es actuelles: ${currentSubs} subs`);
         
-        // Ne pas relancer l'erreur pour Ã©viter le crash du serveur
-        // Retourner le compteur actuel Ã  la place
-        return currentSubs;
+        return { 
+            success: true, 
+            data: subCount,
+            diff: diff,
+            oldValue: oldCount
+        };
+        
+    } catch (error) {
+        logEvent('ERROR', '❌ Erreur sync subs:', { error: error.message });
+        // En cas d'erreur, ne pas perdre les données actuelles
+        logEvent('INFO', `💾 Conservation des données actuelles: ${currentSubs} subs`);
+        
+        return { 
+            success: false, 
+            error: error.message, 
+            code: 'API_ERROR',
+            data: currentSubs 
+        };
     }
 }
 
@@ -1947,22 +2346,22 @@ function loadFollowGoals() {
                 const match = line.match(/^(\d+):\s*(.*?)\s*$/);
                 if (match) {
                     const count = parseInt(match[1]);
-                    const message = match[2]; // Peut Ãªtre vide, c'est OK
+                    const message = match[2]; // Peut être vide, c'est OK
                     followGoals.set(count, message);
                 }
             });
             
-            console.log('âœ… Objectifs follows chargÃ©s:', followGoals.size, 'objectifs');
+            console.log('✅ Objectifs follows chargés:', followGoals.size, 'objectifs');
             
-            // Mettre Ã  jour immÃ©diatement les fichiers avec les nouveaux objectifs
+            // Mettre à jour immédiatement les fichiers avec les nouveaux objectifs
             updateFollowFiles(currentFollows);
             
-            // Diffuser la mise Ã  jour
+            // Diffuser la mise à jour
             broadcastFollowUpdate();
-            console.log('ðŸ”„ Objectifs follows mis Ã  jour et diffusÃ©s immÃ©diatement');
+            console.log('📄 Objectifs follows mis à jour et diffusés immédiatement');
         }
     } catch (error) {
-        console.error('âŒ Erreur chargement objectifs follows:', error.message);
+        console.error('❌ Erreur chargement objectifs follows:', error.message);
     }
 }
 
@@ -1980,26 +2379,26 @@ function loadSubGoals() {
                 const match = line.match(/^(\d+):\s*(.*?)\s*$/);
                 if (match) {
                     const count = parseInt(match[1]);
-                    const message = match[2]; // Peut Ãªtre vide, c'est OK
+                    const message = match[2]; // Peut être vide, c'est OK
                     subGoals.set(count, message);
                 }
             });
             
-            console.log('âœ… Objectifs subs chargÃ©s:', subGoals.size, 'objectifs');
+            console.log('✅ Objectifs subs chargés:', subGoals.size, 'objectifs');
             
-            // Mettre Ã  jour immÃ©diatement les fichiers avec les nouveaux objectifs
+            // Mettre à jour immédiatement les fichiers avec les nouveaux objectifs
             updateSubFiles(currentSubs);
             
-            // Diffuser la mise Ã  jour
+            // Diffuser la mise à jour
             broadcastSubUpdate();
-            console.log('ðŸ”„ Objectifs subs mis Ã  jour et diffusÃ©s immÃ©diatement');
+            console.log('📄 Objectifs subs mis à jour et diffusés immédiatement');
         }
     } catch (error) {
-        console.error('âŒ Erreur chargement objectifs subs:', error.message);
+        console.error('❌ Erreur chargement objectifs subs:', error.message);
     }
 }
 
-// Fonction de compatibilitÃ© (charge les goals follows par dÃ©faut)
+// Fonction de compatibilité (charge les goals follows par défaut)
 function loadGoals() {
     loadFollowGoals();
     loadSubGoals();
@@ -2010,7 +2409,7 @@ function setupConfigWatcher() {
     const followConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'followgoal_config.txt');
     const subConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'subgoals_config.txt');
     
-    // ArrÃªter la surveillance prÃ©cÃ©dente si elle existe
+    // Arrêter la surveillance précédente si elle existe
     if (configWatcher) {
         configWatcher.close();
     }
@@ -2022,9 +2421,9 @@ function setupConfigWatcher() {
         // Surveiller les changements du fichier de configuration des follows
         configWatcher = fs.watch(followConfigPath, (eventType, filename) => {
             if (eventType === 'change') {
-                console.log('ðŸ”„ Fichier followgoal_config.txt modifiÃ© - rechargement...');
-                // Petit dÃ©lai pour s'assurer que l'Ã©criture est terminÃ©e
-                setTimeout(() => {
+                console.log('📄 Fichier followgoal_config.txt modifié - rechargement...');
+                // Petit délai pour s'assurer que l'écriture est terminée
+                timerRegistry.setTimeout('reloadFollowGoals', () => {
                     loadFollowGoals();
                 }, 100);
             }
@@ -2033,17 +2432,17 @@ function setupConfigWatcher() {
         // Surveiller les changements du fichier de configuration des subs
         subConfigWatcher = fs.watch(subConfigPath, (eventType, filename) => {
             if (eventType === 'change') {
-                console.log('ðŸ”„ Fichier subgoals_config.txt modifiÃ© - rechargement...');
-                // Petit dÃ©lai pour s'assurer que l'Ã©criture est terminÃ©e
-                setTimeout(() => {
+                console.log('📄 Fichier subgoals_config.txt modifié - rechargement...');
+                // Petit délai pour s'assurer que l'écriture est terminée
+                timerRegistry.setTimeout('reloadSubGoals', () => {
                     loadSubGoals();
                 }, 100);
             }
         });
         
-        console.log('ðŸ‘ï¸ Surveillance des fichiers de configuration activÃ©e');
+        console.log('👁️ Surveillance des fichiers de configuration activée');
     } catch (error) {
-        console.error('âŒ Erreur surveillance fichiers:', error.message);
+        console.error('❌ Erreur surveillance fichiers:', error.message);
     }
 }
 
@@ -2055,9 +2454,9 @@ function getCurrentFollowGoal(follows) {
     
     const sortedGoals = Array.from(followGoals.keys()).sort((a, b) => a - b);
     
-    // VÃ©rifier qu'il y a au moins un objectif
+    // Vérifier qu'il y a au moins un objectif
     if (sortedGoals.length === 0) {
-        console.log('âš ï¸ Aucun objectif follow trouvÃ© dans la configuration');
+        console.log('⚠️ Aucun objectif follow trouvé dans la configuration');
         return {
             current: follows,
             target: follows,
@@ -2079,7 +2478,7 @@ function getCurrentFollowGoal(follows) {
     }
     
     if (nextGoal) {
-        // Il y a un objectif suivant Ã  atteindre
+        // Il y a un objectif suivant à atteindre
         const message = followGoals.get(nextGoal);
         const remaining = nextGoal - follows;
         progress = ((follows / nextGoal) * 100).toFixed(1);
@@ -2092,7 +2491,7 @@ function getCurrentFollowGoal(follows) {
             progress: progress
         };
     } else if (lastReachedGoal) {
-        // Pas d'objectif suivant, on a dÃ©passÃ© tous les objectifs
+        // Pas d'objectif suivant, on a dépassé tous les objectifs
         return {
             current: follows,
             target: follows,
@@ -2126,9 +2525,9 @@ function getCurrentSubGoal(subs) {
     
     const sortedGoals = Array.from(subGoals.keys()).sort((a, b) => a - b);
     
-    // VÃ©rifier qu'il y a au moins un objectif
+    // Vérifier qu'il y a au moins un objectif
     if (sortedGoals.length === 0) {
-        console.log('âš ï¸ Aucun objectif sub trouvÃ© dans la configuration');
+        console.log('⚠️ Aucun objectif sub trouvé dans la configuration');
         return {
             current: subs,
             target: subs,
@@ -2150,7 +2549,7 @@ function getCurrentSubGoal(subs) {
     }
     
     if (nextGoal) {
-        // Il y a un objectif suivant Ã  atteindre
+        // Il y a un objectif suivant à atteindre
         const message = subGoals.get(nextGoal);
         const remaining = nextGoal - subs;
         progress = ((subs / nextGoal) * 100).toFixed(1);
@@ -2163,7 +2562,7 @@ function getCurrentSubGoal(subs) {
             progress: progress
         };
     } else if (lastReachedGoal) {
-        // Pas d'objectif suivant, on a dÃ©passÃ© tous les objectifs
+        // Pas d'objectif suivant, on a dépassé tous les objectifs
         return {
             current: subs,
             target: subs,
@@ -2189,45 +2588,41 @@ function getCurrentSubGoal(subs) {
     }
 }
 
-// Fonction de compatibilitÃ© (utilise les goals follows par dÃ©faut)
-function getCurrentGoal(count) {
-    return getCurrentFollowGoal(count);
-}
-
 // ========================================
-// âš¡ SYSTÃˆME DE BATCHING INTELLIGENT
+// ⚡ SYSTÈME DE BATCHING INTELLIGENT
 // ========================================
 
 /**
- * Ajoute un follow au batch avec file d'attente synchronisÃ©e aux animations
+ * Ajoute un follow au batch avec file d'attente synchronisée aux animations
  * Pendant qu'une animation est en cours (1s), accumule tous les events
  * Puis flush le batch dans la prochaine animation
  */
 function addFollowToBatch(count = 1) {
     followBatch.count += count;
     
-    // Annuler le timer prÃ©cÃ©dent si existe
+    // Annuler le timer précédent si existe
     if (followBatch.timer) {
         clearTimeout(followBatch.timer);
     }
     
-    // Si une animation est en cours, juste accumuler (le timer existant gÃ©rera le flush)
+    // Si une animation est en cours, juste accumuler (le timer existant gérera le flush)
     if (followBatch.isAnimating) {
-        logEvent('INFO', `â³ Animation en cours - Accumulation follows: ${followBatch.count}`);
-        // Ne pas crÃ©er de nouveau timer, attendre que l'animation se termine
+        logEvent('INFO', `⏳ Animation en cours - Accumulation follows: ${followBatch.count}`);
+        // Ne pas créer de nouveau timer, attendre que l'animation se termine
         return;
     }
     
-    // Aucune animation en cours : attendre un peu pour capturer les events groupÃ©s
-    followBatch.timer = setTimeout(() => {
+    // Aucune animation en cours : attendre un peu pour capturer les events groupés
+    timerRegistry.clearTimeout('followBatch');
+    followBatch.timer = timerRegistry.setTimeout('followBatch', () => {
         flushFollowBatch();
     }, BATCH_DELAY);
     
-    logEvent('INFO', `ðŸ“¥ Follow ajoutÃ© au batch: ${followBatch.count} (flush dans ${BATCH_DELAY}ms)`);
+    logEvent('INFO', `🔥 Follow ajouté au batch: ${followBatch.count} (flush dans ${BATCH_DELAY}ms)`);
 }
 
 /**
- * Traite et envoie le batch de follows accumulÃ©s
+ * Traite et envoie le batch de follows accumulés
  * Lance une animation de 1 seconde pendant laquelle les nouveaux events s'accumulent
  */
 function flushFollowBatch() {
@@ -2240,32 +2635,35 @@ function flushFollowBatch() {
     // Marquer qu'une animation est en cours
     followBatch.isAnimating = true;
     
-    // Mettre Ã  jour le compteur
+    // Mettre à jour le compteur
     currentFollows += batchCount;
     
-    // Mettre Ã  jour les fichiers
+    // Synchroniser lastKnownFollowCount pour que le polling ne se perde pas
+    lastKnownFollowCount = currentFollows;
+    
+    // Mettre à jour les fichiers
     updateFollowFiles(currentFollows);
     
-    // Broadcast avec indication du nombre groupÃ©
+    // Broadcast avec indication du nombre groupé
     broadcastFollowUpdate(batchCount);
     
-    logEvent('INFO', `ðŸŽ¬ Animation dÃ©marrÃ©e: +${batchCount} follows (Total: ${currentFollows}) - DurÃ©e: ${ANIMATION_DURATION}ms`);
+    logEvent('INFO', `🎬 Animation démarrée: +${batchCount} follows (Total: ${currentFollows}) - Durée: ${ANIMATION_DURATION}ms`);
     
-    // AprÃ¨s la durÃ©e de l'animation, marquer comme terminÃ©e et flush si nouveaux events
-    setTimeout(() => {
+    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
+    timerRegistry.setTimeout('followAnimation', () => {
         followBatch.isAnimating = false;
-        logEvent('INFO', `âœ… Animation terminÃ©e - Batch actuel: ${followBatch.count} follows`);
+        logEvent('INFO', `✅ Animation terminée - Batch actuel: ${followBatch.count} follows`);
         
-        // Si des events se sont accumulÃ©s pendant l'animation, les traiter
+        // Si des events se sont accumulés pendant l'animation, les traiter
         if (followBatch.count > 0) {
-            logEvent('INFO', `ðŸ”„ Flush automatique du batch accumulÃ©: ${followBatch.count} follows`);
-            flushFollowBatch(); // RÃ©cursif : lance la prochaine animation
+            logEvent('INFO', `📄 Flush automatique du batch accumulé: ${followBatch.count} follows`);
+            flushFollowBatch(); // Récursif : lance la prochaine animation
         }
     }, ANIMATION_DURATION);
 }
 
 /**
- * Ajoute un sub au batch avec file d'attente synchronisÃ©e aux animations
+ * Ajoute un sub au batch avec file d'attente synchronisée aux animations
  */
 function addSubToBatch(count = 1, tier = '1000') {
     subBatch.count += count;
@@ -2276,27 +2674,28 @@ function addSubToBatch(count = 1, tier = '1000') {
     }
     subBatch.tiers[tier] += count;
     
-    // Annuler le timer prÃ©cÃ©dent
+    // Annuler le timer précédent
     if (subBatch.timer) {
         clearTimeout(subBatch.timer);
     }
     
     // Si une animation est en cours, juste accumuler
     if (subBatch.isAnimating) {
-        logEvent('INFO', `â³ Animation en cours - Accumulation subs: ${subBatch.count}`);
+        logEvent('INFO', `⏳ Animation en cours - Accumulation subs: ${subBatch.count}`);
         return;
     }
     
-    // Aucune animation en cours : attendre un peu pour capturer les events groupÃ©s
-    subBatch.timer = setTimeout(() => {
+    // Aucune animation en cours : attendre un peu pour capturer les events groupés
+    timerRegistry.clearTimeout('subBatch');
+    subBatch.timer = timerRegistry.setTimeout('subBatch', () => {
         flushSubBatch();
     }, BATCH_DELAY);
     
-    logEvent('INFO', `ðŸ“¥ Sub ajoutÃ© au batch: ${subBatch.count} (flush dans ${BATCH_DELAY}ms)`);
+    logEvent('INFO', `🔥 Sub ajouté au batch: ${subBatch.count} (flush dans ${BATCH_DELAY}ms)`);
 }
 
 /**
- * Traite et envoie le batch de subs accumulÃ©s
+ * Traite et envoie le batch de subs accumulés
  * Lance une animation de 1 seconde pendant laquelle les nouveaux events s'accumulent
  */
 function flushSubBatch() {
@@ -2312,54 +2711,54 @@ function flushSubBatch() {
     // Marquer qu'une animation est en cours
     subBatch.isAnimating = true;
     
-    // Mettre Ã  jour le compteur
+    // Mettre à jour le compteur
     currentSubs += batchCount;
     
-    // Mettre Ã  jour les fichiers
+    // Mettre à jour les fichiers
     updateSubFiles(currentSubs);
     
-    // Broadcast avec dÃ©tails des tiers
+    // Broadcast avec détails des tiers
     broadcastSubUpdate(batchCount, tiers);
     
     const tierDetails = Object.entries(tiers)
-        .map(([tier, count]) => `${count}Ã—T${tier.charAt(0)}`)
+        .map(([tier, count]) => `${count}×T${tier.charAt(0)}`)
         .join(', ');
     
-    logEvent('INFO', `ðŸŽ¬ Animation dÃ©marrÃ©e: +${batchCount} subs (${tierDetails}) (Total: ${currentSubs}) - DurÃ©e: ${ANIMATION_DURATION}ms`);
+    logEvent('INFO', `🎬 Animation démarrée: +${batchCount} subs (${tierDetails}) (Total: ${currentSubs}) - Durée: ${ANIMATION_DURATION}ms`);
     
-    // AprÃ¨s la durÃ©e de l'animation, marquer comme terminÃ©e et flush si nouveaux events
-    setTimeout(() => {
+    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
+    timerRegistry.setTimeout('subAnimation', () => {
         subBatch.isAnimating = false;
-        logEvent('INFO', `âœ… Animation terminÃ©e - Batch actuel: ${subBatch.count} subs`);
+        logEvent('INFO', `✅ Animation terminée - Batch actuel: ${subBatch.count} subs`);
         
-        // Si des events se sont accumulÃ©s pendant l'animation, les traiter
+        // Si des events se sont accumulés pendant l'animation, les traiter
         if (subBatch.count > 0) {
-            logEvent('INFO', `ðŸ”„ Flush automatique du batch accumulÃ©: ${subBatch.count} subs`);
-            flushSubBatch(); // RÃ©cursif : lance la prochaine animation
+            logEvent('INFO', `📄 Flush automatique du batch accumulé: ${subBatch.count} subs`);
+            flushSubBatch(); // Récursif : lance la prochaine animation
         }
     }, ANIMATION_DURATION);
 }
 
 // ========================================
-// Fin du systÃ¨me de batching
+// Fin du système de batching
 // ========================================
 
-// Mettre Ã  jour les fichiers pour les follows
+// Mettre à jour les fichiers pour les follows
 function updateFollowFiles(follows) {
     const goal = getCurrentFollowGoal(follows);
     
     // Choix du format d'affichage selon le cas
     let goalText;
     if (goal.isMaxReached) {
-        // Cas oÃ¹ on a dÃ©passÃ© tous les objectifs : afficher seulement le nombre
+        // Cas où on a dépassé tous les objectifs : afficher seulement le nombre
         goalText = follows.toString();
     } else {
-        // VÃ©rifier si le message est vide ou undefined
+        // Vérifier si le message est vide ou undefined
         if (!goal.message || goal.message.trim() === '') {
             // Message vide : afficher seulement {followcount}/{goal}
             goalText = `${goal.current}/${goal.target}`;
         } else {
-            // Message prÃ©sent : afficher le format complet {followcount}/{goal} : {message}
+            // Message présent : afficher le format complet {followcount}/{goal} : {message}
             goalText = `${goal.current}/${goal.target} : ${goal.message}`;
         }
     }
@@ -2371,28 +2770,28 @@ function updateFollowFiles(follows) {
         // Fichier de base pour follows
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_followers_count.txt'), follows.toString());
         
-        console.log(`ðŸ“Š Fichiers follows mis Ã  jour: ${follows} follows`);
+        console.log(`📊 Fichiers follows mis à jour: ${follows} follows`);
     } catch (error) {
-        console.error('âŒ Erreur Ã©criture fichiers follows:', error.message);
+        console.error('❌ Erreur écriture fichiers follows:', error.message);
     }
 }
 
-// Mettre Ã  jour les fichiers pour les subs
+// Mettre à jour les fichiers pour les subs
 function updateSubFiles(subs) {
     const goal = getCurrentSubGoal(subs);
     
     // Choix du format d'affichage selon le cas
     let goalText;
     if (goal.isMaxReached) {
-        // Cas oÃ¹ on a dÃ©passÃ© tous les objectifs : afficher seulement le nombre
+        // Cas où on a dépassé tous les objectifs : afficher seulement le nombre
         goalText = subs.toString();
     } else {
-        // VÃ©rifier si le message est vide ou undefined
+        // Vérifier si le message est vide ou undefined
         if (!goal.message || goal.message.trim() === '') {
             // Message vide : afficher seulement {subcount}/{goal}
             goalText = `${goal.current}/${goal.target}`;
         } else {
-            // Message prÃ©sent : afficher le format complet {subcount}/{goal} : {message}
+            // Message présent : afficher le format complet {subcount}/{goal} : {message}
             goalText = `${goal.current}/${goal.target} : ${goal.message}`;
         }
     }
@@ -2404,24 +2803,19 @@ function updateSubFiles(subs) {
         // Fichier de base pour subs
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), subs.toString());
         
-        console.log(`ðŸ“Š Fichiers subs mis Ã  jour: ${subs} subs`);
+        console.log(`📊 Fichiers subs mis à jour: ${subs} subs`);
     } catch (error) {
-        console.error('âŒ Erreur Ã©criture fichiers subs:', error.message);
+        console.error('❌ Erreur écriture fichiers subs:', error.message);
     }
 }
 
-// Fonction de compatibilitÃ© (mise Ã  jour des follows par dÃ©faut)
-function updateFiles(follows) {
-    updateFollowFiles(follows);
-}
-
-// CrÃ©er le serveur WebSocket
+// Créer le serveur WebSocket
 const wss = new WebSocket.Server({ port: 8083 });
 
 wss.on('connection', (ws) => {
-    console.log('ðŸ”Œ Client WebSocket connectÃ©');
+    console.log('📌 Client WebSocket connecté');
     
-    // Envoyer les donnÃ©es actuelles (follows et subs)
+    // Envoyer les données actuelles (follows et subs)
     ws.send(JSON.stringify({
         type: 'follow_update',
         count: currentFollows,
@@ -2435,48 +2829,97 @@ wss.on('connection', (ws) => {
     }));
     
     ws.on('close', () => {
-        console.log('ðŸ”Œ Client WebSocket dÃ©connectÃ©');
+        console.log('📌 Client WebSocket déconnecté');
     });
 });
 
-// Diffuser les mises Ã  jour de follows aux clients WebSocket
+// Diffuser les mises à jour de follows aux clients WebSocket
 function broadcastFollowUpdate(batchCount = 1) {
     const data = {
         type: 'follow_update',
         count: currentFollows,
         goal: getCurrentFollowGoal(currentFollows),
-        batchCount: batchCount, // Nombre de follows groupÃ©s
-        isBatch: batchCount > 1 // Indique si c'est un event groupÃ©
+        batchCount: batchCount, // Nombre de follows groupés
+        isBatch: batchCount > 1 // Indique si c'est un event groupé
     };
     
+    const message = JSON.stringify(data);
+    const droppedClients = [];
+    let successCount = 0;
+    
     wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
+        if (client.readyState !== WebSocket.OPEN) return;
+        
+        // ✅ Vérifier la backpressure (saturation du buffer)
+        if (client.bufferedAmount > LIMITS.WEBSOCKET_BUFFER_LIMIT) {
+            logEvent('WARN', '⚠️ WebSocket saturé, skip envoi', {
+                bufferedAmount: client.bufferedAmount,
+                limit: LIMITS.WEBSOCKET_BUFFER_LIMIT
+            });
+            droppedClients.push(client);
+            return;
         }
+        
+        // Envoi avec callback d'erreur
+        client.send(message, (err) => {
+            if (err) {
+                logEvent('ERROR', 'Erreur envoi WebSocket:', { error: err.message });
+            } else {
+                successCount++;
+            }
+        });
     });
+    
+    if (droppedClients.length > 0) {
+        logEvent('WARN', `⚠️ ${droppedClients.length} clients ignorés (saturés)`);
+    }
+    
+    logEvent('INFO', `📡 Follow update diffusé à ${successCount}/${wss.clients.size} clients`);
 }
 
-// Diffuser les mises Ã  jour de subs aux clients WebSocket  
+// Diffuser les mises à jour de subs aux clients WebSocket  
 function broadcastSubUpdate(batchCount = 1, tiers = {}) {
     const data = {
         type: 'sub_update',
         count: currentSubs,
         goal: getCurrentSubGoal(currentSubs),
-        batchCount: batchCount, // Nombre de subs groupÃ©s
-        isBatch: batchCount > 1, // Indique si c'est un event groupÃ©
-        tiers: tiers // DÃ©tails des tiers groupÃ©s
+        batchCount: batchCount, // Nombre de subs groupés
+        isBatch: batchCount > 1, // Indique si c'est un event groupé
+        tiers: tiers // Détails des tiers groupés
     };
     
+    const message = JSON.stringify(data);
+    const droppedClients = [];
+    let successCount = 0;
+    
     wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
+        if (client.readyState !== WebSocket.OPEN) return;
+        
+        // ✅ Vérifier la backpressure (saturation du buffer)
+        if (client.bufferedAmount > LIMITS.WEBSOCKET_BUFFER_LIMIT) {
+            logEvent('WARN', '⚠️ WebSocket saturé, skip envoi', {
+                bufferedAmount: client.bufferedAmount,
+                limit: LIMITS.WEBSOCKET_BUFFER_LIMIT
+            });
+            droppedClients.push(client);
+            return;
         }
+        
+        // Envoi avec callback d'erreur
+        client.send(message, (err) => {
+            if (err) {
+                logEvent('ERROR', 'Erreur envoi WebSocket:', { error: err.message });
+            } else {
+                successCount++;
+            }
+        });
     });
-}
-
-// Fonction de compatibilitÃ© (diffusion des follows par dÃ©faut)
-function broadcastUpdate() {
-    broadcastFollowUpdate();
+    
+    if (droppedClients.length > 0) {
+        logEvent('WARN', `⚠️ ${droppedClients.length} clients ignorés (saturés)`);
+    }
+    
+    logEvent('INFO', `📡 Sub update diffusé à ${successCount}/${wss.clients.size} clients`);
 }
 
 // Charger la configuration Twitch
@@ -2484,11 +2927,11 @@ function loadTwitchConfig() {
     try {
         const configPath = path.join(ROOT_DIR, 'obs', 'data', 'twitch_config.txt');
         if (fs.existsSync(configPath)) {
-            // Chargement sÃ©curisÃ© avec dÃ©chiffrement automatique
+            // Chargement sécurisé avec déchiffrement automatique
             const content = configCrypto.loadEncrypted(configPath);
             
             if (!content) {
-                console.log('ðŸ“ CrÃ©ation du fichier de configuration Twitch...');
+                console.log('🔐 Création du fichier de configuration Twitch...');
                 saveTwitchConfig();
                 return;
             }
@@ -2518,20 +2961,20 @@ function loadTwitchConfig() {
                 }
             });
             
-            // Marquer comme configurÃ© si on a les infos essentielles
+            // Marquer comme configuré si on a les infos essentielles
             if (twitchConfig.client_id && twitchConfig.access_token && twitchConfig.user_id) {
                 twitchConfig.configured = true;
-                console.log('âœ… Configuration Twitch chargÃ©e (sÃ©curisÃ©e)');
+                console.log('✅ Configuration Twitch chargée (sécurisée)');
             } else {
-                console.log('âš ï¸ Configuration Twitch incomplÃ¨te');
+                console.log('⚠️ Configuration Twitch incomplète');
             }
         } else {
-            console.log('ðŸ“ CrÃ©ation du fichier de configuration Twitch...');
+            console.log('🔐 Création du fichier de configuration Twitch...');
             saveTwitchConfig();
         }
     } catch (error) {
-        console.error('âŒ Erreur chargement config Twitch:', error.message);
-        console.error('ðŸ’¡ Si le fichier est corrompu, utilisez le bouton "DÃ©connecter Twitch" pour rÃ©initialiser');
+        console.error('❌ Erreur chargement config Twitch:', error.message);
+        console.error('💡 Si le fichier est corrompu, utilisez le bouton "Déconnecter Twitch" pour réinitialiser');
     }
 }
 
@@ -2547,11 +2990,11 @@ function saveTwitchConfig() {
             `USERNAME=${twitchConfig.username || ''}`
         ].join('\n');
         
-        // Sauvegarde sÃ©curisÃ©e avec chiffrement automatique
+        // Sauvegarde sécurisée avec chiffrement automatique
         configCrypto.saveEncrypted(configPath, configContent);
-        console.log('ðŸ’¾ Configuration Twitch sauvegardÃ©e (chiffrÃ©e)');
+        console.log('💾 Configuration Twitch sauvegardée (chiffrée)');
     } catch (error) {
-        console.error('âŒ Erreur sauvegarde config Twitch:', error.message);
+        console.error('❌ Erreur sauvegarde config Twitch:', error.message);
     }
 }
 
@@ -2573,7 +3016,7 @@ app.get('/test', (req, res) => {
 });
 
 // ========================================
-// ðŸ”§ ADMIN PANEL ROUTES (Hidden)
+// 🔧 ADMIN PANEL ROUTES (Hidden)
 // ========================================
 
 app.get('/admin', (req, res) => {
@@ -2596,7 +3039,7 @@ app.get('/api/stats', (req, res) => {
             subGoal: subGoal
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur lecture stats admin', { error: error.message });
+        logEvent('ERROR', '❌ Erreur lecture stats admin', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2606,13 +3049,13 @@ app.post('/admin/add-follows', (req, res) => {
     try {
         const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
         
-        // Utiliser le systÃ¨me de batching pour gÃ©rer le spam
+        // Utiliser le système de batching pour gérer le spam
         addFollowToBatch(amount);
         
-        logEvent('INFO', `âž• Admin: Ajout de ${amount} follows au batch`);
+        logEvent('INFO', `➕ Admin: Ajout de ${amount} follows au batch`);
         res.json({ success: true, total: currentFollows + followBatch.count });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur add follows', { error: error.message });
+        logEvent('ERROR', '❌ Erreur add follows', { error: error.message });
         res.status(400).json({ error: error.message });
     }
 });
@@ -2625,16 +3068,16 @@ app.post('/admin/remove-follows', (req, res) => {
         // Utiliser la variable globale
         currentFollows = Math.max(0, currentFollows - amount);
         
-        // Mettre Ã  jour les fichiers avec la fonction existante
+        // Mettre à jour les fichiers avec la fonction existante
         updateFollowFiles(currentFollows);
         
         // Broadcast avec la fonction existante
         broadcastFollowUpdate();
         
-        logEvent('INFO', `âž– Admin: -${amount} follows (Total: ${currentFollows})`);
+        logEvent('INFO', `➖ Admin: -${amount} follows (Total: ${currentFollows})`);
         res.json({ success: true, total: currentFollows });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur remove follows', { error: error.message });
+        logEvent('ERROR', '❌ Erreur remove follows', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2647,16 +3090,16 @@ app.post('/admin/set-follows', (req, res) => {
         // Utiliser la variable globale
         currentFollows = count;
         
-        // Mettre Ã  jour les fichiers avec la fonction existante
+        // Mettre à jour les fichiers avec la fonction existante
         updateFollowFiles(currentFollows);
         
         // Broadcast avec la fonction existante
         broadcastFollowUpdate();
         
-        logEvent('INFO', `ðŸ“ Admin: Follows dÃ©finis Ã  ${count}`);
+        logEvent('INFO', `🔐 Admin: Follows définis à ${count}`);
         res.json({ success: true, total: count });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur set follows', { error: error.message });
+        logEvent('ERROR', '❌ Erreur set follows', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2666,13 +3109,13 @@ app.post('/admin/add-subs', (req, res) => {
     try {
         const { amount, tier } = req.body;
         
-        // Utiliser le systÃ¨me de batching pour gÃ©rer le spam
+        // Utiliser le système de batching pour gérer le spam
         addSubToBatch(amount, tier);
         
-        logEvent('INFO', `âž• Admin: Ajout de ${amount} subs tier ${tier} au batch`);
+        logEvent('INFO', `➕ Admin: Ajout de ${amount} subs tier ${tier} au batch`);
         res.json({ success: true, total: currentSubs + subBatch.count });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur add subs', { error: error.message });
+        logEvent('ERROR', '❌ Erreur add subs', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2685,16 +3128,16 @@ app.post('/admin/remove-subs', (req, res) => {
         // Utiliser la variable globale
         currentSubs = Math.max(0, currentSubs - amount);
         
-        // Mettre Ã  jour les fichiers avec la fonction existante
+        // Mettre à jour les fichiers avec la fonction existante
         updateSubFiles(currentSubs);
         
         // Broadcast avec la fonction existante
         broadcastSubUpdate();
         
-        logEvent('INFO', `âž– Admin: -${amount} subs (Total: ${currentSubs})`);
+        logEvent('INFO', `➖ Admin: -${amount} subs (Total: ${currentSubs})`);
         res.json({ success: true, total: currentSubs });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur remove subs', { error: error.message });
+        logEvent('ERROR', '❌ Erreur remove subs', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2707,16 +3150,16 @@ app.post('/admin/set-subs', (req, res) => {
         // Utiliser la variable globale
         currentSubs = count;
         
-        // Mettre Ã  jour les fichiers avec la fonction existante
+        // Mettre à jour les fichiers avec la fonction existante
         updateSubFiles(currentSubs);
         
         // Broadcast avec la fonction existante
         broadcastSubUpdate();
         
-        logEvent('INFO', `ðŸ“ Admin: Subs dÃ©finis Ã  ${count}`);
+        logEvent('INFO', `🔐 Admin: Subs définis à ${count}`);
         res.json({ success: true, total: count });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur set subs', { error: error.message });
+        logEvent('ERROR', '❌ Erreur set subs', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2739,10 +3182,10 @@ app.post('/admin/set-follow-goal', (req, res) => {
             }
         });
         
-        logEvent('INFO', `ðŸŽ¯ Admin: Objectif follows dÃ©fini Ã  ${goal}`);
+        logEvent('INFO', `🎯 Admin: Objectif follows défini à ${goal}`);
         res.json({ success: true, goal: goal });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur set follow goal', { error: error.message });
+        logEvent('ERROR', '❌ Erreur set follow goal', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2765,10 +3208,10 @@ app.post('/admin/set-sub-goal', (req, res) => {
             }
         });
         
-        logEvent('INFO', `ðŸŽ¯ Admin: Objectif subs dÃ©fini Ã  ${goal}`);
+        logEvent('INFO', `🎯 Admin: Objectif subs défini à ${goal}`);
         res.json({ success: true, goal: goal });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur set sub goal', { error: error.message });
+        logEvent('ERROR', '❌ Erreur set sub goal', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2776,12 +3219,22 @@ app.post('/admin/set-sub-goal', (req, res) => {
 // Sync with Twitch API (compare and update)
 app.get('/admin/sync-twitch', async (req, res) => {
     try {
-        logEvent('INFO', 'ðŸ”„ Admin: Synchronisation avec Twitch API');
+        // Rate limiting
+        if (!syncLimiter.allow()) {
+            return res.status(429).json({ 
+                success: false,
+                error: 'Too many requests',
+                message: 'Attendez 1 minute avant la prochaine synchro',
+                nextResetIn: Math.ceil(syncLimiter.nextResetIn() / 1000)
+            });
+        }
+        
+        logEvent('INFO', '📄 Admin: Synchronisation avec Twitch API');
         
         if (!twitchConfig.access_token || !twitchConfig.user_id) {
             return res.json({ 
                 success: false,
-                error: 'Non authentifiÃ© avec Twitch'
+                error: 'Non authentifié avec Twitch'
             });
         }
         
@@ -2789,21 +3242,21 @@ app.get('/admin/sync-twitch', async (req, res) => {
         const localFollows = currentFollows;
         const localSubs = currentSubs;
         
-        // RÃ©cupÃ©rer les valeurs depuis Twitch
-        const twitchFollows = await syncTwitchFollows('Sync admin panel');
-        const twitchSubs = await syncTwitchSubs('Sync admin panel');
+        // Récupérer les valeurs depuis Twitch (Result Pattern)
+        const followsResult = await syncTwitchFollows('Sync admin panel');
+        const subsResult = await syncTwitchSubs('Sync admin panel');
         
-        // Calculer les diffÃ©rences
-        const followsDiff = twitchFollows - localFollows;
-        const subsDiff = twitchSubs - localSubs;
+        // Calculer les différences
+        const followsDiff = followsResult.success ? followsResult.diff : 0;
+        const subsDiff = subsResult.success ? subsResult.diff : 0;
         const updated = (followsDiff !== 0) || (subsDiff !== 0);
         
-        logEvent('INFO', `ðŸ“Š Sync terminÃ©e - Follows: ${localFollows}â†’${twitchFollows} (${followsDiff >= 0 ? '+' : ''}${followsDiff}) | Subs: ${localSubs}â†’${twitchSubs} (${subsDiff >= 0 ? '+' : ''}${subsDiff})`);
+        logEvent('INFO', `📊 Sync terminée - Follows: ${localFollows}→${followsResult.data} (${followsDiff >= 0 ? '+' : ''}${followsDiff}) | Subs: ${localSubs}→${subsResult.data} (${subsDiff >= 0 ? '+' : ''}${subsDiff})`);
         
         res.json({
-            success: true,
-            twitchFollows: twitchFollows,
-            twitchSubs: twitchSubs,
+            success: followsResult.success && subsResult.success,
+            twitchFollows: followsResult.data,
+            twitchSubs: subsResult.data,
             localFollows: localFollows,
             localSubs: localSubs,
             followsDiff: followsDiff,
@@ -2812,7 +3265,7 @@ app.get('/admin/sync-twitch', async (req, res) => {
         });
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur sync Twitch', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur sync Twitch', { error: error.message });
         res.status(500).json({ 
             success: false,
             error: error.message 
@@ -2823,12 +3276,12 @@ app.get('/admin/sync-twitch', async (req, res) => {
 // Test Twitch API
 app.get('/admin/test-twitch-api', async (req, res) => {
     try {
-        logEvent('INFO', 'ðŸ” Admin: Test API Twitch');
+        logEvent('INFO', '🔐 Admin: Test API Twitch');
         
         if (!twitchConfig.access_token || !twitchConfig.user_id) {
             return res.json({ 
                 status: 'NOT_AUTHENTICATED',
-                message: 'Non authentifiÃ©'
+                message: 'Non authentifié'
             });
         }
         
@@ -2861,7 +3314,7 @@ app.get('/admin/test-twitch-api', async (req, res) => {
         });
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur test API', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur test API', { error: error.message });
         res.status(500).json({ 
             status: 'ERROR',
             error: error.message 
@@ -2872,15 +3325,15 @@ app.get('/admin/test-twitch-api', async (req, res) => {
 // Test EventSub
 app.get('/admin/test-eventsub', (req, res) => {
     try {
-        const status = eventSubSessionId ? 'CONNECTED' : 'DISCONNECTED';
+        const status = sessionId ? 'CONNECTED' : 'DISCONNECTED';
         
         res.json({
             status: status,
-            sessionId: eventSubSessionId,
-            message: status === 'CONNECTED' ? 'EventSub connectÃ©' : 'EventSub dÃ©connectÃ©'
+            sessionId: sessionId,
+            message: status === 'CONNECTED' ? 'EventSub connecté' : 'EventSub déconnecté'
         });
         
-        logEvent('INFO', `ðŸ“¡ Admin: Test EventSub - ${status}`);
+        logEvent('INFO', `📡 Admin: Test EventSub - ${status}`);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2889,17 +3342,17 @@ app.get('/admin/test-eventsub', (req, res) => {
 // Test Polling
 app.get('/admin/test-polling', async (req, res) => {
     try {
-        logEvent('INFO', 'â±ï¸ Admin: Test polling manuel');
+        logEvent('INFO', '⏱️ Admin: Test polling manuel');
         
-        // ExÃ©cute le polling manuellement
+        // Exécute le polling manuellement
         await pollFollowCount();
         
         res.json({ 
             success: true,
-            message: 'Polling exÃ©cutÃ©'
+            message: 'Polling exécuté'
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur test polling', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur test polling', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2915,10 +3368,10 @@ app.get('/admin/read-files', (req, res) => {
             twitchConfig: twitchConfig
         };
         
-        logEvent('INFO', 'ðŸ“– Admin: Lecture fichiers');
+        logEvent('INFO', '📖 Admin: Lecture fichiers');
         res.json(files);
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur lecture fichiers', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur lecture fichiers', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2927,21 +3380,21 @@ app.get('/admin/read-files', (req, res) => {
 app.get('/admin/test-file-write', (req, res) => {
     try {
         const testPath = path.join(__dirname, 'admin_test_write.txt');
-        const testContent = `Test Ã©criture admin - ${new Date().toISOString()}`;
+        const testContent = `Test écriture admin - ${new Date().toISOString()}`;
         
         fs.writeFileSync(testPath, testContent, 'utf8');
         const readBack = fs.readFileSync(testPath, 'utf8');
         
         fs.unlinkSync(testPath); // Clean up
         
-        logEvent('INFO', 'ðŸ’¾ Admin: Test Ã©criture OK');
+        logEvent('INFO', '💾 Admin: Test écriture OK');
         res.json({ 
             success: true,
             written: testContent,
             readBack: readBack
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur test Ã©criture', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur test écriture', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2967,14 +3420,14 @@ app.get('/admin/backup-data', (req, res) => {
         const backupPath = path.join(backupDir, `backup_${timestamp}.json`);
         fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), 'utf8');
         
-        logEvent('INFO', `ðŸ“¦ Admin: Backup crÃ©Ã© - ${backupPath}`);
+        logEvent('INFO', `📦 Admin: Backup créé - ${backupPath}`);
         res.json({ 
             success: true,
             filename: `backup_${timestamp}.json`,
             path: backupPath
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur backup', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur backup', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -2985,7 +3438,7 @@ app.get('/admin/restore-backup', (req, res) => {
         const backupDir = path.join(__dirname, 'backups');
         
         if (!fs.existsSync(backupDir)) {
-            return res.status(404).json({ error: 'Aucun backup trouvÃ©' });
+            return res.status(404).json({ error: 'Aucun backup trouvé' });
         }
         
         const backups = fs.readdirSync(backupDir)
@@ -2994,7 +3447,7 @@ app.get('/admin/restore-backup', (req, res) => {
             .reverse();
         
         if (backups.length === 0) {
-            return res.status(404).json({ error: 'Aucun backup trouvÃ©' });
+            return res.status(404).json({ error: 'Aucun backup trouvé' });
         }
         
         const latestBackup = path.join(backupDir, backups[0]);
@@ -3005,14 +3458,14 @@ app.get('/admin/restore-backup', (req, res) => {
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), backupData.followGoal, 'utf8');
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), backupData.subGoal, 'utf8');
         
-        logEvent('INFO', `â†©ï¸ Admin: Backup restaurÃ© - ${backups[0]}`);
+        logEvent('INFO', `↩️ Admin: Backup restauré - ${backups[0]}`);
         res.json({ 
             success: true,
             restored: backups[0],
             data: backupData
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur restore', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur restore', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -3023,13 +3476,13 @@ app.get('/admin/corrupt-data', (req, res) => {
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'CORRUPTED_DATA', 'utf8');
         fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'INVALID', 'utf8');
         
-        logEvent('WARN', 'ðŸ”¥ Admin: DonnÃ©es corrompues pour test');
+        logEvent('WARN', '🔥 Admin: Données corrompues pour test');
         res.json({ 
             success: true,
-            message: 'DonnÃ©es corrompues - testez la rÃ©cupÃ©ration'
+            message: 'Données corrompues - testez la récupération'
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Admin: Erreur corruption', { error: error.message });
+        logEvent('ERROR', '❌ Admin: Erreur corruption', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -3045,13 +3498,13 @@ app.post('/api/config', (req, res) => {
         twitchConfig.client_id = client_id;
         saveTwitchConfig();
         
-        res.json({ success: true, message: 'Configuration sauvegardÃ©e' });
+        res.json({ success: true, message: 'Configuration sauvegardée' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// ðŸ”¥ DEVICE CODE GRANT FLOW - Routes API
+// 🔥 DEVICE CODE GRANT FLOW - Routes API
 app.post('/api/start-device-auth', async (req, res) => {
     try {
         if (!twitchConfig.client_id) {
@@ -3061,11 +3514,11 @@ app.post('/api/start-device-auth', async (req, res) => {
             });
         }
         
-        // VÃ©rifier si un processus d'authentification est dÃ©jÃ  en cours
+        // Vérifier si un processus d'authentification est déjà en cours
         if (deviceCodePolling !== null) {
             return res.json({
                 success: true,
-                message: 'Authentification dÃ©jÃ  en cours',
+                message: 'Authentification déjà en cours',
                 user_code: deviceCodeData.user_code || '',
                 verification_uri: deviceCodeData.verification_uri || '',
                 expires_in: deviceCodeData.expires_in || 0,
@@ -3073,7 +3526,7 @@ app.post('/api/start-device-auth', async (req, res) => {
             });
         }
         
-        console.log('ðŸš€ DÃ©marrage Device Code Grant Flow via API...');
+        console.log('🚀 Démarrage Device Code Grant Flow via API...');
         const deviceData = await initiateDeviceCodeFlow();
         
         res.json({
@@ -3082,27 +3535,27 @@ app.post('/api/start-device-auth', async (req, res) => {
             verification_uri: deviceData.verification_uri,
             expires_in: deviceData.expires_in,
             interval: deviceData.interval,
-            message: 'Device Code Grant Flow dÃ©marrÃ© avec succÃ¨s'
+            message: 'Device Code Grant Flow démarré avec succès'
         });
     } catch (error) {
-        console.error('âŒ Erreur start-device-auth:', error.message);
+        console.error('❌ Erreur start-device-auth:', error.message);
         res.status(500).json({ 
             error: error.message,
             success: false,
-            details: 'Impossible de dÃ©marrer l\'authentification Device Code Grant'
+            details: 'Impossible de démarrer l\'authentification Device Code Grant'
         });
     }
 });
 
 app.get('/api/auth-status', (req, res) => {
     try {
-        // Gestion sÃ©curisÃ©e du statut d'authentification
+        // Gestion sécurisée du statut d'authentification
         const now = Date.now();
         const isPolling = deviceCodePolling !== null;
         const hasDeviceCode = deviceCodeData && deviceCodeData.device_code;
         const timeRemaining = hasDeviceCode ? Math.max(0, Math.floor((deviceCodeData.expires_at - now) / 1000)) : 0;
         
-        // VÃ©rifier si l'authentification est complÃ¨te
+        // Vérifier si l'authentification est complète
         const isAuthenticated = twitchConfig.configured && 
                                twitchConfig.access_token && 
                                twitchConfig.user_id;
@@ -3125,8 +3578,8 @@ app.get('/api/auth-status', (req, res) => {
             timestamp: now
         });
     } catch (error) {
-        console.error('âŒ Erreur endpoint auth-status:', error.message);
-        // Ne jamais faire planter cet endpoint - retourner un Ã©tat par dÃ©faut
+        console.error('❌ Erreur endpoint auth-status:', error.message);
+        // Ne jamais faire planter cet endpoint - retourner un état par défaut
         res.json({
             configured: false,
             authenticated: false,
@@ -3148,13 +3601,13 @@ app.get('/api/auth-status', (req, res) => {
     }
 });
 
-// Endpoint pour vÃ©rifier le statut des privilÃ¨ges modÃ©rateur
+// Endpoint pour vérifier le statut des privilèges modérateur
 app.get('/api/moderator-status', async (req, res) => {
     try {
         if (!twitchConfig.access_token || !twitchConfig.user_id) {
             return res.json({
                 configured: false,
-                error: 'Non configurÃ©'
+                error: 'Non configuré'
             });
         }
 
@@ -3170,7 +3623,7 @@ app.get('/api/moderator-status', async (req, res) => {
             scopes: twitchConfig.scope ? twitchConfig.scope.split(' ') : []
         });
     } catch (error) {
-        console.error('âŒ Erreur lors de la vÃ©rification du statut modÃ©rateur:', error.message);
+        console.error('❌ Erreur lors de la vérification du statut modérateur:', error.message);
         res.status(500).json({
             configured: true,
             error: error.message
@@ -3180,69 +3633,61 @@ app.get('/api/moderator-status', async (req, res) => {
 
 app.get('/api/sync-twitch', async (req, res) => {
     try {
+        // Rate limiting
+        if (!syncLimiter.allow()) {
+            return res.status(429).json({ 
+                success: false,
+                error: 'Too many requests',
+                message: 'Attendez 1 minute avant la prochaine synchro',
+                remaining: syncLimiter.remaining(),
+                nextResetIn: Math.ceil(syncLimiter.nextResetIn() / 1000)
+            });
+        }
+        
         if (!twitchConfig.configured) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Twitch non configurÃ© - Veuillez vous connecter d\'abord' 
+                error: 'Twitch non configuré - Veuillez vous connecter d\'abord' 
             });
         }
         
         if (!twitchConfig.access_token) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Token d\'accÃ¨s manquant - Reconnectez-vous Ã  Twitch' 
+                error: 'Token d\'accès manquant - Reconnectez-vous à Twitch' 
             });
         }
         
-        logEvent('INFO', 'ðŸ”„ DÃ©marrage synchronisation manuelle depuis l\'API Twitch...');
+        logEvent('INFO', '📄 Démarrage synchronisation manuelle depuis l\'API Twitch...');
         
-        // Synchroniser follows ET subs depuis l'API Twitch
-        let followCount, subCount;
-        let followError = null, subError = null;
+        // Synchroniser follows ET subs depuis l'API Twitch (Result Pattern)
+        const followsResult = await syncTwitchFollows('Synchronisation manuelle');
+        const subsResult = await syncTwitchSubs('Synchronisation manuelle');
         
-        try {
-            followCount = await syncTwitchFollows('Synchronisation manuelle');
-            logEvent('SUCCESS', `âœ… Follows synchronisÃ©s: ${followCount}`);
-        } catch (error) {
-            followError = error.message;
-            logEvent('ERROR', `âŒ Erreur sync follows: ${error.message}`);
-            followCount = currentFollows; // Garder l'ancienne valeur
-        }
-        
-        try {
-            subCount = await syncTwitchSubs('Synchronisation manuelle');
-            logEvent('SUCCESS', `âœ… Subs synchronisÃ©s: ${subCount}`);
-        } catch (error) {
-            subError = error.message;
-            logEvent('ERROR', `âŒ Erreur sync subs: ${error.message}`);
-            subCount = currentSubs; // Garder l'ancienne valeur
-        }
-        
-        // Construire la rÃ©ponse
-        const hasErrors = followError || subError;
+        const hasErrors = !followsResult.success || !subsResult.success;
         
         res.json({
             success: !hasErrors,
-            currentFollows: currentFollows,
-            currentSubs: currentSubs,
+            currentFollows: followsResult.data,
+            currentSubs: subsResult.data,
             message: hasErrors ? 
                 'Synchronisation partielle avec erreurs' : 
-                'Synchronisation complÃ¨te rÃ©ussie ! Follows et Subs rÃ©cupÃ©rÃ©s depuis l\'API Twitch',
+                'Synchronisation complète réussie ! Follows et Subs récupérés depuis l\'API Twitch',
             details: {
-                follows: followError ? 
-                    `Erreur: ${followError}` : 
-                    `${followCount} follows synchronisÃ©s depuis Twitch`,
-                subs: subError ? 
-                    `Erreur: ${subError}` : 
-                    `${subCount} subs synchronisÃ©s depuis Twitch`
+                follows: followsResult.success ? 
+                    `${followsResult.data} follows synchronisés depuis Twitch` : 
+                    `Erreur: ${followsResult.error}`,
+                subs: subsResult.success ? 
+                    `${subsResult.data} subs synchronisés depuis Twitch` : 
+                    `Erreur: ${subsResult.error}`
             },
             errors: hasErrors ? {
-                follows: followError,
-                subs: subError
+                follows: followsResult.error,
+                subs: subsResult.error
             } : null
         });
     } catch (error) {
-        logEvent('ERROR', `âŒ Erreur gÃ©nÃ©rale sync: ${error.message}`);
+        logEvent('ERROR', `❌ Erreur générale sync: ${error.message}`);
         res.status(500).json({ 
             success: false,
             error: error.message,
@@ -3304,11 +3749,11 @@ app.get('/api/status', (req, res) => {
         reconnectAttempts: reconnectAttempts,
         maxReconnectAttempts: maxReconnectAttempts,
         lastUpdate: new Date().toISOString(),
-        backup: followBackupInfo, // Ancien format pour compatibilitÃ©
+        backup: followBackupInfo, // Ancien format pour compatibilité
         followBackup: followBackupInfo,
         subBackup: subBackupInfo,
         websocketClients: wss.clients.size,
-        // ðŸ”„ Informations sur le tampon d'Ã©vÃ©nements
+        // 📄 Informations sur le tampon d'événements
         eventBuffer: {
             size: eventBuffer.length,
             isProcessing: isProcessingEvents,
@@ -3370,16 +3815,16 @@ app.post('/api/clean-logs', (req, res) => {
             const subcountLogPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
             if (fs.existsSync(subcountLogPath)) {
                 const originalSize = fs.statSync(subcountLogPath).size;
-                const header = `# Log nettoyÃ© manuellement via interface web - ${new Date().toISOString()}\n\n`;
+                const header = `# Log nettoyé manuellement via interface web - ${new Date().toISOString()}\n\n`;
                 fs.writeFileSync(subcountLogPath, header, 'utf8');
                 results.subcountLogs = {
                     cleaned: true,
                     originalSizeKB: (originalSize / 1024).toFixed(2),
                     newSizeKB: (header.length / 1024).toFixed(2)
                 };
-                logEvent('INFO', 'ðŸ§¹ Log subcount_logs.txt nettoyÃ© via interface web');
+                logEvent('INFO', '🧹 Log subcount_logs.txt nettoyé via interface web');
             } else {
-                results.subcountLogs = { cleaned: false, reason: 'Fichier non trouvÃ©' };
+                results.subcountLogs = { cleaned: false, reason: 'Fichier non trouvé' };
             }
         }
         
@@ -3387,16 +3832,16 @@ app.post('/api/clean-logs', (req, res) => {
             const obsLogPath = path.join(__dirname, 'obs_subcount_auto.log');
             if (fs.existsSync(obsLogPath)) {
                 const originalSize = fs.statSync(obsLogPath).size;
-                const header = `# Log nettoyÃ© manuellement via interface web - ${new Date().toISOString()}\n\n`;
+                const header = `# Log nettoyé manuellement via interface web - ${new Date().toISOString()}\n\n`;
                 fs.writeFileSync(obsLogPath, header, 'utf8');
                 results.obsLogs = {
                     cleaned: true,
                     originalSizeKB: (originalSize / 1024).toFixed(2),
                     newSizeKB: (header.length / 1024).toFixed(2)
                 };
-                logEvent('INFO', 'ðŸ§¹ Log obs_subcount_auto.log nettoyÃ© via interface web');
+                logEvent('INFO', '🧹 Log obs_subcount_auto.log nettoyé via interface web');
             } else {
-                results.obsLogs = { cleaned: false, reason: 'Fichier non trouvÃ©' };
+                results.obsLogs = { cleaned: false, reason: 'Fichier non trouvé' };
             }
         }
         
@@ -3472,7 +3917,7 @@ app.get('/api/current-subs', (req, res) => {
     });
 });
 
-// Routes pour les overlays OBS (compatibilitÃ©)
+// Routes pour les overlays OBS (compatibilité)
 app.get('/api/sub_goal', (req, res) => {
     const goal = getCurrentSubGoal(currentSubs);
     res.json({ goal });
@@ -3483,22 +3928,22 @@ app.get('/api/follow_goal', (req, res) => {
     res.json({ goal });
 });
 
-// ðŸ”„ Endpoint pour gÃ©rer le tampon d'Ã©vÃ©nements
+// 📄 Endpoint pour gérer le tampon d'événements
 app.post('/api/event-buffer/clear', (req, res) => {
     try {
         const clearedEvents = eventBuffer.length;
         eventBuffer = [];
         stopEventProcessing();
         
-        logEvent('INFO', `ðŸ§¹ Tampon d'Ã©vÃ©nements vidÃ©: ${clearedEvents} Ã©vÃ©nements supprimÃ©s`);
+        logEvent('INFO', `🧹 Tampon d'événements vidé: ${clearedEvents} événements supprimés`);
         
         res.json({
             success: true,
-            message: `Tampon vidÃ©: ${clearedEvents} Ã©vÃ©nements supprimÃ©s`,
+            message: `Tampon vidé: ${clearedEvents} événements supprimés`,
             clearedEvents: clearedEvents
         });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur vidage tampon:', error.message);
+        logEvent('ERROR', '❌ Erreur vidage tampon:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -3521,14 +3966,14 @@ app.get('/api/event-buffer/status', (req, res) => {
     });
 });
 
-// ðŸ§ª Endpoint de test pour simuler un Ã©vÃ©nement EventSub
+// 🧪 Endpoint de test pour simuler un événement EventSub
 app.post('/api/test/simulate-follow', (req, res) => {
     try {
         const { user_name = 'TestUser', user_id = '999999999' } = req.body;
         
-        logEvent('TEST', `ðŸ§ª Simulation Ã©vÃ©nement follow: ${user_name}`);
+        logEvent('TEST', `🧪 Simulation événement follow: ${user_name}`);
         
-        // CrÃ©er un Ã©vÃ©nement de test
+        // Créer un événement de test
         const testEvent = {
             user_name: user_name,
             user_id: user_id,
@@ -3537,18 +3982,23 @@ app.post('/api/test/simulate-follow', (req, res) => {
             simulated: true
         };
         
-        // Ajouter au tampon
-        addEventToBuffer('follow', testEvent);
+        // Ajouter au EventQueue
+        eventQueue.add({
+            id: `test-follow-${Date.now()}`,
+            type: VALID_EVENT_TYPES.FOLLOW,
+            data: testEvent,
+            timestamp: Date.now()
+        });
         
         res.json({
             success: true,
-            message: `Ã‰vÃ©nement follow simulÃ© pour ${user_name}`,
+            message: `Événement follow simulé pour ${user_name}`,
             event: testEvent,
-            bufferSize: eventBuffer.length
+            queueSize: eventQueue.size()
         });
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur simulation follow:', error.message);
+        logEvent('ERROR', '❌ Erreur simulation follow:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -3558,19 +4008,19 @@ app.post('/api/refresh-token', async (req, res) => {
     try {
         const success = await refreshTwitchToken();
         if (success) {
-            res.json({ success: true, message: 'Token renouvelÃ© avec succÃ¨s' });
+            res.json({ success: true, message: 'Token renouvelé avec succès' });
         } else {
-            res.status(500).json({ success: false, error: 'Ã‰chec du renouvellement' });
+            res.status(500).json({ success: false, error: 'Échec du renouvellement' });
         }
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Endpoint pour dÃ©connecter Twitch (multi-streaming)
+// Endpoint pour déconnecter Twitch (multi-streaming)
 app.post('/api/disconnect-twitch', (req, res) => {
     try {
-        console.log('ðŸ”Œ DÃ©connexion Twitch demandÃ©e...');
+        console.log('📌 Déconnexion Twitch demandée...');
         
         // Sauvegarder l'ancien username pour le log
         const oldUsername = twitchConfig.username || 'Utilisateur inconnu';
@@ -3581,20 +4031,20 @@ app.post('/api/disconnect-twitch', (req, res) => {
             twitchEventSubWs.close();
             twitchEventSubWs = null;
             sessionId = null;
-            console.log('ðŸ”Œ EventSub WebSocket fermÃ©');
+            console.log('📌 EventSub WebSocket fermé');
         }
         
-        // ArrÃªter le polling
+        // Arrêter le polling
         stopFollowPolling();
         
-        // ArrÃªter le device code polling si actif
+        // Arrêter le device code polling si actif
         if (deviceCodePolling) {
-            clearInterval(deviceCodePolling);
+            timerRegistry.clearInterval('deviceCodePolling');
             deviceCodePolling = null;
-            console.log('ðŸ”„ Device Code polling arrÃªtÃ©');
+            console.log('📄 Device Code polling arrêté');
         }
         
-        // RÃ©initialiser la configuration Twitch
+        // Réinitialiser la configuration Twitch
         twitchConfig.access_token = '';
         twitchConfig.refresh_token = '';
         twitchConfig.user_id = '';
@@ -3607,16 +4057,16 @@ app.post('/api/disconnect-twitch', (req, res) => {
         // Reset du compteur de reconnexion
         reconnectAttempts = 0;
         
-        logEvent('INFO', `ðŸ”Œ DÃ©connexion Twitch rÃ©ussie (@${oldUsername})`);
+        logEvent('INFO', `📌 Déconnexion Twitch réussie (@${oldUsername})`);
         
         res.json({
             success: true,
-            message: `DÃ©connectÃ© de @${oldUsername}`,
+            message: `Déconnecté de @${oldUsername}`,
             previousUser: oldUsername
         });
         
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur dÃ©connexion Twitch:', error.message);
+        logEvent('ERROR', '❌ Erreur déconnexion Twitch:', error.message);
         res.status(500).json({
             success: false,
             error: error.message
@@ -3627,15 +4077,15 @@ app.post('/api/disconnect-twitch', (req, res) => {
 // Endpoint pour recharger la configuration des objectifs
 app.post('/api/reload-goals', (req, res) => {
     try {
-        console.log('ðŸ”„ Rechargement manuel des objectifs...');
+        console.log('📄 Rechargement manuel des objectifs...');
         loadGoals();
         res.json({ 
             success: true, 
-            message: 'Configuration rechargÃ©e',
+            message: 'Configuration rechargée',
             goalsCount: followGoals.size + subGoals.size 
         });
     } catch (error) {
-        console.error('âŒ Erreur rechargement:', error.message);
+        console.error('❌ Erreur rechargement:', error.message);
         res.status(500).json({ 
             success: false, 
             error: error.message 
@@ -3646,7 +4096,7 @@ app.post('/api/reload-goals', (req, res) => {
 // Endpoint pour forcer la reconnexion EventSub
 app.post('/api/reconnect-eventsub', (req, res) => {
     try {
-        console.log('ðŸ”„ Reconnexion forcÃ©e EventSub...');
+        console.log('📄 Reconnexion forcée EventSub...');
         
         // Reset du compteur de tentatives
         reconnectAttempts = 0;
@@ -3660,16 +4110,16 @@ app.post('/api/reconnect-eventsub', (req, res) => {
         }
         
         // Relancer la connexion
-        setTimeout(() => {
+        timerRegistry.setTimeout('restartEventSub', () => {
             connectTwitchEventSub();
         }, 1000);
         
         res.json({ 
             success: true, 
-            message: 'Reconnexion EventSub initiÃ©e' 
+            message: 'Reconnexion EventSub initiée' 
         });
     } catch (error) {
-        console.error('âŒ Erreur reconnexion forcÃ©e:', error.message);
+        console.error('❌ Erreur reconnexion forcée:', error.message);
         res.status(500).json({ 
             success: false, 
             error: error.message 
@@ -3677,14 +4127,14 @@ app.post('/api/reconnect-eventsub', (req, res) => {
     }
 });
 
-// GÃ©nÃ©rer la page de test pour diagnostiquer les boutons
+// Générer la page de test pour diagnostiquer les boutons
 function generateTestPage() {
     return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ðŸ§ª Test des boutons - SubCount Auto</title>
+    <title>🧪 Test des boutons - SubCount Auto</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0e0e23; color: white; }
         .header { text-align: center; background: linear-gradient(45deg, #9146ff, #00ffc7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
@@ -3699,49 +4149,49 @@ function generateTestPage() {
 </head>
 <body>
     <div class="header">
-        <h1>ðŸ§ª Test des boutons</h1>
+        <h1>🧪 Test des boutons</h1>
         <p>Diagnostic des fonctions JavaScript</p>
     </div>
     
     <div class="card">
-        <h2>ðŸ”§ Tests de base</h2>
+        <h2>🔧 Tests de base</h2>
         <div class="flex">
-            <button onclick="testAlert()">ðŸš¨ Test Alert</button>
-            <button onclick="testConsole()">ðŸ“ Test Console</button>
-            <button onclick="testFetch()">ðŸŒ Test Fetch</button>
+            <button onclick="testAlert()">🚨 Test Alert</button>
+            <button onclick="testConsole()">📝 Test Console</button>
+            <button onclick="testFetch()">🌐 Test Fetch</button>
         </div>
     </div>
     
     <div class="card">
-        <h2>ðŸ‘¥ Tests Follows</h2>
+        <h2>👥 Tests Follows</h2>
         <div class="flex">
             <button onclick="addFollow()" class="success">+1 Follow</button>
             <button onclick="addFollow(5)" class="success">+5 Follows</button>
-            <button onclick="setFollows()" class="warning">DÃ©finir nombre</button>
+            <button onclick="setFollows()" class="warning">Définir nombre</button>
         </div>
     </div>
     
     <div class="card">
-        <h2>â­ Tests Subs</h2>
+        <h2>⭐ Tests Subs</h2>
         <div class="flex">
             <button onclick="addSub()" class="success">+1 Sub</button>
             <button onclick="addSub(5)" class="success">+5 Subs</button>
-            <button onclick="setSubs()" class="warning">DÃ©finir nombre</button>
+            <button onclick="setSubs()" class="warning">Définir nombre</button>
         </div>
     </div>
     
     <div class="card">
-        <h2>ðŸ”„ Tests SystÃ¨me</h2>
+        <h2>📄 Tests Système</h2>
         <div class="flex">
-            <button onclick="syncTwitch()" class="success">ðŸ”„ Synchroniser</button>
-            <button onclick="updateDiagnostic()" class="success">ðŸ” Diagnostic</button>
+            <button onclick="syncTwitch()" class="success">📄 Synchroniser</button>
+            <button onclick="updateDiagnostic()" class="success">🔐 Diagnostic</button>
         </div>
     </div>
     
     <div class="card">
-        <h2>ðŸ“‹ Journal des Ã©vÃ©nements</h2>
-        <div id="log" class="log">Aucun Ã©vÃ©nement...</div>
-        <button onclick="clearLog()">ðŸ§¹ Vider le journal</button>
+        <h2>📋 Journal des événements</h2>
+        <div id="log" class="log">Aucun événement...</div>
+        <button onclick="clearLog()">🧹 Vider le journal</button>
     </div>
     
     <script>
@@ -3754,36 +4204,36 @@ function generateTestPage() {
         }
         
         function clearLog() {
-            document.getElementById('log').innerHTML = 'Journal vidÃ©...';
+            document.getElementById('log').innerHTML = 'Journal vidé...';
         }
         
         function testAlert() {
-            log('ðŸš¨ Test Alert appelÃ©');
+            log('🚨 Test Alert appelé');
             alert('Test Alert fonctionne !');
         }
         
         function testConsole() {
-            log('ðŸ“ Test Console appelÃ©');
+            log('📝 Test Console appelé');
             console.log('Test Console fonctionne !');
         }
         
         async function testFetch() {
-            log('ðŸŒ Test Fetch appelÃ©...');
+            log('🌐 Test Fetch appelé...');
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
-                log('âœ… Fetch rÃ©ussi: ' + JSON.stringify(data).substring(0, 100) + '...');
+                log('✅ Fetch réussi: ' + JSON.stringify(data).substring(0, 100) + '...');
             } catch (error) {
-                log('âŒ Erreur Fetch: ' + error.message);
+                log('❌ Erreur Fetch: ' + error.message);
             }
         }
         
         function addFollow(amount = 1) {
-            log(\`ðŸ‘¥ addFollow(\${amount}) appelÃ©\`);
+            log(\`👥 addFollow(\${amount}) appelé\`);
             fetch('/api/status')
                 .then(r => r.json())
                 .then(data => {
-                    log('ðŸ“Š Status rÃ©cupÃ©rÃ©: ' + data.currentFollows + ' follows');
+                    log('📊 Status récupéré: ' + data.currentFollows + ' follows');
                     const newCount = data.currentFollows + amount;
                     return fetch('/api/update-follows', {
                         method: 'POST',
@@ -3793,17 +4243,17 @@ function generateTestPage() {
                 })
                 .then(r => r.json())
                 .then(data => {
-                    log('âœ… Follows mis Ã  jour: ' + data.currentFollows);
-                    alert('Follows mis Ã  jour: ' + data.currentFollows);
+                    log('✅ Follows mis à jour: ' + data.currentFollows);
+                    alert('Follows mis à jour: ' + data.currentFollows);
                 })
                 .catch(error => {
-                    log('âŒ Erreur addFollow: ' + error.message);
+                    log('❌ Erreur addFollow: ' + error.message);
                     alert('Erreur: ' + error.message);
                 });
         }
         
         function setFollows() {
-            log('ðŸ“ setFollows appelÃ©');
+            log('🔐 setFollows appelé');
             const count = prompt('Nombre de follows :');
             if (count !== null && !isNaN(count)) {
                 fetch('/api/update-follows', {
@@ -3813,19 +4263,19 @@ function generateTestPage() {
                 })
                 .then(r => r.json())
                 .then(data => {
-                    log('âœ… Follows dÃ©finis: ' + data.currentFollows);
-                    alert('Follows dÃ©finis: ' + data.currentFollows);
+                    log('✅ Follows définis: ' + data.currentFollows);
+                    alert('Follows définis: ' + data.currentFollows);
                 })
                 .catch(error => {
-                    log('âŒ Erreur setFollows: ' + error.message);
+                    log('❌ Erreur setFollows: ' + error.message);
                 });
             } else {
-                log('âš ï¸ setFollows annulÃ©');
+                log('⚠️ setFollows annulé');
             }
         }
         
         function addSub(amount = 1) {
-            log(\`â­ addSub(\${amount}) appelÃ©\`);
+            log(\`⭐ addSub(\${amount}) appelé\`);
             fetch('/api/status')
                 .then(r => r.json())
                 .then(data => {
@@ -3838,16 +4288,16 @@ function generateTestPage() {
                 })
                 .then(r => r.json())
                 .then(data => {
-                    log('âœ… Subs mis Ã  jour: ' + data.currentSubs);
-                    alert('Subs mis Ã  jour: ' + data.currentSubs);
+                    log('✅ Subs mis à jour: ' + data.currentSubs);
+                    alert('Subs mis à jour: ' + data.currentSubs);
                 })
                 .catch(error => {
-                    log('âŒ Erreur addSub: ' + error.message);
+                    log('❌ Erreur addSub: ' + error.message);
                 });
         }
         
         function setSubs() {
-            log('ðŸ“ setSubs appelÃ©');
+            log('🔐 setSubs appelé');
             const count = prompt('Nombre de subs :');
             if (count !== null && !isNaN(count)) {
                 fetch('/api/update-subs', {
@@ -3857,58 +4307,58 @@ function generateTestPage() {
                 })
                 .then(r => r.json())
                 .then(data => {
-                    log('âœ… Subs dÃ©finis: ' + data.currentSubs);
-                    alert('Subs dÃ©finis: ' + data.currentSubs);
+                    log('✅ Subs définis: ' + data.currentSubs);
+                    alert('Subs définis: ' + data.currentSubs);
                 })
                 .catch(error => {
-                    log('âŒ Erreur setSubs: ' + error.message);
+                    log('❌ Erreur setSubs: ' + error.message);
                 });
             } else {
-                log('âš ï¸ setSubs annulÃ©');
+                log('⚠️ setSubs annulé');
             }
         }
         
         function syncTwitch() {
-            log('ðŸ”„ syncTwitch appelÃ©');
+            log('📄 syncTwitch appelé');
             fetch('/api/sync-twitch')
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
-                        const message = 'Synchronisation rÃ©ussie! Follows: ' + data.currentFollows + ', Subs: ' + data.currentSubs;
-                        log('âœ… ' + message);
-                        alert('âœ… ' + message);
+                        const message = 'Synchronisation réussie! Follows: ' + data.currentFollows + ', Subs: ' + data.currentSubs;
+                        log('✅ ' + message);
+                        alert('✅ ' + message);
                     } else {
-                        log('âŒ Erreur sync: ' + data.error);
-                        alert('âŒ Erreur: ' + data.error);
+                        log('❌ Erreur sync: ' + data.error);
+                        alert('❌ Erreur: ' + data.error);
                     }
                 })
                 .catch(error => {
-                    log('âŒ Erreur syncTwitch: ' + error.message);
+                    log('❌ Erreur syncTwitch: ' + error.message);
                 });
         }
         
         function updateDiagnostic() {
-            log('ðŸ” updateDiagnostic appelÃ©');
+            log('🔐 updateDiagnostic appelé');
             fetch('/api/status')
                 .then(r => r.json())
                 .then(data => {
-                    log('ðŸ“Š Diagnostic: ' + data.currentFollows + ' follows, ' + data.currentSubs + ' subs');
+                    log('📊 Diagnostic: ' + data.currentFollows + ' follows, ' + data.currentSubs + ' subs');
                     alert('Diagnostic: ' + data.currentFollows + ' follows, ' + data.currentSubs + ' subs');
                 })
                 .catch(error => {
-                    log('âŒ Erreur diagnostic: ' + error.message);
+                    log('❌ Erreur diagnostic: ' + error.message);
                 });
         }
         
-        // Log de dÃ©marrage
-        log('ðŸš€ Page de test chargÃ©e');
+        // Log de démarrage
+        log('🚀 Page de test chargée');
     </script>
 </body>
 </html>`;
 }
 
 // ==================================================================
-// ðŸŽ¨ SYSTEME DE CONFIGURATION DYNAMIQUE DES OVERLAYS
+// 🎨 SYSTÈME DE CONFIGURATION DYNAMIQUE DES OVERLAYS
 // ==================================================================
 
 // Charger la configuration des overlays
@@ -3920,9 +4370,9 @@ function loadOverlayConfig() {
         if (fs.existsSync(overlayConfigPath)) {
             const data = fs.readFileSync(overlayConfigPath, 'utf8');
             overlayConfig = JSON.parse(data);
-            logEvent('INFO', 'âœ… Configuration overlay chargÃ©e', overlayConfig);
+            logEvent('INFO', '✅ Configuration overlay chargée', overlayConfig);
         } else {
-            // Configuration par dÃ©faut
+            // Configuration par défaut
             overlayConfig = {
                 font: { family: 'SEA', size: '64px', weight: 'normal' },
                 colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
@@ -3932,7 +4382,7 @@ function loadOverlayConfig() {
             saveOverlayConfig();
         }
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur chargement config overlay', { error: error.message });
+        logEvent('ERROR', '❌ Erreur chargement config overlay', { error: error.message });
         overlayConfig = {
             font: { family: 'SEA', size: '64px', weight: 'normal' },
             colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
@@ -3945,23 +4395,23 @@ function loadOverlayConfig() {
 function saveOverlayConfig() {
     try {
         fs.writeFileSync(overlayConfigPath, JSON.stringify(overlayConfig, null, 2), 'utf8');
-        logEvent('INFO', 'âœ… Configuration overlay sauvegardÃ©e');
+        logEvent('INFO', '✅ Configuration overlay sauvegardée');
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur sauvegarde config overlay', { error: error.message });
+        logEvent('ERROR', '❌ Erreur sauvegarde config overlay', { error: error.message });
     }
 }
 
-// API REST pour rÃ©cupÃ©rer la configuration
+// API REST pour récupérer la configuration
 app.get('/api/overlay-config', (req, res) => {
     res.json(overlayConfig);
 });
 
-// API REST pour mettre Ã  jour la configuration depuis Python
+// API REST pour mettre à jour la configuration depuis Python
 app.post('/api/overlay-config', (req, res) => {
     try {
         const updates = req.body;
         
-        // Fusionner les mises Ã  jour avec la config existante
+        // Fusionner les mises à jour avec la config existante
         if (updates.font) overlayConfig.font = { ...overlayConfig.font, ...updates.font };
         if (updates.colors) overlayConfig.colors = { ...overlayConfig.colors, ...updates.colors };
         if (updates.animation) overlayConfig.animation = { ...overlayConfig.animation, ...updates.animation };
@@ -3969,24 +4419,24 @@ app.post('/api/overlay-config', (req, res) => {
         
         saveOverlayConfig();
         
-        // Notifier tous les overlays connectÃ©s via WebSocket
+        // Notifier tous les overlays connectés via WebSocket
         broadcastConfigUpdate();
         
-        logEvent('INFO', 'âœ… Configuration overlay mise Ã  jour depuis Python', updates);
+        logEvent('INFO', '✅ Configuration overlay mise à jour depuis Python', updates);
         res.json({ success: true, config: overlayConfig });
     } catch (error) {
-        logEvent('ERROR', 'âŒ Erreur mise Ã  jour config', { error: error.message });
+        logEvent('ERROR', '❌ Erreur mise à jour config', { error: error.message });
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// WebSocket Server pour communication temps rÃ©el avec les overlays
+// WebSocket Server pour communication temps réel avec les overlays
 const overlayWss = new WebSocket.Server({ port: 8084 });
 const overlayClients = new Set();
 
 overlayWss.on('connection', (ws) => {
     overlayClients.add(ws);
-    logEvent('INFO', 'ðŸ"Œ Overlay HTML connectÃ© au WebSocket config');
+    logEvent('INFO', '📌 Overlay HTML connecté au WebSocket config');
     
     // Envoyer la configuration actuelle au nouveau client
     ws.send(JSON.stringify({
@@ -3996,11 +4446,11 @@ overlayWss.on('connection', (ws) => {
     
     ws.on('close', () => {
         overlayClients.delete(ws);
-        logEvent('INFO', 'ðŸ"Œ Overlay HTML dÃ©connectÃ© du WebSocket config');
+        logEvent('INFO', '📌 Overlay HTML déconnecté du WebSocket config');
     });
     
     ws.on('error', (error) => {
-        logEvent('ERROR', 'âŒ Erreur WebSocket overlay', { error: error.message });
+        logEvent('ERROR', '❌ Erreur WebSocket overlay', { error: error.message });
         overlayClients.delete(ws);
     });
 });
@@ -4022,170 +4472,172 @@ function broadcastConfigUpdate() {
                 overlayClients.delete(client);
             }
         } catch (error) {
-            logEvent('ERROR', 'âŒ Erreur envoi config Ã  un client', { error: error.message });
+            logEvent('ERROR', '❌ Erreur envoi config à un client', { error: error.message });
             overlayClients.delete(client);
         }
     });
     
-    logEvent('INFO', `ðŸ"¡ Config diffusÃ©e Ã  ${successCount}/${overlayClients.size} overlays`);
+    logEvent('INFO', `📡 Config diffusée à ${successCount}/${overlayClients.size} overlays`);
 }
 
-// Charger la config au dÃ©marrage
+// Charger la config au démarrage
 loadOverlayConfig();
 
 // ==================================================================
-// DÃ©marrage du serveur
+// Démarrage du serveur
 app.listen(PORT, () => {
-    console.log('ðŸš€ SubCount Auto Server - Device Code Grant Flow v2.0');
-    console.log(`ðŸ“¡ API: http://localhost:${PORT}`);
-    console.log(`ðŸ”Œ WebSocket: ws://localhost:8083`);
-    console.log(`â° DÃ©marrÃ© le: ${new Date().toLocaleString('fr-FR')}`);
+    console.log('🚀 SubCount Auto Server - Device Code Grant Flow v2.0');
+    console.log(`📡 API: http://localhost:${PORT}`);
+    console.log(`📌 WebSocket: ws://localhost:8083`);
+    console.log(`⏰ Démarré le: ${new Date().toLocaleString('fr-FR')}`);
     
     // Charger les configurations
     loadTwitchConfig();
     loadGoals();
     
-    // Charger le compteur sauvegardÃ© au dÃ©marrage (avant l'API Twitch)
+    // Charger le compteur sauvegardé au démarrage (avant l'API Twitch)
     const savedFollowCount = loadFollowCountFromFile();
     if (savedFollowCount > 0) {
         currentFollows = savedFollowCount;
-        console.log(`ðŸ“‚ Compteur follows initial restaurÃ©: ${savedFollowCount} follows`);
+        console.log(`📂 Compteur follows initial restauré: ${savedFollowCount} follows`);
     }
     
     const savedSubCount = loadSubCountFromFile();
     if (savedSubCount > 0) {
         currentSubs = savedSubCount;
-        console.log(`ðŸ“‚ Compteur subs initial restaurÃ©: ${savedSubCount} subs`);
+        console.log(`📂 Compteur subs initial restauré: ${savedSubCount} subs`);
     }
     
     // Initialiser la surveillance du fichier de configuration
     setupConfigWatcher();
     
     // Initialiser les fichiers avec le compteur actuel
-    updateFiles(currentFollows);
+    updateFollowFiles(currentFollows);
     
-    // ðŸ”„ Initialiser le systÃ¨me de tampon d'Ã©vÃ©nements
+    // 📄 Initialiser le système de tampon d'événements
     eventBuffer = [];
     isProcessingEvents = false;
-    logEvent('INFO', 'ðŸ”„ SystÃ¨me de tampon d\'Ã©vÃ©nements initialisÃ©');
+    logEvent('INFO', '📄 Système de tampon d\'événements initialisé');
     
-    console.log('âœ… Serveur prÃªt !');
+    console.log('✅ Serveur prêt !');
     
     if (twitchConfig.configured) {
-        console.log(`ðŸŽ® ConnectÃ© Ã  Twitch: @${twitchConfig.username}`);
+        console.log(`🎮 Connecté à Twitch: @${twitchConfig.username}`);
         
-        // DÃ©marrer EventSub automatiquement avec un dÃ©lai
-        console.log('ðŸš€ DÃ©marrage EventSub WebSocket dans 3 secondes...');
-        setTimeout(async () => {
+        // Démarrer EventSub automatiquement avec un délai
+        console.log('🚀 Démarrage EventSub WebSocket dans 3 secondes...');
+        timerRegistry.setTimeout('autoStartEventSub', async () => {
             try {
-                // VÃ©rifier que nous avons bien tous les tokens avant de synchroniser
+                // Vérifier que nous avons bien tous les tokens avant de synchroniser
                 if (twitchConfig.access_token && twitchConfig.user_id) {
-                    console.log('ðŸ”„ Synchronisation avec tokens existants...');
-                    await syncTwitchFollows('Synchronisation au dÃ©marrage');
-                    await syncTwitchSubs('Synchronisation au dÃ©marrage');
-                    console.log('âœ… Synchronisation initiale complÃ¨te (follows + subs) rÃ©ussie');
+                    console.log('📄 Synchronisation avec tokens existants...');
+                    await syncTwitchFollows('Synchronisation au démarrage');
+                    await syncTwitchSubs('Synchronisation au démarrage');
+                    console.log('✅ Synchronisation initiale complète (follows + subs) réussie');
                 } else {
-                    console.log('âš ï¸ Tokens manquants, synchronisation ignorÃ©e au dÃ©marrage');
+                    console.log('⚠️ Tokens manquants, synchronisation ignorée au démarrage');
                 }
             } catch (error) {
-                console.warn('âš ï¸ Synchronisation initiale Ã©chouÃ©e, utilisation des donnÃ©es sauvegardÃ©es');
+                console.warn('⚠️ Synchronisation initiale échouée, utilisation des données sauvegardées');
             }
             
-            // DÃ©marrer EventSub seulement si on a les tokens
+            // Démarrer EventSub seulement si on a les tokens
             if (twitchConfig.access_token && twitchConfig.user_id) {
                 connectTwitchEventSub();
             } else {
-                console.log('âš ï¸ Configuration Twitch requise pour EventSub');
+                console.log('⚠️ Configuration Twitch requise pour EventSub');
             }
         }, 3000);
     } else {
-        console.log('âš™ï¸ Configuration Twitch: http://localhost:8082/config');
-        console.log('ðŸ” Device Code Grant Flow : Plus sÃ©curisÃ©, application publique');
+        console.log('⚙️ Configuration Twitch: http://localhost:8082/config');
+        console.log('🔐 Device Code Grant Flow : Plus sécurisé, application publique');
     }
     
     // Log de diagnostic
-    console.log(`ðŸ”§ Ã‰tat initial: ${currentFollows} follows (${followGoals.size} objectifs), ${currentSubs} subs (${subGoals.size} objectifs)`);
+    console.log(`🔧 État initial: ${currentFollows} follows (${followGoals.size} objectifs), ${currentSubs} subs (${subGoals.size} objectifs)`);
     isInitializing = false;
 });
 
-// Gestion de l'arrÃªt propre
+// Gestion de l'arrêt propre
 process.on('SIGINT', () => {
-    console.log('\nðŸ›‘ ArrÃªt du serveur...');
+    console.log('\n🛑 Arrêt du serveur...');
+    
+    // Nettoyer tous les timers via timerRegistry
+    timerRegistry.clearAll();
+    console.log('⏱️ Tous les timers ont été nettoyés');
+    
     if (twitchEventSubWs) {
         twitchEventSubWs.close();
     }
     if (configWatcher) {
         configWatcher.close();
-        console.log('ðŸ‘ï¸ Surveillance fichier follows arrÃªtÃ©e');
+        console.log('👁️ Surveillance fichier follows arrêtée');
     }
     if (subConfigWatcher) {
         subConfigWatcher.close();
-        console.log('ðŸ‘ï¸ Surveillance fichier subs arrÃªtÃ©e');
+        console.log('👁️ Surveillance fichier subs arrêtée');
     }
-    if (deviceCodePolling) {
-        clearInterval(deviceCodePolling);
-        console.log('ðŸ”„ Polling Device Code arrÃªtÃ©');
-    }
-    // ðŸ”„ ArrÃªter le traitement des Ã©vÃ©nements
+    
+    // 📄 Arrêter le traitement des événements
     stopEventProcessing();
     if (eventBuffer.length > 0) {
-        console.log(`âš ï¸ ${eventBuffer.length} Ã©vÃ©nements en attente perdus lors de l'arrÃªt`);
+        console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    console.log('\nðŸ›‘ ArrÃªt du serveur...');
+    console.log('\n🛑 Arrêt du serveur...');
+    
+    // Nettoyer tous les timers via timerRegistry
+    timerRegistry.clearAll();
+    console.log('⏱️ Tous les timers ont été nettoyés');
+    
     if (twitchEventSubWs) {
         twitchEventSubWs.close();
     }
     if (configWatcher) {
         configWatcher.close();
-        console.log('ðŸ‘ï¸ Surveillance fichier follows arrÃªtÃ©e');
+        console.log('👁️ Surveillance fichier follows arrêtée');
     }
     if (subConfigWatcher) {
         subConfigWatcher.close();
-        console.log('ðŸ‘ï¸ Surveillance fichier subs arrÃªtÃ©e');
+        console.log('👁️ Surveillance fichier subs arrêtée');
     }
-    if (deviceCodePolling) {
-        clearInterval(deviceCodePolling);
-        console.log('ðŸ”„ Polling Device Code arrÃªtÃ©');
-    }
-    // ðŸ”„ ArrÃªter le traitement des Ã©vÃ©nements
+    
+    // 📄 Arrêter le traitement des événements
     stopEventProcessing();
     if (eventBuffer.length > 0) {
-        console.log(`âš ï¸ ${eventBuffer.length} Ã©vÃ©nements en attente perdus lors de l'arrÃªt`);
+        console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);
 });
 
-// ðŸ›¡ï¸ Gestion des erreurs non gÃ©rÃ©es (protection contre les crashes)
+// 🛡️ Gestion des erreurs non gérées (protection contre les crashes)
 process.on('uncaughtException', (error) => {
-    console.error('âŒ ERREUR NON GÃ‰RÃ‰E - Le serveur continue:', error.message);
-    console.error('ðŸ“ Stack trace:', error.stack);
+    console.error('❌ ERREUR NON GÉRÉE - Le serveur continue:', error.message);
+    console.error('📄 Stack trace:', error.stack);
     
     // Logger l'erreur
-    logEvent('CRITICAL', 'âŒ Erreur non gÃ©rÃ©e:', {
+    logEvent('CRITICAL', '❌ Erreur non gérée:', {
         message: error.message,
         stack: error.stack,
         timestamp: Date.now()
     });
     
-    // Ne pas arrÃªter le serveur, juste loguer l'erreur
+    // Ne pas arrêter le serveur, juste loguer l'erreur
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('âŒ PROMESSE REJETÃ‰E NON GÃ‰RÃ‰E - Le serveur continue:', reason);
+    console.error('❌ PROMESSE REJETÉE NON GÉRÉE - Le serveur continue:', reason);
     
     // Logger l'erreur
-    logEvent('CRITICAL', 'âŒ Promesse rejetÃ©e non gÃ©rÃ©e:', {
+    logEvent('CRITICAL', '❌ Promesse rejetée non gérée:', {
         reason: reason?.message || reason,
         promise: promise.toString(),
         timestamp: Date.now()
     });
     
-    // Ne pas arrÃªter le serveur, juste loguer l'erreur
+    // Ne pas arrêter le serveur, juste loguer l'erreur
 });
-
-
 

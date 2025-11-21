@@ -7,6 +7,37 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [2.2.2] - 2025-11-21
+
+### 🐛 Corrections Critiques
+- **FIX MAJEUR : Détection des unfollows** : Les unfollows sont maintenant détectés en **10 secondes maximum** (au lieu de 2+ minutes)
+  - Polling constant : Vérification à 100% du temps (au lieu de 33% probabiliste)
+  - Synchronisation `lastKnownFollowCount` fixée dans `flushFollowBatch()` et `updateFollowCount()`
+  - Root cause : Désynchronisation entre polling tracker et batch système
+
+### ⚡ Optimisations Système
+- **EventQueue thread-safe** : Remplacement du système `eventBuffer` obsolète (~150 lignes supprimées)
+- **Result Pattern** : Gestion d'erreurs cohérente pour `getTwitchFollowCount()`
+  - Codes standardisés : `NOT_CONFIGURED`, `TOKEN_EXPIRED`, `API_ERROR`, `TIMEOUT`, `NETWORK_ERROR`
+  - Propagation propre dans 4+ emplacements
+- **Variables synchronisées** : 20+ variables globales maintenant auto-synchro avec `appState` via getters/setters
+  - Élimine les risques de désynchronisation
+  - Rétrocompatible à 100%
+
+### 🛡️ Sécurité et Robustesse
+- **`validatePositiveInt()`** : Validation robuste des entrées (crash prevention)
+- **`resetDeviceCodeFlow()`** : Utilise `appState.config` au lieu de variables globales
+- **Rate limiting** : Respecte les limites Twitch (7 req/min sur 800 max = 0.9%)
+
+### 📊 Impact
+| Événement | Avant v2.2.2 | Après v2.2.2 |
+|-----------|--------------|--------------|
+| Follow | ✅ < 1s | ✅ < 1s |
+| Unfollow | ❌ 2+ min | ✅ **10s max** |
+| Requêtes API | 2-6/min | **6/min** (constant) |
+
+---
+
 ## [2.2.1] - 2025-11-19
 
 ### 🐛 Corrections
@@ -42,7 +73,7 @@ Root/
 
 ### 📝 Documentation
 - **Simplification drastique** : 1 guide utilisateur complet (`app/app/docs/GUIDE_UTILISATEUR.md`)
-- **Note de release GitHub** : `app/app/docs/RELEASE_v2.2.1.md` (copier-coller direct)
+- **Note de release GitHub** : `app/app/docs/RELEASE_v2.2.2.md` (copier-coller direct)
 - **Suppression** : Toute documentation de développement et notes techniques
 - **Conservation** : README.md et CHANGELOG.md uniquement
 

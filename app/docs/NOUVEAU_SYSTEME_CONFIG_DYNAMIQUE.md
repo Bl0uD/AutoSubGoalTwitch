@@ -1,6 +1,6 @@
 ﻿# 🎉 SYSTÈME DE CONFIGURATION DYNAMIQUE DÉPLOYÉ !
 
-> **📢 Mise à jour v2.2.1** : Tous les overlays HTML sont maintenant dynamiques par défaut !  
+> **📢 Mise à jour v2.2.2** : Tous les overlays HTML sont maintenant dynamiques par défaut !  
 > Les fichiers `*_dynamic.html` ont été renommés pour remplacer les versions statiques.  
 > Plus besoin de choisir entre deux versions - la configuration en temps réel est toujours active.
 

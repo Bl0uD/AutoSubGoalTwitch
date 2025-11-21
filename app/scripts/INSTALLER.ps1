@@ -1,5 +1,5 @@
 ﻿# ===================================================================
-#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.2.1
+#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.2.2
 # ===================================================================
 
 $ErrorActionPreference = "Continue"
@@ -10,7 +10,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
-Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.2.1" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.2.2" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 

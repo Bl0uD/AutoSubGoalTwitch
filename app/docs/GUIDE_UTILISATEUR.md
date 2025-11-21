@@ -253,6 +253,6 @@ Oui, automatiquement dans `obs/data/*_backup.txt` et `app/backups/`.
 
 ## 🎉 Bon stream ! ✨
 
-**v2.2.1** - Avec configuration dynamique et mise à jour automatique
+**v2.2.2** - Avec configuration dynamique et mise à jour automatique
 
 </div>
