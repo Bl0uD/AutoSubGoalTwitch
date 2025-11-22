@@ -7,6 +7,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [2.2.3] - 2025-11-22
+
+### 🐛 Corrections Critiques
+- **FIX MAJEUR : Animations uniformes** : Les désabonnements (unsub/unfollow) ont maintenant la **même animation fluide** que les abonnements/follows (1 seconde)
+  - Direction d'animation transmise correctement via paramètre `direction` dans `animateCounterProgressive()`
+  - Propagation de `direction` à tous les appels `displayGoalText()` pendant l'animation
+  - Stockage de `direction` dans `animationQueue` pour chaque animation
+  - Correction de `processAnimationQueue()` pour transmettre la direction
+
+- **FIX CRITIQUE : Affichage overlay** : Correction de la référence à variable inexistante
+  - Bug : `${direction}` utilisé dans `updateCounter()` au lieu de `${animationDirection}`
+  - Cause : Script de correction automatique avait remplacé trop largement
+  - Impact : Écran noir total sur les overlays
+  - Solution : Restauration de `${animationDirection}` dans les 4 fichiers overlay
+
+### 📊 Impact Visuel
+| Événement | Avant v2.2.3 | Après v2.2.3 |
+|-----------|--------------|--------------|
+| Sub/Follow | ✅ Animation 1s | ✅ Animation 1s |
+| Unsub/Unfollow | ❌ Instantané | ✅ **Animation 1s** |
+| Direction | ✅/❌ Incohérent | ✅ **Down/Up correct** |
+
+### 🔧 Fichiers Modifiés
+- `obs/overlays/subgoal_left.html`
+- `obs/overlays/subgoal_right.html`
+- `obs/overlays/followgoal_left.html`
+- `obs/overlays/followgoal_right.html`
+- `app/config/version.json`
+
+### 🧹 Nettoyage
+- Suppression de `app/scripts/FIX_ANIMATION_DIRECTION.ps1`
+- Suppression de `app/scripts/fix_animation.py`
+- Suppression de `app/server/server.js.backup`
+- Suppression de tous les dossiers `__pycache__/`
+
+---
+
 ## [2.2.2] - 2025-11-21
 
 ### 🐛 Corrections Critiques

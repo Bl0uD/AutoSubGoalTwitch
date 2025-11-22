@@ -75,15 +75,16 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "2.2.1"
+VERSION = "v2.2.2"
 
 # Variables globales
 server_process = None
 server_thread = None
 is_server_running = False
 update_info = None
-server_thread = None
-is_server_running = False
+CACHED_FONTS = None  # Cache des polices Windows
+server_health_status = False  # Statut santé du serveur
+global_settings = None  # Settings OBS accessibles globalement
 
 # Configuration du logging
 logging.basicConfig(
@@ -97,6 +98,25 @@ logging.basicConfig(
 
 # Mode silencieux - N'affiche que les erreurs et notifications importantes
 SILENT_MODE = True
+
+# Timeouts HTTP standardisés
+HTTP_TIMEOUT_SHORT = 5  # Opérations rapides (add/remove)
+HTTP_TIMEOUT_MEDIUM = 10  # Sync Twitch
+HTTP_TIMEOUT_LONG = 30  # Opérations lourdes
+
+# Map des couleurs CSS pour overlays
+COLOR_MAP = {
+    "white": "white",
+    "black": "black",
+    "red": "#FF0000",
+    "blue": "#00FFFF",
+    "green": "#00FF00",
+    "yellow": "#FFD700",
+    "purple": "#8B00FF",
+    "orange": "#FF4500",
+    "pink": "#FF69B4",
+    "cyan": "#00FFFF"
+}
 
 def log_message(message, level="info", force_display=False):
     """
@@ -126,10 +146,17 @@ def log_message(message, level="info", force_display=False):
 def get_windows_fonts():
     """
     Récupère la liste de toutes les polices installées sur Windows (polices mères uniquement, sans variantes)
+    Utilise un cache pour éviter de recharger les polices à chaque appel
     
     Returns:
         list: Liste des noms de polices disponibles (sans Bold, Italic, Light, etc.)
     """
+    global CACHED_FONTS
+    
+    # Retourner le cache si disponible
+    if CACHED_FONTS is not None:
+        return CACHED_FONTS
+    
     fonts = set()
     
     # Variantes à filtrer (case-insensitive)
@@ -218,11 +245,15 @@ def get_windows_fonts():
         
         log_message(f"✅ {len(result)} polices mères chargées (variantes filtrées)", level="info")
         
-        return result if len(result) > 0 else ["SEA", "Arial", "Verdana", "Georgia", "Impact"]
+        # Mettre en cache le résultat
+        CACHED_FONTS = result if len(result) > 0 else ["SEA", "Arial", "Verdana", "Georgia", "Impact"]
+        return CACHED_FONTS
         
     except Exception as e:
         log_message(f"⚠️ Erreur lecture polices: {e}", level="warning")
-        return ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
+        # Mettre en cache les polices par défaut
+        CACHED_FONTS = ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
+        return CACHED_FONTS
 
 def cleanup_log_file(log_file_path, max_size_mb=5, keep_lines=1000):
     """
@@ -668,18 +699,18 @@ def add_follow():
     if not REQUESTS_AVAILABLE:
         log_message("❌ Module requests non disponible", level="error")
         return False
-    try:
-        response = requests.post(
-            f"{SERVER_URL}/admin/add-follows",
-            json={'amount': 1},
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        if response.status_code == 200:
-            log_message("✅ +1 Follow ajouté", level="info")
-            return True
-    except Exception as e:
-        log_message(f"❌ Erreur ajout follow: {e}", level="error")
+    
+    response = api_call_with_retry(
+        f"{SERVER_URL}/admin/add-follows",
+        method='POST',
+        json={'amount': 1},
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    if response and response.status_code == 200:
+        log_message("✅ +1 Follow ajouté", level="info")
+        return True
+    
     return False
 
 def remove_follow():
@@ -687,147 +718,147 @@ def remove_follow():
     if not REQUESTS_AVAILABLE:
         log_message("❌ Module requests non disponible", level="error")
         return False
-    try:
-        response = requests.post(
-            f"{SERVER_URL}/admin/remove-follows",
-            json={'amount': 1},
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        if response.status_code == 200:
-            log_message("✅ -1 Follow retiré", level="info")
-            return True
-    except Exception as e:
-        log_message(f"❌ Erreur retrait follow: {e}", level="error")
+    
+    response = api_call_with_retry(
+        f"{SERVER_URL}/admin/remove-follows",
+        method='POST',
+        json={'amount': 1},
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    if response and response.status_code == 200:
+        log_message("✅ -1 Follow retiré", level="info")
+        return True
+    
     return False
 
 def add_sub():
     """Ajoute 1 sub (tier 1)"""
     if not REQUESTS_AVAILABLE:
-        log_message("❌ Module requests non disponible")
+        log_message("❌ Module requests non disponible", level="error")
         return False
-    try:
-        response = requests.post(
-            f"{SERVER_URL}/admin/add-subs",
-            json={'amount': 1, 'tier': '1000'},
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        if response.status_code == 200:
-            log_message("✅ +1 Sub ajouté (Tier 1)")
-            return True
-    except Exception as e:
-        log_message(f"❌ Erreur ajout sub: {e}")
+    
+    response = api_call_with_retry(
+        f"{SERVER_URL}/admin/add-subs",
+        method='POST',
+        json={'amount': 1, 'tier': '1000'},
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    if response and response.status_code == 200:
+        log_message("✅ +1 Sub ajouté (Tier 1)", level="info")
+        return True
+    
     return False
 
 def remove_sub():
     """Retire 1 sub"""
     if not REQUESTS_AVAILABLE:
-        log_message("❌ Module requests non disponible")
+        log_message("❌ Module requests non disponible", level="error")
         return False
-    try:
-        response = requests.post(
-            f"{SERVER_URL}/admin/remove-subs",
-            json={'amount': 1},
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        if response.status_code == 200:
-            log_message("✅ -1 Sub retiré")
-            return True
-    except Exception as e:
-        log_message(f"❌ Erreur retrait sub: {e}")
+    
+    response = api_call_with_retry(
+        f"{SERVER_URL}/admin/remove-subs",
+        method='POST',
+        json={'amount': 1},
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    if response and response.status_code == 200:
+        log_message("✅ -1 Sub retiré", level="info")
+        return True
+    
     return False
 
 def sync_with_twitch():
     """Synchronise avec Twitch API"""
     if not REQUESTS_AVAILABLE:
-        log_message("❌ Module requests non disponible")
+        log_message("❌ Module requests non disponible", level="error")
         return False
     try:
-        log_message("🔄 Synchronisation avec Twitch API...")
-        response = requests.get(f"{SERVER_URL}/admin/sync-twitch", timeout=10)
+        log_message("🔄 Synchronisation avec Twitch API...", level="info")
+        response = requests.get(f"{SERVER_URL}/admin/sync-twitch", timeout=HTTP_TIMEOUT_MEDIUM)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                log_message(f"✅ Sync réussie - Follows: {data['twitchFollows']}, Subs: {data['twitchSubs']}")
+                log_message(f"✅ Sync réussie - Follows: {data['twitchFollows']}, Subs: {data['twitchSubs']}", level="info")
                 if data.get('updated'):
-                    log_message(f"   Diff Follows: {data['followsDiff']:+d}, Diff Subs: {data['subsDiff']:+d}")
+                    log_message(f"   Diff Follows: {data['followsDiff']:+d}, Diff Subs: {data['subsDiff']:+d}", level="info")
                 else:
-                    log_message("   Déjà à jour")
+                    log_message("   Déjà à jour", level="info")
                 return True
             else:
-                log_message(f"❌ Erreur sync: {data.get('error', 'Erreur inconnue')}")
+                log_message(f"❌ Erreur sync: {data.get('error', 'Erreur inconnue')}", level="error")
         else:
-            log_message(f"❌ Erreur HTTP: {response.status_code}")
+            log_message(f"❌ Erreur HTTP: {response.status_code}", level="error")
     except Exception as e:
-        log_message(f"❌ Erreur sync Twitch: {e}")
+        log_message(f"❌ Erreur sync Twitch: {e}", level="error")
     return False
 
 def open_dashboard():
     """Ouvre le dashboard dans le navigateur"""
     try:
         webbrowser.open(f"{SERVER_URL}/")
-        log_message("🏠 Dashboard ouvert dans le navigateur")
+        log_message("🏠 Dashboard ouvert dans le navigateur", level="info")
         return True
     except Exception as e:
-        log_message(f"❌ Erreur ouverture dashboard: {e}")
+        log_message(f"❌ Erreur ouverture dashboard: {e}", level="error")
     return False
 
 def open_config():
     """Ouvre la page de configuration"""
     try:
         webbrowser.open(f"{SERVER_URL}/config")
-        log_message("⚙️ Configuration ouverte dans le navigateur")
+        log_message("⚙️ Configuration ouverte dans le navigateur", level="info")
         return True
     except Exception as e:
-        log_message(f"❌ Erreur ouverture config: {e}")
+        log_message(f"❌ Erreur ouverture config: {e}", level="error")
     return False
 
 def open_admin():
     """Ouvre le panel admin"""
     try:
         webbrowser.open(f"{SERVER_URL}/admin")
-        log_message("🔧 Panel Admin ouvert dans le navigateur")
+        log_message("🔧 Panel Admin ouvert dans le navigateur", level="info")
         return True
     except Exception as e:
-        log_message(f"❌ Erreur ouverture admin: {e}")
+        log_message(f"❌ Erreur ouverture admin: {e}", level="error")
     return False
 
 def connect_twitch():
     """Ouvre la page de configuration pour se connecter à Twitch"""
     try:
         webbrowser.open(f"{SERVER_URL}")
-        log_message("🔐 Page Admin Twitch ouverte")
-        log_message("   Suivez les instructions pour vous connecter")
+        log_message("🔐 Page Admin Twitch ouverte", level="info")
+        log_message("   Suivez les instructions pour vous connecter", level="info")
         return True
     except Exception as e:
-        log_message(f"❌ Erreur ouverture admin Twitch: {e}")
+        log_message(f"❌ Erreur ouverture admin Twitch: {e}", level="error")
     return False
 
 def disconnect_twitch():
     """Déconnecte le compte Twitch actuel"""
     if not REQUESTS_AVAILABLE:
-        log_message("❌ Module requests non disponible")
+        log_message("❌ Module requests non disponible", level="error")
         return False
     try:
         response = requests.post(
             f"{SERVER_URL}/api/disconnect-twitch",
             headers={'Content-Type': 'application/json'},
-            timeout=5
+            timeout=HTTP_TIMEOUT_SHORT
         )
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                log_message(f"✅ Déconnecté de Twitch: {data.get('previousUser', 'Utilisateur inconnu')}")
-                log_message("   Vous pouvez maintenant connecter un autre compte")
+                log_message(f"✅ Déconnecté de Twitch: {data.get('previousUser', 'Utilisateur inconnu')}", level="info")
+                log_message("   Vous pouvez maintenant connecter un autre compte", level="info")
                 return True
             else:
-                log_message(f"❌ Erreur déconnexion: {data.get('error', 'Erreur inconnue')}")
+                log_message(f"❌ Erreur déconnexion: {data.get('error', 'Erreur inconnue')}", level="error")
         else:
-            log_message(f"❌ Erreur HTTP: {response.status_code}")
+            log_message(f"❌ Erreur HTTP: {response.status_code}", level="error")
     except Exception as e:
-        log_message(f"❌ Erreur déconnexion Twitch: {e}")
+        log_message(f"❌ Erreur déconnexion Twitch: {e}", level="error")
     return False
 
 def get_twitch_status():
@@ -835,91 +866,250 @@ def get_twitch_status():
     if not REQUESTS_AVAILABLE:
         return None
     try:
-        response = requests.get(f"{SERVER_URL}/api/auth-status", timeout=5)
+        response = requests.get(f"{SERVER_URL}/api/auth-status", timeout=HTTP_TIMEOUT_SHORT)
         if response.status_code == 200:
             data = response.json()
             return data
     except Exception as e:
-        log_message(f"❌ Erreur récupération status Twitch: {e}")
+        log_message(f"❌ Erreur récupération status Twitch: {e}", level="error")
+    return None
+
+def is_server_healthy():
+    """Vérifie si le serveur répond correctement"""
+    global server_health_status
+    
+    if not REQUESTS_AVAILABLE:
+        return False
+    
+    try:
+        response = requests.get(f"{SERVER_URL}/", timeout=2)
+        is_healthy = response.status_code == 200
+        server_health_status = is_healthy
+        return is_healthy
+    except Exception:
+        server_health_status = False
+        return False
+
+def api_call_with_retry(url, method='GET', retries=3, timeout=HTTP_TIMEOUT_SHORT, **kwargs):
+    """Appel API avec retry automatique sur échec
+    
+    Args:
+        url: URL de l'API
+        method: Méthode HTTP ('GET' ou 'POST')
+        retries: Nombre de tentatives (défaut: 3)
+        timeout: Timeout en secondes
+        **kwargs: Arguments supplémentaires pour requests
+    
+    Returns:
+        Response object ou None si échec après toutes les tentatives
+    """
+    if not REQUESTS_AVAILABLE:
+        log_message("❌ Module requests non disponible", level="error")
+        return None
+    
+    for attempt in range(retries):
+        try:
+            if method.upper() == 'GET':
+                response = requests.get(url, timeout=timeout, **kwargs)
+            elif method.upper() == 'POST':
+                response = requests.post(url, timeout=timeout, **kwargs)
+            else:
+                log_message(f"❌ Méthode HTTP non supportée: {method}", level="error")
+                return None
+            
+            # Retourner si succès
+            if response.status_code < 500:
+                return response
+            
+            # Erreur serveur 5xx, retry
+            if attempt < retries - 1:
+                log_message(f"⚠️ Erreur serveur {response.status_code}, tentative {attempt + 2}/{retries}...", level="warning")
+                time.sleep(1)  # Attendre 1s avant retry
+            
+        except requests.exceptions.Timeout:
+            if attempt < retries - 1:
+                log_message(f"⚠️ Timeout, tentative {attempt + 2}/{retries}...", level="warning")
+                time.sleep(1)
+            else:
+                log_message(f"❌ Timeout après {retries} tentatives", level="error")
+        except Exception as e:
+            if attempt < retries - 1:
+                log_message(f"⚠️ Erreur {e}, tentative {attempt + 2}/{retries}...", level="warning")
+                time.sleep(1)
+            else:
+                log_message(f"❌ Échec après {retries} tentatives: {e}", level="error")
+    
     return None
 
 # ========================================================================
 # GESTION CONFIGURATION DYNAMIQUE DES OVERLAYS
 # ========================================================================
 
+def is_valid_css_color(color):
+    """Valide un code couleur CSS
+    
+    Args:
+        color: String contenant le code couleur à valider
+    
+    Returns:
+        bool: True si la couleur est valide, False sinon
+    """
+    import re
+    
+    if not color or not isinstance(color, str):
+        return False
+    
+    color = color.strip()
+    
+    # Patterns supportés
+    patterns = [
+        r'^#[0-9A-Fa-f]{3}$',  # Hex court (#RGB)
+        r'^#[0-9A-Fa-f]{6}$',  # Hex normal (#RRGGBB)
+        r'^#[0-9A-Fa-f]{8}$',  # Hex avec alpha (#RRGGBBAA)
+        r'^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$',  # rgb(r,g,b)
+        r'^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*[\d.]+\s*\)$'  # rgba(r,g,b,a)
+    ]
+    
+    # Noms de couleurs CSS standard
+    css_colors = [
+        'white', 'black', 'red', 'green', 'blue', 'yellow', 'cyan', 'magenta',
+        'orange', 'purple', 'pink', 'brown', 'gray', 'grey', 'transparent'
+    ]
+    
+    # Vérifier si c'est un nom de couleur
+    if color.lower() in css_colors:
+        return True
+    
+    # Vérifier si ça match un des patterns
+    for pattern in patterns:
+        if re.match(pattern, color):
+            # Pour RGB/RGBA, valider que les valeurs sont dans [0-255]
+            if 'rgb' in color:
+                numbers = re.findall(r'\d{1,3}', color)
+                if any(int(n) > 255 for n in numbers[:3]):  # Vérifier R,G,B (pas alpha)
+                    return False
+            return True
+    
+    return False
+
 def apply_overlay_font(props, prop, settings):
     """Applique la police sélectionnée aux overlays"""
+    global global_settings
+    global_settings = settings  # Mettre à jour les settings globaux
+    
     if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible")
+        log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
     
     font_family = obs.obs_data_get_string(settings, "overlay_font")
     font_size = obs.obs_data_get_int(settings, "overlay_font_size")
     
     if font_family:
-        overlay_config.update_font(family=font_family, size=f"{font_size}px")
-        log_message(f"✅ Police mise à jour: {font_family} @ {font_size}px")
+        # Vérifier que overlay_config existe avant de l'utiliser
+        try:
+            overlay_config.update_font(family=font_family, size=f"{font_size}px")
+            log_message(f"✅ Police mise à jour: {font_family} @ {font_size}px", level="info")
+        except NameError:
+            log_message("❌ overlay_config non initialisé", level="error")
+            return False
     
     return True
 
 def apply_overlay_colors(props, prop, settings):
     """Applique la couleur prédéfinie aux overlays (callback du dropdown)"""
+    global global_settings
+    global_settings = settings  # Mettre à jour les settings globaux
+    
     if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible")
+        log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
     
     text_color = obs.obs_data_get_string(settings, "overlay_text_color")
     
     if text_color:
-        # Convertir le nom de couleur en code CSS
-        color_map = {
-            "white": "white",
-            "black": "black",
-            "red": "#FF0000",
-            "blue": "#00FFFF",
-            "green": "#00FF00",
-            "yellow": "#FFD700",
-            "purple": "#8B00FF",
-            "orange": "#FF4500",
-            "pink": "#FF69B4",
-            "cyan": "#00FFFF"
-        }
+        # Utiliser la constante globale COLOR_MAP
+        final_color = COLOR_MAP.get(text_color, text_color)
         
-        final_color = color_map.get(text_color, text_color)
-        overlay_config.update_colors(text=final_color)
-        log_message(f"✅ Couleur prédéfinie appliquée: {text_color}")
+        # Vérifier que overlay_config existe avant de l'utiliser
+        try:
+            # Vider le cache pour permettre de réappliquer la même couleur
+            overlay_config.clear_cache()
+            overlay_config.update_colors(text=final_color)
+            log_message(f"✅ Couleur prédéfinie appliquée: {text_color}", level="info")
+        except NameError:
+            log_message("❌ overlay_config non initialisé", level="error")
+            return False
     
     return True
 
-def apply_custom_color(props, prop, settings):
-    """Applique le code couleur personnalisé aux overlays (callback du champ texte)"""
+def apply_custom_color(props, prop):
+    """Applique le code couleur personnalisé aux overlays (callback du bouton)"""
     if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible")
+        log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
     
-    custom_color = obs.obs_data_get_string(settings, "overlay_custom_color")
+    # Récupérer la propriété directement depuis props
+    custom_color_prop = obs.obs_properties_get(props, "overlay_custom_color")
+    if not custom_color_prop:
+        log_message("❌ Impossible de récupérer la propriété couleur", level="error")
+        return False
     
-    if custom_color and custom_color.strip():
-        overlay_config.update_colors(text=custom_color.strip())
-        log_message(f"✅ Code couleur CSS appliqué: {custom_color}")
-    else:
-        log_message("⚠️ Veuillez entrer un code couleur", level="warning")
+    # Fallback: essayer depuis global_settings
+    if global_settings is None:
+        log_message("❌ Settings non disponibles", level="error")
+        return False
     
-    return True
+    # Lire la valeur actuelle depuis les settings
+    custom_color = obs.obs_data_get_string(global_settings, "overlay_custom_color")
+    
+    # Si vide, essayer de lire la valeur par défaut
+    if not custom_color:
+        custom_color = obs.obs_data_get_default_string(global_settings, "overlay_custom_color")
+    
+    if not custom_color or not custom_color.strip():
+        log_message("⚠️ Veuillez entrer un code couleur dans le champ", level="warning")
+        return False
+    
+    custom_color = custom_color.strip()
+    
+    # Valider le format CSS avant d'appliquer
+    if not is_valid_css_color(custom_color):
+        log_message(f"❌ Code couleur CSS invalide: {custom_color}", level="error")
+        log_message("   Formats acceptés: #RGB, #RRGGBB, rgb(r,g,b), rgba(r,g,b,a), ou nom de couleur", level="info")
+        return False
+    
+    # Vérifier que overlay_config existe avant de l'utiliser
+    try:
+        # Vider le cache pour permettre de réappliquer la même couleur
+        overlay_config.clear_cache()
+        overlay_config.update_colors(text=custom_color)
+        log_message(f"✅ Code couleur CSS appliqué: {custom_color}", level="info")
+        return True
+    except NameError:
+        log_message("❌ overlay_config non initialisé", level="error")
+        return False
+    except Exception as e:
+        log_message(f"❌ Erreur application couleur: {e}", level="error")
+        return False
 
 def reset_overlay_config(props, prop):
     """Réinitialise la configuration des overlays aux valeurs par défaut"""
     if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible")
+        log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
     
-    overlay_config.update_full_config(
-        font={'family': 'SEA', 'size': '64px', 'weight': 'normal'},
-        colors={'text': 'white', 'shadow': 'rgba(0,0,0,0.5)', 'stroke': 'black'},
-        animation={'duration': '1s', 'easing': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'},
-        layout={'paddingLeft': '20px', 'gap': '0'}
-    )
-    log_message("✅ Configuration overlays réinitialisée aux valeurs par défaut")
+    # Vérifier que overlay_config existe avant de l'utiliser
+    try:
+        overlay_config.update_full_config(
+            font={'family': 'SEA', 'size': '64px', 'weight': 'normal'},
+            colors={'text': 'white', 'shadow': 'rgba(0,0,0,0.5)', 'stroke': 'black'},
+            animation={'duration': '1s', 'easing': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'},
+            layout={'paddingLeft': '20px', 'gap': '0'}
+        )
+        log_message("✅ Configuration overlays réinitialisée aux valeurs par défaut", level="info")
+    except NameError:
+        log_message("❌ overlay_config non initialisé", level="error")
+        return False
     return True
 
 # ============================================================================
@@ -972,12 +1162,21 @@ def script_unload():
 
 def script_tick(seconds):
     """Appelé à chaque frame (pour mise à jour de l'interface)"""
-    # Note: Cette fonction est appelée très fréquemment, ne rien faire de lourd ici
-    pass
+    # Vérifier la santé du serveur toutes les 5 secondes
+    if int(seconds) % 5 == 0 and seconds > 0:
+        # Vérification asynchrone pour ne pas bloquer OBS
+        if is_server_running:
+            threading.Thread(target=is_server_healthy, daemon=True).start()
 
 def script_update(settings):
     """Appelé quand les paramètres changent"""
-    pass
+    global global_settings
+    global_settings = settings
+
+def script_save(settings):
+    """Appelé lors de la sauvegarde - stocke les settings"""
+    global global_settings
+    global_settings = settings
 
 def script_defaults(settings):
     """Définit les valeurs par défaut"""
@@ -1109,15 +1308,21 @@ def script_properties():
         custom_color = obs.obs_properties_add_text(
             props,
             "overlay_custom_color",
-            "  🎨  Code couleur CSS\n          (ex: #FFFFFF)",
+            "  🎨  Code couleur CSS",
             obs.OBS_TEXT_DEFAULT
         )
         obs.obs_property_set_long_description(
             custom_color,
-            "Ex: #FF4578, rgb(255,87,51), rgba(255,87,51,0.8)"
+            "Ex: #FF4578, rgb(255,87,51), rgba(255,87,51,0.8)\nTapez votre couleur puis cliquez sur 'Appliquer'"
         )
         
-        obs.obs_property_set_modified_callback(custom_color, apply_custom_color)
+        # PAS de callback sur le champ pour éviter la réinitialisation du curseur
+        
+        # Bouton pour valider la couleur personnalisée
+        obs.obs_properties_add_button(
+            props, "apply_custom_color_btn", "  ✅  Appliquer la couleur", 
+            apply_custom_color
+        )
         
         # Bouton Reset
         obs.obs_properties_add_button(

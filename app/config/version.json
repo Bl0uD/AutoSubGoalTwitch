@@ -1,17 +1,12 @@
 {
-  "version": "2.2.2",
-  "release_date": "2025-11-21",
+  "version": "2.2.3",
+  "release_date": "2025-11-22",
   "changelog": [
-    "🐛 FIX CRITIQUE : Unfollows détectés en 10s max (au lieu de 2+ minutes)",
-    "🔥 Polling constant : 100% du temps (au lieu de 33% probabiliste)",
-    "🔄 Synchronisation lastKnownFollowCount fixée (batch + update)",
-    "⚡ EventQueue thread-safe (remplace eventBuffer obsolète)",
-    "🛡️ Result Pattern pour gestion d'erreurs cohérente",
-    "🔗 20+ variables synchronisées avec appState (zéro désync)",
-    "✅ validatePositiveInt() ajoutée (crash prevention)",
-    "🔧 resetDeviceCodeFlow() utilise appState.config",
-    "📊 Rate limiting : 7 req/min sur 800 max (0.9% - ultra sécurisé)",
-    "🎯 Architecture refactorisée : 150+ lignes de code mort supprimées"
+    "🐛 FIX CRITIQUE : Animations uniformes pour gains ET pertes (1s fluide)",
+    "🔧 Direction d'animation transmise correctement (down/up)",
+    "✅ Correction variable ${animationDirection} dans updateCounter()",
+    "🧹 Nettoyage : scripts temporaires et caches Python supprimés",
+    "📊 4 overlays corrigés (subgoal/followgoal left/right)"
   ],
   "github_repo": "Bl0uD/AutoSubGoalTwitch",
   "update_url": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",

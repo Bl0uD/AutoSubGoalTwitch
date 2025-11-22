@@ -27,14 +27,14 @@
         body {
             background: transparent;
             margin: 0;
-            font-family: var(--font-family), monospace;
+            font-family: var(--font-family), 'SEA', system-ui, sans-serif;
             display: flex;
             justify-content: flex-end;
             align-items: center;
             height: 100vh;
             color: var(--text-color);
             padding-right: var(--padding-left);
-            padding-right: 0;
+            padding-left: 0;
         }
 
         .counter {
@@ -321,11 +321,11 @@
             currentText = newText;
         }
         
-        function animateCounterProgressive(fromCount, toCount, goal) {
+        function animateCounterProgressive(fromCount, toCount, goal, direction) {
             const steps = Math.abs(toCount - fromCount);
             
             if (steps === 0) {
-                displayGoalText(goal);
+                displayGoalText(goal, direction);
                 return;
             }
             
@@ -350,14 +350,14 @@
                 if (currentValue !== lastDisplayedValue || progress === 1) {
                     lastDisplayedValue = currentValue;
                     const intermediateGoal = { ...goal, current: currentValue };
-                    displayGoalText(intermediateGoal);
+                    displayGoalText(intermediateGoal, direction);
                 }
                 
                 if (progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
                     const finalGoal = { ...goal, current: toCount };
-                    displayGoalText(finalGoal);
+                    displayGoalText(finalGoal, direction);
                     isAnimating = false;
                     processAnimationQueue();
                 }
@@ -386,7 +386,7 @@
             if (animationQueue.length > 0 && !isAnimating) {
                 const nextAnimation = animationQueue.shift();
                 isAnimating = true;
-                animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal);
+                animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal, nextAnimation.direction);
             }
         }
 
@@ -442,19 +442,20 @@
             currentFollowgoal = goal;
             
             if (previousSubCount !== null && goal.current !== previousSubCount) {
-                animationDirection = goal.current > previousSubCount ? "down" : "up";
-                console.log(`ðŸ”„ Direction: ${animationDirection} (${previousSubCount} â†’ ${goal.current})`);
+                const direction = goal.current > previousSubCount ? "down" : "up";
+                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current})`);
                 
                 animationQueue.push({
                     from: previousSubCount,
                     to: goal.current,
-                    goal: goal
+                    goal: goal,
+                    direction: direction
                 });
                 
                 if (!isAnimating) {
                     isAnimating = true;
                     const animation = animationQueue.shift();
-                    animateCounterProgressive(animation.from, animation.to, animation.goal);
+                    animateCounterProgressive(animation.from, animation.to, animation.goal, animation.direction);
                 }
             } else {
                 displayGoalText(goal);
@@ -476,7 +477,7 @@
         connectWebSocket();
         setTimeout(fetchCurrentData, 1000);
         setTimeout(() => {
-            console.log('ðŸ”„ Refresh complet - recalcul des dimensions...');
+            console.log('🔄 Refresh complet - recalcul des dimensions...');
             forceRecalculateDisplay();
         }, 15000);
     </script>

@@ -725,6 +725,9 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "      - http://localhost:8082/obs/overlays/followgoal_left.html" -ForegroundColor Gray
     Write-Host "      - http://localhost:8082/obs/overlays/followgoal_right.html" -ForegroundColor Gray
     Write-Host ""
+    Write-Host "   ℹ️  Les overlays utilisent désormais un fichier commun (overlay-common.js)" -ForegroundColor DarkCyan
+    Write-Host "      pour faciliter la maintenance et améliorer les performances." -ForegroundColor DarkCyan
+    Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow
     Write-Host "         INSTALLATION INCOMPLETE" -ForegroundColor Yellow
