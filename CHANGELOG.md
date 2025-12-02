@@ -7,6 +7,60 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.0.0] - 2025-12-02
+
+### 🏗️ Refonte Architecture Majeure
+
+#### Architecture Modulaire (10 Services)
+- **Extraction complète** : server.js passe de 5200 à 2555 lignes (-51%)
+- **10 services indépendants** :
+  - `files.js` - Gestion fichiers et app_state.json
+  - `counters.js` - Compteurs follows/subs
+  - `goals.js` - Objectifs et file watchers
+  - `batching.js` - Système de batching intelligent
+  - `polling.js` - Polling API Twitch
+  - `event-handlers.js` - Handlers EventSub
+  - `eventsub.js` - Connexion WebSocket Twitch
+  - `twitch-config.js` - Configuration Twitch chiffrée
+  - `broadcast.js` - Diffusion WebSocket clients
+  - `twitch.js` - Appels API Twitch
+
+#### Routes Modulaires
+- `pages.js` - Pages HTML (/, /admin, /config)
+- `api.js` - API REST (/api/*)
+- `admin.js` - Actions admin (/admin/*)
+- `twitch.js` - Auth Twitch (/twitch/*)
+
+#### Utilitaires Centralisés
+- `constants.js` - Toutes les constantes du projet
+- `logger.js` - Logging structuré avec filtrage sécurité
+- `validation.js` - Validation robuste des entrées
+- `rate-limiter.js` - Rate limiting (Sliding, TokenBucket)
+- `timer-registry.js` - Gestion timers (évite memory leaks)
+- `event-queue.js` - File d'attente événements thread-safe
+
+### ✨ Améliorations
+
+- **Animations Slot-machine** : Animation progressive pour changements multiples
+- **Détection polices utilisateur** : Lecture HKEY_CURRENT_USER pour polices installées par l'utilisateur
+- **Admin Panel** : Boutons retirer follows/subs corrigés
+- **Cohérence overlays** : Même animation sur tous les fichiers HTML
+
+### 🐛 Corrections
+
+- **Fix** : `followRemoveBatch is not defined` - Variables batch ajoutées dans appState
+- **Fix** : `animateDirectTransition` remplacée par `animateSlotMachine` cohérente
+- **Fix** : Polices utilisateur (comme "SEA") non détectées
+- **Fix** : Fonction `loadAdminPassword()` manquante dans admin.html
+
+### 🧹 Nettoyage
+
+- Suppression fichiers `__pycache__`
+- Suppression overlay obsolète `followgoal_left_v3.html`
+- Mise à jour package.json version 2.3.0 → 3.0.0
+
+---
+
 ## [2.2.3] - 2025-11-22
 
 ### 🐛 Corrections Critiques

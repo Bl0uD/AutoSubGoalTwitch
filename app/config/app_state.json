@@ -2,7 +2,7 @@
   "counters": {
     "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-02T19:52:38.915Z"
+    "lastUpdated": "2025-12-02T20:05:18.894Z"
   },
   "goals": {
     "currentFollowGoal": 500,
@@ -12,7 +12,7 @@
   },
   "overlay": {
     "font": {
-      "family": "Microsoft Uighur",
+      "family": "Sea",
       "size": "64px",
       "weight": "normal"
     },
@@ -48,15 +48,16 @@
     }
   },
   "version": {
-    "current": "2.3.0",
+    "current": "3.0.0",
     "releaseDate": "2025-12-02",
     "changelog": [
-      "🎨 Filtrage intelligent des polices (variantes exclues)",
-      "🇫🇷 Support français pour les noms de polices (Gras, Italique, etc.)",
-      "🧹 Nettoyage complet des fichiers obsolètes",
-      "🏗️ Architecture centralisée app_state.json consolidée",
-      "📦 Suppression fichiers OBS text (total_*.txt)",
-      "✅ Overlays HTML comme source unique de données"
+      "🏗️ Architecture modulaire: 10 services extraits de server.js",
+      "📉 Réduction server.js: 5200 → 2555 lignes (-51%)",
+      "🎰 Animation slot-machine cohérente sur tous les overlays",
+      "🔤 Détection polices utilisateur (HKEY_CURRENT_USER)",
+      "🛠️ Correction boutons retirer follows/subs",
+      "📁 Routes modulaires: pages, api, admin, twitch",
+      "⚡ Utilitaires centralisés: logger, validation, rate-limiter"
     ],
     "criticalFiles": [
       "obs_subcount_auto.py",

@@ -1,6 +1,6 @@
 @echo off
 echo.
-echo SubCount Auto - Demarrage automatique v2.3.0
+echo SubCount Auto - Demarrage automatique v3.0.0
 echo.
 
 REM Verifier si Node.js est installe

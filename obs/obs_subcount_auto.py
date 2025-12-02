@@ -76,7 +76,7 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "v2.3.0"
+VERSION = "v3.0.0"
 
 # Variables globales
 server_process = None
@@ -229,12 +229,10 @@ def get_windows_fonts():
         
         return clean
     
-    try:
-        # Méthode principale: Lire le registre Windows (meilleure source)
+    def read_fonts_from_registry(registry_key, path):
+        """Lit les polices depuis une clé de registre spécifique"""
         try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
-            
+            key = winreg.OpenKey(registry_key, path)
             i = 0
             while True:
                 try:
@@ -250,10 +248,23 @@ def get_windows_fonts():
                     i += 1
                 except OSError:
                     break
-            
             winreg.CloseKey(key)
         except Exception as e:
             log_message(f"⚠️ Erreur lecture registre: {e}", level="warning")
+    
+    try:
+        # Méthode 1: Lire les polices SYSTÈME (HKEY_LOCAL_MACHINE)
+        read_fonts_from_registry(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+        )
+        
+        # Méthode 2: Lire les polices UTILISATEUR (HKEY_CURRENT_USER)
+        # Important pour les polices installées par l'utilisateur (comme SEA)
+        read_fonts_from_registry(
+            winreg.HKEY_CURRENT_USER,
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+        )
         
         # Convertir en liste triée
         font_list = sorted(list(fonts), key=str.lower)
