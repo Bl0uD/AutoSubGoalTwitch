@@ -13,6 +13,8 @@
  * - files : Mise à jour des fichiers overlays
  * - polling : Polling des follows en backup d'EventSub
  * - event-handlers : Handlers pour les événements follows/subs
+ * - eventsub : Connexion WebSocket EventSub Twitch
+ * - twitch-config : Gestion de la configuration Twitch
  */
 
 const appState = require('./app-state');
@@ -23,6 +25,8 @@ const countersService = require('./counters');
 const filesService = require('./files');
 const pollingService = require('./polling');
 const eventHandlersService = require('./event-handlers');
+const eventsubService = require('./eventsub');
+const twitchConfigService = require('./twitch-config');
 const { createBroadcastService } = require('./broadcast');
 
 module.exports = {
@@ -37,6 +41,8 @@ module.exports = {
     filesService,
     pollingService,
     eventHandlersService,
+    eventsubService,
+    twitchConfigService,
     
     // Service avec pattern factory
     createBroadcastService,

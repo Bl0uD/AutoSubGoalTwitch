@@ -24,7 +24,7 @@ const {
 const {
     APP_STATE_PATH, loadAppState, saveAppState, updateCounter,
     getOverlayConfig, updateOverlayConfig, getVersionInfo, getCounters, setCounters,
-    // Services modulaires (Phase 3.6 + Phase 5)
+    // Services modulaires (Phase 3.6 + Phase 5 + Phase 6)
     twitchService,
     goalsService,
     batchingService,
@@ -32,6 +32,8 @@ const {
     filesService,
     pollingService,
     eventHandlersService,
+    eventsubService,
+    twitchConfigService,
     createBroadcastService,
 } = require('./services');
 
@@ -2492,11 +2494,36 @@ const eventHandlersContext = {
     syncTwitchFollows,
 };
 
+// Contexte pour eventsubService
+const eventsubContext = {
+    timerRegistry,
+    getTwitchConfig: () => twitchConfig,
+    setSessionId: (val) => { sessionId = val; },
+    eventQueue,
+    // Fonctions de souscription EventSub
+    subscribeToChannelFollow,
+    subscribeToChannelSubscription,
+    subscribeToChannelSubscriptionGift,
+    subscribeToChannelSubscriptionEnd,
+    // Fonctions de callback
+    handleEventSubNotification,
+    startFollowPolling,
+};
+
+// Contexte pour twitchConfigService
+const twitchConfigContext = {
+    ROOT_DIR,
+    configCrypto,
+    getTwitchConfig: () => twitchConfig,
+};
+
 // Initialiser les services avec le contexte
 goalsService.initContext(serviceContext);
 batchingService.initContext(serviceContext);
 pollingService.initContext(pollingContext);
 eventHandlersService.initContext(eventHandlersContext);
+eventsubService.initContext(eventsubContext);
+twitchConfigService.initContext(twitchConfigContext);
 
 // Ajouter les services au contexte (disponibles pour les routes)
 appContext.services = {
@@ -2508,9 +2535,11 @@ appContext.services = {
     files: filesService,
     polling: pollingService,
     eventHandlers: eventHandlersService,
+    eventsub: eventsubService,
+    twitchConfig: twitchConfigService,
 };
 
-logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch, counters, files, polling, eventHandlers)');
+logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch, counters, files, polling, eventHandlers, eventsub, twitchConfig)');
 
 // Initialiser les contextes des routes
 initAllContexts(appContext);
