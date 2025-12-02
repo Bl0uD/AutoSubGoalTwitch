@@ -112,83 +112,173 @@ function getVersionInfo() {
     return state.version;
 }
 
-// Fonction de logging centralisée
-function logEvent(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [${level}] ${message}`;
-    
-    // Console
-    console.log(logMessage);
-    
-    // Ne logger les données que si nécessaire et filtrées (pas de raw_event volumineux)
-    if (data && level !== 'INFO') {
-        const safeData = {};
-        if (data.user_name) safeData.user_name = data.user_name;
-        if (data.user_id) safeData.user_id = data.user_id;
-        if (data.count) safeData.count = data.count;
-        if (data.error) safeData.error = data.error;
-        if (data.tier) safeData.tier = data.tier;
-        if (data.reason) safeData.reason = data.reason;
-        // ❌ Jamais raw_event complet
-        console.log('📄 Données:', safeData);
-    }
-    
-    // Fichier de log
-    try {
-        const logPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
-        
-        // Nettoyer le log si nécessaire avant d'écrire
-        cleanupLogFile(logPath);
-        
-        const logEntry = data ? 
-            `${logMessage}\nDonnées: ${JSON.stringify(data, null, 2)}\n---\n` : 
-            `${logMessage}\n`;
-        
-        fs.appendFileSync(logPath, logEntry, 'utf8');
-    } catch (error) {
-        console.error('❌ Erreur écriture log:', error.message);
-    }
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTÈME DE LOGGING AMÉLIORÉ
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Fonction de nettoyage automatique des logs
-function cleanupLogFile(logFilePath, maxSizeMB = 2, keepLines = 500) {
-    try {
-        if (fs.existsSync(logFilePath)) {
-            const stats = fs.statSync(logFilePath);
+/**
+ * Niveaux de log avec priorité
+ */
+const LOG_LEVELS = Object.freeze({
+    DEBUG: { priority: 0, emoji: '🔍', color: '\x1b[90m' },
+    INFO: { priority: 1, emoji: '📄', color: '\x1b[36m' },
+    WARN: { priority: 2, emoji: '⚠️', color: '\x1b[33m' },
+    ERROR: { priority: 3, emoji: '❌', color: '\x1b[31m' },
+    CRITICAL: { priority: 4, emoji: '🚨', color: '\x1b[35m' },
+    // Niveaux spéciaux pour événements métier
+    SYNC: { priority: 1, emoji: '📊', color: '\x1b[32m' },
+    ÉVÉNEMENT: { priority: 1, emoji: '🎉', color: '\x1b[32m' },
+    NOTIFICATION: { priority: 1, emoji: '📣', color: '\x1b[36m' },
+    TEST: { priority: 1, emoji: '🧪', color: '\x1b[95m' },
+});
+
+/**
+ * Champs sensibles à ne jamais logger
+ */
+const SENSITIVE_FIELDS = new Set([
+    'access_token', 'refresh_token', 'device_code', 
+    'password', 'secret', 'authorization'
+]);
+
+/**
+ * Champs autorisés pour le logging des données
+ */
+const ALLOWED_DATA_FIELDS = new Set([
+    'user_name', 'user_id', 'count', 'error', 'tier', 
+    'reason', 'total', 'diff', 'message', 'status',
+    'followCount', 'subCount', 'goal', 'timestamp'
+]);
+
+/**
+ * Classe Logger - Gestion centralisée des logs
+ */
+class Logger {
+    constructor(options = {}) {
+        this.minLevel = options.minLevel || 'DEBUG';
+        this.logPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
+        this.maxFileSizeMB = options.maxFileSizeMB || 2;
+        this.keepLines = options.keepLines || 500;
+        this.writeCounter = 0;
+        this.cleanupInterval = 50; // Vérifier toutes les N écritures
+    }
+
+    /**
+     * Filtre les données sensibles
+     */
+    _sanitizeData(data) {
+        if (!data || typeof data !== 'object') return data;
+        
+        const safeData = {};
+        for (const [key, value] of Object.entries(data)) {
+            // Ignorer les champs sensibles
+            if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
+                continue;
+            }
+            // Garder seulement les champs autorisés ou les champs simples
+            if (ALLOWED_DATA_FIELDS.has(key) || typeof value !== 'object') {
+                safeData[key] = value;
+            }
+        }
+        return Object.keys(safeData).length > 0 ? safeData : null;
+    }
+
+    /**
+     * Formate un message de log
+     */
+    _formatMessage(level, message, data) {
+        const timestamp = new Date().toISOString();
+        const levelInfo = LOG_LEVELS[level] || LOG_LEVELS.INFO;
+        return `[${timestamp}] [${level}] ${message}`;
+    }
+
+    /**
+     * Nettoie le fichier de log si trop gros
+     */
+    _cleanupIfNeeded() {
+        this.writeCounter++;
+        if (this.writeCounter % this.cleanupInterval !== 0) return;
+
+        try {
+            if (!fs.existsSync(this.logPath)) return;
+            
+            const stats = fs.statSync(this.logPath);
             const fileSizeMB = stats.size / (1024 * 1024);
             
-            // Vérifier seulement toutes les 50 écritures pour éviter trop de vérifications
-            if (!cleanupLogFile.counter) cleanupLogFile.counter = 0;
-            cleanupLogFile.counter++;
-            
-            if (cleanupLogFile.counter % 50 === 0 && fileSizeMB > maxSizeMB) {
-                console.log(`🧹 Nettoyage du log (${fileSizeMB.toFixed(2)}MB > ${maxSizeMB}MB)`);
+            if (fileSizeMB > this.maxFileSizeMB) {
+                console.log(`🧹 Nettoyage du log (${fileSizeMB.toFixed(2)}MB > ${this.maxFileSizeMB}MB)`);
                 
-                // Lire toutes les lignes
-                const content = fs.readFileSync(logFilePath, 'utf8');
+                const content = fs.readFileSync(this.logPath, 'utf8');
                 const lines = content.split('\n');
                 
-                if (lines.length > keepLines) {
-                    // Garder seulement les dernières lignes
-                    const linesToKeep = lines.slice(-keepLines);
-                    
-                    // Header informatif
+                if (lines.length > this.keepLines) {
+                    const linesToKeep = lines.slice(-this.keepLines);
                     const header = [
                         `# Log nettoyé automatiquement - ${new Date().toISOString()}`,
-                        `# Conservé les ${keepLines} dernières lignes sur ${lines.length} total`,
-                        '',
-                        ''
+                        `# Conservé les ${this.keepLines} dernières lignes sur ${lines.length} total`,
+                        '', ''
                     ];
-                    
-                    // Réécrire le fichier
-                    fs.writeFileSync(logFilePath, header.concat(linesToKeep).join('\n'), 'utf8');
+                    fs.writeFileSync(this.logPath, header.concat(linesToKeep).join('\n'), 'utf8');
                     console.log(`✅ Log nettoyé: ${lines.length} → ${linesToKeep.length} lignes`);
                 }
             }
+        } catch (error) {
+            console.error('❌ Erreur nettoyage log:', error.message);
         }
-    } catch (error) {
-        console.error('❌ Erreur nettoyage log:', error.message);
     }
+
+    /**
+     * Écrit un log
+     */
+    log(level, message, data = null) {
+        const levelInfo = LOG_LEVELS[level] || LOG_LEVELS.INFO;
+        const logMessage = this._formatMessage(level, message, data);
+        
+        // Console
+        console.log(logMessage);
+        
+        // Afficher données filtrées si nécessaire (sauf INFO pour réduire le bruit)
+        const safeData = this._sanitizeData(data);
+        if (safeData && level !== 'INFO' && level !== 'DEBUG') {
+            console.log('   📄 Données:', safeData);
+        }
+        
+        // Fichier de log
+        try {
+            this._cleanupIfNeeded();
+            
+            const logEntry = safeData ? 
+                `${logMessage}\n  Données: ${JSON.stringify(safeData)}\n` : 
+                `${logMessage}\n`;
+            
+            fs.appendFileSync(this.logPath, logEntry, 'utf8');
+        } catch (error) {
+            console.error('❌ Erreur écriture log:', error.message);
+        }
+    }
+
+    // Méthodes de raccourci
+    debug(message, data) { this.log('DEBUG', message, data); }
+    info(message, data) { this.log('INFO', message, data); }
+    warn(message, data) { this.log('WARN', message, data); }
+    error(message, data) { this.log('ERROR', message, data); }
+    critical(message, data) { this.log('CRITICAL', message, data); }
+}
+
+// Instance globale du logger
+const logger = new Logger();
+
+/**
+ * Fonction wrapper pour compatibilité avec l'ancien code
+ * @deprecated Utiliser logger.log() directement
+ */
+function logEvent(level, message, data = null) {
+    logger.log(level, message, data);
+}
+
+// Alias pour cleanupLogFile (pour compatibilité)
+function cleanupLogFile(logFilePath, maxSizeMB = 2, keepLines = 500) {
+    // Le nettoyage est maintenant géré par Logger._cleanupIfNeeded()
+    // Cette fonction reste pour compatibilité mais ne fait rien
 }
 
 const app = express();
