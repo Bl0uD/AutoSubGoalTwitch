@@ -211,6 +211,10 @@ console.log('   • Panel admin : http://localhost:8082/admin');
 console.log('   • API publique : http://localhost:8082/api/stats');
 console.log('\n═══════════════════════════════════════════════════════════════════════════════════════════════════════════\n');
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FONCTIONS DE VALIDATION D'ENTRÉES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /**
  * Valide un entier positif avec limites
  * @param {*} value - Valeur à valider
@@ -244,6 +248,81 @@ function validatePositiveInt(value, fieldName = 'valeur', min = 0, max = 1000000
     }
     
     return num;
+}
+
+/**
+ * Valide une chaîne de caractères
+ * @param {*} value - Valeur à valider
+ * @param {string} fieldName - Nom du champ
+ * @param {number} minLen - Longueur minimum (défaut: 0)
+ * @param {number} maxLen - Longueur maximum (défaut: 1000)
+ * @param {boolean} required - Si le champ est requis (défaut: true)
+ * @returns {string} Chaîne validée et trimée
+ * @throws {Error} Si validation échoue
+ */
+function validateString(value, fieldName = 'valeur', minLen = 0, maxLen = 1000, required = true) {
+    if (value === null || value === undefined || value === '') {
+        if (required) {
+            throw new Error(`${fieldName} est requis`);
+        }
+        return '';
+    }
+    
+    if (typeof value !== 'string') {
+        throw new Error(`${fieldName} doit être une chaîne (reçu: ${typeof value})`);
+    }
+    
+    const trimmed = value.trim();
+    
+    if (trimmed.length < minLen) {
+        throw new Error(`${fieldName} doit avoir au moins ${minLen} caractères`);
+    }
+    
+    if (trimmed.length > maxLen) {
+        throw new Error(`${fieldName} ne peut pas dépasser ${maxLen} caractères`);
+    }
+    
+    return trimmed;
+}
+
+/**
+ * Valide une valeur parmi une liste d'options autorisées
+ * @param {*} value - Valeur à valider
+ * @param {Array} allowedValues - Liste des valeurs autorisées
+ * @param {string} fieldName - Nom du champ
+ * @param {*} defaultValue - Valeur par défaut si non fournie (optionnel)
+ * @returns {*} Valeur validée
+ * @throws {Error} Si validation échoue
+ */
+function validateEnum(value, allowedValues, fieldName = 'valeur', defaultValue = undefined) {
+    if (value === null || value === undefined) {
+        if (defaultValue !== undefined) {
+            return defaultValue;
+        }
+        throw new Error(`${fieldName} est requis`);
+    }
+    
+    if (!allowedValues.includes(value)) {
+        throw new Error(`${fieldName} doit être l'un de: ${allowedValues.join(', ')} (reçu: ${value})`);
+    }
+    
+    return value;
+}
+
+/**
+ * Valide un tier Twitch
+ * @param {*} value - Valeur à valider
+ * @returns {string} Tier validé ('1000', '2000', '3000')
+ */
+function validateTier(value) {
+    const VALID_TIERS = ['1000', '2000', '3000'];
+    const tier = String(value || '1000');
+    
+    if (!VALID_TIERS.includes(tier)) {
+        return '1000'; // Défaut à tier 1
+    }
+    
+    return tier;
 }
 
 // Configuration CORS - RESTREINT À LOCALHOST UNIQUEMENT
@@ -3280,7 +3359,7 @@ app.post('/admin/add-follows', (req, res) => {
 // Remove Follows
 app.post('/admin/remove-follows', (req, res) => {
     try {
-        const { amount } = req.body;
+        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
         
         // Utiliser le système de batching pour gérer le spam (comme add-follows)
         addFollowRemoveToBatch(amount);
@@ -3289,14 +3368,14 @@ app.post('/admin/remove-follows', (req, res) => {
         res.json({ success: true, total: Math.max(0, currentFollows - followRemoveBatch.count) });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur remove follows', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Set Follows
 app.post('/admin/set-follows', (req, res) => {
     try {
-        const { count } = req.body;
+        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
         
         // Utiliser la variable globale
         currentFollows = count;
@@ -3318,7 +3397,8 @@ app.post('/admin/set-follows', (req, res) => {
 // Add Subs
 app.post('/admin/add-subs', (req, res) => {
     try {
-        const { amount, tier } = req.body;
+        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
+        const tier = validateTier(req.body.tier);
         
         // Utiliser le système de batching pour gérer le spam
         addSubToBatch(amount, tier);
@@ -3327,14 +3407,14 @@ app.post('/admin/add-subs', (req, res) => {
         res.json({ success: true, total: currentSubs + subBatch.count });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur add subs', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Remove Subs
 app.post('/admin/remove-subs', (req, res) => {
     try {
-        const { amount } = req.body;
+        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
         
         // Utiliser le système de batching pour gérer le spam (comme remove-follows)
         addSubEndToBatch(amount);
@@ -3343,14 +3423,14 @@ app.post('/admin/remove-subs', (req, res) => {
         res.json({ success: true, total: Math.max(0, currentSubs - subEndBatch.count) });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur remove subs', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Set Subs
 app.post('/admin/set-subs', (req, res) => {
     try {
-        const { count } = req.body;
+        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
         
         // Utiliser la variable globale
         currentSubs = count;
@@ -3365,19 +3445,19 @@ app.post('/admin/set-subs', (req, res) => {
         res.json({ success: true, total: count });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur set subs', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Set Follow Goal
 app.post('/admin/set-follow-goal', (req, res) => {
     try {
-        const { goal } = req.body;
+        const goal = validatePositiveInt(req.body.goal, 'goal', 0, 10000000);
         
         // Sauvegarder dans app_state.json
-        const appState = loadAppState();
-        appState.goals.follows = parseInt(goal) || 0;
-        saveAppState(appState);
+        const appStateData = loadAppState();
+        appStateData.goals.follows = goal;
+        saveAppState(appStateData);
         
         // Broadcast via WebSocket
         wss.clients.forEach(client => {
@@ -3393,19 +3473,19 @@ app.post('/admin/set-follow-goal', (req, res) => {
         res.json({ success: true, goal: goal });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur set follow goal', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Set Sub Goal
 app.post('/admin/set-sub-goal', (req, res) => {
     try {
-        const { goal } = req.body;
+        const goal = validatePositiveInt(req.body.goal, 'goal', 0, 10000000);
         
         // Sauvegarder dans app_state.json
-        const appState = loadAppState();
-        appState.goals.subs = parseInt(goal) || 0;
-        saveAppState(appState);
+        const appStateData = loadAppState();
+        appStateData.goals.subs = goal;
+        saveAppState(appStateData);
         
         // Broadcast via WebSocket
         wss.clients.forEach(client => {
@@ -3421,7 +3501,7 @@ app.post('/admin/set-sub-goal', (req, res) => {
         res.json({ success: true, goal: goal });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur set sub goal', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
@@ -4052,45 +4132,45 @@ app.post('/api/clean-logs', (req, res) => {
 });
 
 app.post('/api/update-follows', (req, res) => {
-    const { count } = req.body;
-    
-    if (typeof count !== 'number' || count < 0) {
-        return res.status(400).json({ error: 'Nombre de follows invalide' });
+    try {
+        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
+        
+        currentFollows = count;
+        updateFollowFiles(currentFollows);
+        broadcastFollowUpdate();
+        
+        // Sauvegarder automatiquement sur disque
+        saveFollowCountToFile(currentFollows);
+        
+        res.json({
+            success: true,
+            currentFollows: currentFollows,
+            goal: getCurrentFollowGoal(currentFollows)
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-    
-    currentFollows = count;
-    updateFollowFiles(currentFollows);
-    broadcastFollowUpdate();
-    
-    // Sauvegarder automatiquement sur disque
-    saveFollowCountToFile(currentFollows);
-    
-    res.json({
-        success: true,
-        currentFollows: currentFollows,
-        goal: getCurrentFollowGoal(currentFollows)
-    });
 });
 
 app.post('/api/update-subs', (req, res) => {
-    const { count } = req.body;
-    
-    if (typeof count !== 'number' || count < 0) {
-        return res.status(400).json({ error: 'Nombre de subs invalide' });
+    try {
+        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
+        
+        currentSubs = count;
+        updateSubFiles(currentSubs);
+        broadcastSubUpdate();
+        
+        // Sauvegarder automatiquement sur disque
+        saveSubCountToFile(currentSubs);
+        
+        res.json({
+            success: true,
+            currentSubs: currentSubs,
+            goal: getCurrentSubGoal(currentSubs)
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-    
-    currentSubs = count;
-    updateSubFiles(currentSubs);
-    broadcastSubUpdate();
-    
-    // Sauvegarder automatiquement sur disque
-    saveSubCountToFile(currentSubs);
-    
-    res.json({
-        success: true,
-        currentSubs: currentSubs,
-        goal: getCurrentSubGoal(currentSubs)
-    });
 });
 
 app.get('/api/current', (req, res) => {
@@ -4685,6 +4765,11 @@ function broadcastConfigUpdate() {
 
 // Charger la config au démarrage
 loadOverlayConfig();
+
+// ==================================================================
+// Middleware de gestion d'erreurs centralisé (doit être après toutes les routes)
+// ==================================================================
+app.use(handleError);
 
 // ==================================================================
 // Démarrage du serveur
