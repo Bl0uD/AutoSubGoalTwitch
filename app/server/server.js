@@ -699,6 +699,10 @@ class EventQueue {
     size() {
         return this.queue.length;
     }
+
+    getAll() {
+        return [...this.queue]; // Retourne une copie du tableau
+    }
 }
 
 /**
@@ -3480,7 +3484,7 @@ app.post('/admin/set-follows', (req, res) => {
         res.json({ success: true, total: count });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur set follows', { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
