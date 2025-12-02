@@ -1,6 +1,6 @@
 @echo off
 REM ===================================================================
-REM  INSTALLEUR - AutoSubGoalTwitch v3.0.0
+REM  INSTALLEUR - AutoSubGoalTwitch v3.1.0
 REM ===================================================================
 
 REM Vérification des droits administrateur
@@ -22,7 +22,7 @@ if %errorLevel% neq 0 (
 
 echo.
 echo ===================================================================
-echo      INSTALLEUR AUTOSUBGOALTWITCH v3.0.0
+echo      INSTALLEUR AUTOSUBGOALTWITCH v3.1.0
 echo ===================================================================
 echo.
 echo [OK] Droits administrateur confirmes

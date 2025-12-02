@@ -1,16 +1,22 @@
 ﻿# AutoSubGoalTwitch
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.3.0)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v3.1.0)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.6.8-yellow.svg)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/node.js-14+-green.svg)](https://nodejs.org/)
 [![OBS](https://img.shields.io/badge/OBS-27+-purple.svg)](https://obsproject.com/)
 
-Système de compteurs Twitch pour OBS Studio avec **configuration dynamique en temps réel**.
+Système de compteurs Twitch pour OBS Studio avec **architecture modulaire et configuration dynamique**.
 
 ---
 
-## ✨ Fonctionnalités v2.3.0
+## ✨ Fonctionnalités v3.1.0
+
+### 🏗️ Architecture Moderne (Nouveau!)
+- **StateManager** : État centralisé avec EventEmitter
+- **Injection de dépendances** : Services découplés et testables
+- **Factories** : 6 services modulaires (polling, eventsub, broadcast...)
+- **87% de réduction** du fichier serveur principal
 
 ### 🎨 Configuration Dynamique
 - **Modification en temps réel** depuis OBS (police, couleurs, animations)
@@ -136,7 +142,7 @@ SubcountAutomatic/
 ## 📖 Documentation
 
 - **Guide complet** : [`app/docs/GUIDE_UTILISATEUR.md`](app/docs/GUIDE_UTILISATEUR.md)
-- **Release notes** : [`app/docs/RELEASE_v2.3.0.md`](app/docs/RELEASE_v2.3.0.md)
+- **Architecture** : [`app/docs/ARCHITECTURE_ACTUELLE.md`](app/docs/ARCHITECTURE_ACTUELLE.md)
 - **Changelog** : [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
@@ -181,12 +187,12 @@ netstat -ano | findstr "8082 8083 8084"
 
 ---
 
-## 📊 Statistiques v2.3.0
+## 📊 Statistiques v3.1.0
 
-- **Réduction code** : ~3100 lignes dupliquées éliminées
-- **Overlays** : 8 fichiers → 4 fichiers (-50%)
-- **Documentation** : Simplifiée (-71% de fichiers)
-- **Polices** : 500+ détectées → ~50-100 (filtrage intelligent)
+- **server.js** : 2670 → 350 lignes (**-87%**)
+- **Variables globales** : 20+ → 0 (**-100%**)
+- **Architecture** : StateManager + DI Container
+- **Services** : 6 factories modulaires
 
 ---
 
@@ -200,9 +206,9 @@ Voir [`LICENSE`](LICENSE) pour plus de détails.
 
 <div align="center">
 
-### 🎉 Configuration dynamique • Overlays unifiés • Interface redessinée
+### 🎉 Architecture Moderne • Configuration Dynamique • Services Découplés
 
-**v2.3.0** - Prêt pour le stream ! ✨
+**v3.1.0** - Prêt pour le stream ! ✨
 
 ⭐ **Star ce projet si il vous aide !** ⭐
 

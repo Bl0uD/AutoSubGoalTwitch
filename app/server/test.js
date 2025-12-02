@@ -1,6 +1,12 @@
 /**
  * Tests simples pour valider le serveur SubCount Auto
  * Usage: node test.js [all|status|increment|validation]
+ * 
+ * ⚠️ ATTENTION: Ces tests sont pour server-legacy.js (v3.0)
+ * Le nouveau server.js (v3.1) utilise des routes différentes.
+ * 
+ * @deprecated Nécessite mise à jour pour v3.1
+ * @see server.js pour les nouvelles routes
  */
 
 const http = require('http');

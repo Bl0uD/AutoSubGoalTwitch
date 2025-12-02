@@ -1,7 +1,14 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * 📄 ROUTES - Index
+ * 📄 ROUTES - Index (LEGACY)
  * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * ⚠️ ATTENTION: Ces routes sont utilisées uniquement par server-legacy.js
+ * Le nouveau server.js (v3.1) définit les routes en inline.
+ * 
+ * @deprecated Utilisez server.js avec l'architecture core/factories
+ * @see core/bootstrap.js pour la nouvelle architecture
+ * 
  * Point d'entrée centralisé pour tous les routeurs Express.
  * 
  * Modules:

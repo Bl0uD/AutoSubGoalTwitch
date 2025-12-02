@@ -1,5 +1,5 @@
 ﻿# ===================================================================
-#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v3.0.0
+#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v3.1.0
 # ===================================================================
 
 $ErrorActionPreference = "Continue"
@@ -34,7 +34,7 @@ if (-not (Test-Administrator)) {
 
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
-Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.0.0" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.1.0" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[OK] Droits administrateur confirmes" -ForegroundColor Green
@@ -573,7 +573,7 @@ function Create-ConfigFiles {
     }
   },
   "version": {
-    "current": "3.0.0",
+    "current": "3.1.0",
     "releaseDate": "2025-12-02",
     "changelog": [],
     "criticalFiles": [

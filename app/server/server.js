@@ -24,9 +24,6 @@ const { bootstrap, setupEventListeners, STATE_EVENTS } = require('./core');
 const { PORTS, LIMITS } = require('./utils/constants');
 const { logEvent } = require('./utils/logger');
 
-// Import des routes (à migrer progressivement)
-const { pagesRouter, apiRouter, adminRouter, twitchRouter } = require('./routes');
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════

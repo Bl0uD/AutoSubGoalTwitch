@@ -1,7 +1,13 @@
 /**
  * @file index.js
- * @description Point d'entrée pour les services
+ * @description Point d'entrée pour les services (LEGACY)
  * @version 3.0.0
+ * 
+ * ⚠️ ATTENTION: Ces services sont utilisés uniquement par server-legacy.js
+ * Le nouveau server.js (v3.1) utilise les factories dans core/factories/
+ * 
+ * @deprecated Utilisez core/bootstrap.js et les factories
+ * @see core/factories/ pour les nouveaux services
  * 
  * Ce module exporte tous les services de l'application :
  * - app-state : Gestion de l'état persistant de l'application

@@ -7,6 +7,43 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.1.0] - 2025-12-02
+
+### 🏗️ Architecture DI (Dependency Injection)
+
+#### StateManager - État Centralisé
+- **EventEmitter** : Notifications automatiques sur changements d'état
+- **Getters/Setters typés** : Validation des mutations
+- **Persistance automatique** : Debounce pour performance
+- **650 lignes** de gestion d'état propre
+
+#### DependencyContainer - IoC Container
+- **Injection de dépendances** : Services découplés
+- **Détection des cycles** : Évite les dépendances circulaires
+- **Singletons** : Cache automatique des instances
+- **Scopes** : Isolation pour les tests
+
+#### Factories Modulaires
+- `goals-factory.js` - Gestion des objectifs
+- `broadcast-factory.js` - Diffusion WebSocket
+- `batching-factory.js` - Regroupement événements
+- `twitch-api-factory.js` - Appels API Twitch
+- `eventsub-factory.js` - Connexion EventSub
+- `polling-factory.js` - Polling périodique
+
+### 📊 Métriques
+- **server.js** : 2670 → 350 lignes (**-87%**)
+- **Variables globales** : 20+ → 0 (**-100%**)
+- **Couplage** : Fort → Faible
+- **Testabilité** : Difficile → Facile
+
+### 🧹 Nettoyage
+- Ancien `server.js` conservé en `server-legacy.js`
+- Mise à jour toutes les versions dans scripts
+- Documentation mise à jour
+
+---
+
 ## [3.0.0] - 2025-12-02
 
 ### 🏗️ Refonte Architecture Majeure

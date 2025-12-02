@@ -157,7 +157,9 @@ function createBroadcastService({ stateManager, logger, constants }) {
             type: 'follow_update',
             follows: stateManager.getFollows(),
             followGoal: currentFollowGoal,
+            goal: currentFollowGoal, // Compatibilité overlay.html
             batchCount: batchCount,
+            isBatch: batchCount > 1,
             timestamp: new Date().toISOString()
         });
         
@@ -191,7 +193,9 @@ function createBroadcastService({ stateManager, logger, constants }) {
             type: 'sub_update',
             subs: stateManager.getSubs(),
             subGoal: currentSubGoal,
+            goal: currentSubGoal, // Compatibilité overlay.html
             batchCount: batchCount,
+            isBatch: batchCount > 1,
             timestamp: new Date().toISOString()
         });
         
