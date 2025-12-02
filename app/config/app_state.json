@@ -2,16 +2,15 @@
   "counters": {
     "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-02T23:24:46.528Z"
+    "lastUpdated": "2025-12-02T23:30:12.693Z"
   },
   "goals": {
     "currentFollowGoal": 500,
     "currentSubGoal": 5
   },
   "overlay": {
-    "font": {
-      "family": "Sea",
-      "size": "64px"
+    "colors": {
+      "text": "#8B00FF"
     }
   },
   "version": {

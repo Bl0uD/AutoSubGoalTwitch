@@ -1,5 +1,5 @@
 ﻿# ===================================================================
-#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v3.1.0
+#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v3.1.1
 # ===================================================================
 
 $ErrorActionPreference = "Continue"
@@ -34,7 +34,7 @@ if (-not (Test-Administrator)) {
 
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
-Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.1.0" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.1.1" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[OK] Droits administrateur confirmes" -ForegroundColor Green
@@ -573,8 +573,8 @@ function Create-ConfigFiles {
     }
   },
   "version": {
-    "current": "3.1.0",
-    "releaseDate": "2025-12-02",
+    "current": "3.1.1",
+    "releaseDate": "2025-12-03",
     "changelog": [],
     "criticalFiles": [
       "obs_subcount_auto.py",

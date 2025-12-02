@@ -7,6 +7,31 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.1.1] - 2025-12-03
+
+### 🐛 Corrections
+
+#### Détection des Polices
+- **Polices utilisateur** : Détection des polices installées dans `LocalAppData/Microsoft/Windows/Fonts`
+- **Filtrage variantes** : Exclusion des Bold, Italic, Light, etc. de la liste
+- **Polices système** : Exclusion des polices obsolètes (8514fix, vgaoem, etc.)
+- **Fichiers .fon** : Exclusion des polices bitmap Windows 3.x
+
+#### Interface OBS
+- **Dropdown police** : Liste simple (non éditable) pour éviter les erreurs de saisie
+- **Persistance config** : Police, taille et couleur sauvegardées entre les sessions OBS
+- **Restauration auto** : Configuration restaurée automatiquement au démarrage
+
+#### Overlay HTML
+- **Format goal** : Correction du format `{current, target}` au lieu de `undefined`
+- **Police Sea** : Correction du nom de police dans `@font-face`
+
+### 📊 Métriques
+- **161 polices** détectées (filtrées des 176 brutes)
+- **Logs détaillés** : Callback police avec traçage complet
+
+---
+
 ## [3.1.0] - 2025-12-02
 
 ### 🏗️ Architecture DI (Dependency Injection)
