@@ -19,6 +19,9 @@ backups/
 !backups/.gitkeep
 
 # Data (user-specific)
+app/docs/*
+
+# Data (user-specific)
 data/
 !data/.gitkeep
 

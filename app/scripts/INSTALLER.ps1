@@ -782,15 +782,15 @@ if ($gitInstalled -and $nodeInstalled -and $pythonInstalled -and $npmInstalled) 
     Write-Host "6. AJOUTER LES OVERLAYS:" -ForegroundColor White
     Write-Host "   a) Source > Navigateur" -ForegroundColor Cyan
     Write-Host "   b) URL (PAS 'Fichier local') :" -ForegroundColor Yellow
-    Write-Host "      http://localhost:8082/obs/overlays/subgoal_left.html" -ForegroundColor Green
+    Write-Host "      http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left" -ForegroundColor Green
     Write-Host "   c) Dimensions: 800x200" -ForegroundColor Cyan
     Write-Host "   d) Cocher: 'Actualiser quand scene devient active'" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   URLS disponibles:" -ForegroundColor Gray
-    Write-Host "      - http://localhost:8082/obs/overlays/subgoal_left.html" -ForegroundColor Gray
-    Write-Host "      - http://localhost:8082/obs/overlays/subgoal_right.html" -ForegroundColor Gray
-    Write-Host "      - http://localhost:8082/obs/overlays/followgoal_left.html" -ForegroundColor Gray
-    Write-Host "      - http://localhost:8082/obs/overlays/followgoal_right.html" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/overlay.html?type=sub&align=right" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/overlay.html?type=follow&align=left" -ForegroundColor Gray
+    Write-Host "      - http://localhost:8082/obs/overlays/overlay.html?type=follow&align=right" -ForegroundColor Gray
     Write-Host ""
 } else {
     Write-Host "===================================================================" -ForegroundColor Yellow

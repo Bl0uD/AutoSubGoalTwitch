@@ -302,7 +302,7 @@ Object.defineProperties(global, {
 const eventQueue = new EventQueue();
 
 const timerRegistry = new TimerRegistry();
-const syncLimiter = new SimpleRateLimiter(1, 60000); // 1 sync par minute
+const syncLimiter = new SimpleRateLimiter(5, 60000); // 5 syncs par minute (polling + manuel)
 const adminLimiter = new SimpleRateLimiter(10, 60000); // 10 actions admin par minute
 
 logEvent('INFO', '✅ Utility classes initialisées (EventQueue, TimerRegistry, RateLimiters)');

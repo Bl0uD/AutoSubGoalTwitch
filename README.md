@@ -63,7 +63,7 @@ Le serveur démarre automatiquement ! ✅
 
 ### 5. Ajouter un overlay
 1. **Source → Navigateur**
-2. **URL** : `http://localhost:8082/obs/overlays/subgoal_left.html`
+2. **URL** : `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left`
 3. **Dimensions** : 800x200 (ajuster selon besoin)
 4. **Cocher** : "Actualiser le navigateur lorsque la scène devient active"
 
@@ -92,10 +92,10 @@ Le serveur démarre automatiquement ! ✅
 
 | URL | Description |
 |-----|-------------|
-| `http://localhost:8082/obs/overlays/subgoal_left.html` | Compteur subs aligné à gauche |
-| `http://localhost:8082/obs/overlays/subgoal_right.html` | Compteur subs aligné à droite |
-| `http://localhost:8082/obs/overlays/followgoal_left.html` | Compteur follows aligné à gauche |
-| `http://localhost:8082/obs/overlays/followgoal_right.html` | Compteur follows aligné à droite |
+| `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left` | Compteur subs aligné à gauche |
+| `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=right` | Compteur subs aligné à droite |
+| `http://localhost:8082/obs/overlays/overlay.html?type=follow&align=left` | Compteur follows aligné à gauche |
+| `http://localhost:8082/obs/overlays/overlay.html?type=follow&align=right` | Compteur follows aligné à droite |
 
 **Tous supportent la configuration dynamique** ✨
 

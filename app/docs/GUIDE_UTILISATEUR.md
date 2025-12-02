@@ -51,7 +51,7 @@ Le serveur démarre automatiquement ! ✅
 
 1. **Ajouter une source** : `Source navigateur`
 2. **Nom** : `Subgoal Left` (exemple)
-3. **URL** : `http://localhost:8082/obs/overlays/subgoal_left.html`
+3. **URL** : `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left`
 4. **Dimensions** : 800x200 (ajuster selon besoin)
 5. **Cocher** : `Actualiser le navigateur lorsque la scène devient active`
 6. **OK**
@@ -59,10 +59,10 @@ Le serveur démarre automatiquement ! ✅
 > ⚠️ **IMPORTANT** : N'utilisez PAS "Fichier local" ! Les overlays doivent être chargés via HTTP pour que les WebSockets fonctionnent.
 
 **URLs disponibles :**
-- `http://localhost:8082/obs/overlays/subgoal_left.html` - Compteur subs gauche
-- `http://localhost:8082/obs/overlays/subgoal_right.html` - Compteur subs droite
-- `http://localhost:8082/obs/overlays/followgoal_left.html` - Compteur follows gauche
-- `http://localhost:8082/obs/overlays/followgoal_right.html` - Compteur follows droite
+- `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=left` - Compteur subs gauche
+- `http://localhost:8082/obs/overlays/overlay.html?type=sub&align=right` - Compteur subs droite
+- `http://localhost:8082/obs/overlays/overlay.html?type=follow&align=left` - Compteur follows gauche
+- `http://localhost:8082/obs/overlays/overlay.html?type=follow&align=right` - Compteur follows droite
 
 ---
 

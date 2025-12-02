@@ -833,6 +833,14 @@ def sync_with_twitch():
                 return True
             else:
                 log_message(f"❌ Erreur sync: {data.get('error', 'Erreur inconnue')}", level="error")
+        elif response.status_code == 429:
+            # Rate limited - afficher le temps d'attente
+            try:
+                data = response.json()
+                wait_time = data.get('nextResetIn', 60)
+                log_message(f"⏳ Rate limit atteint - Réessayez dans {wait_time}s", level="warning")
+            except:
+                log_message("⏳ Rate limit atteint - Réessayez dans 1 minute", level="warning")
         else:
             log_message(f"❌ Erreur HTTP: {response.status_code}", level="error")
     except Exception as e:
