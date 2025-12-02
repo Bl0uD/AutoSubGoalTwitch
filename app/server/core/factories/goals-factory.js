@@ -105,36 +105,44 @@ function createGoalsService({ stateManager, logger, ROOT_DIR }) {
     /**
      * Calcule l'objectif actuel pour une valeur donnée
      * @param {'follow' | 'sub'} type
-     * @returns {{ goal: number, message: string, progress: number, current: number }}
+     * @returns {{ goal: { current: number, target: number, message: string, isMaxReached: boolean }, progress: number }}
      */
     function getCurrentGoalInfo(type) {
         const goals = type === 'follow' ? stateManager.getFollowGoals() : stateManager.getSubGoals();
         const currentValue = type === 'follow' ? stateManager.getFollows() : stateManager.getSubs();
         
-        // Trier les objectifs
-        const sortedGoals = [...goals.keys()].sort((a, b) => a - b);
+        // Trier les objectifs (les clés peuvent être des strings, on les convertit en number)
+        const sortedGoals = [...goals.keys()].map(Number).sort((a, b) => a - b);
         
         // Trouver le prochain objectif non atteint
         const nextGoal = sortedGoals.find(g => g > currentValue);
-        const goalValue = nextGoal || sortedGoals[sortedGoals.length - 1] || (type === 'follow' ? 100 : 10);
+        const maxGoal = sortedGoals[sortedGoals.length - 1];
+        const isMaxReached = !nextGoal && currentValue >= maxGoal;
+        const targetValue = nextGoal || maxGoal || (type === 'follow' ? 100 : 10);
+        
+        // Récupérer le message (les clés dans la Map peuvent être string ou number)
+        const message = goals.get(targetValue) || goals.get(String(targetValue)) || '';
         
         return {
-            goal: goalValue,
-            message: goals.get(goalValue) || '',
-            progress: goalValue > 0 ? Math.min(100, Math.round((currentValue / goalValue) * 100)) : 100,
-            current: currentValue
+            goal: {
+                current: currentValue,
+                target: targetValue,
+                message: message,
+                isMaxReached: isMaxReached
+            },
+            progress: targetValue > 0 ? Math.min(100, Math.round((currentValue / targetValue) * 100)) : 100
         };
     }
     
     /**
-     * @returns {{ goal: number, message: string, progress: number, current: number }}
+     * @returns {{ goal: { current: number, target: number, message: string, isMaxReached: boolean }, progress: number }}
      */
     function getCurrentFollowGoal() {
         return getCurrentGoalInfo('follow');
     }
     
     /**
-     * @returns {{ goal: number, message: string, progress: number, current: number }}
+     * @returns {{ goal: { current: number, target: number, message: string, isMaxReached: boolean }, progress: number }}
      */
     function getCurrentSubGoal() {
         return getCurrentGoalInfo('sub');

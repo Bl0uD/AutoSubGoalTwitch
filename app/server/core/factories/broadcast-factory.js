@@ -13,11 +13,12 @@ const WebSocket = require('ws');
  * Crée le service de diffusion WebSocket
  * @param {Object} deps - Dépendances injectées
  * @param {StateManager} deps.stateManager
+ * @param {Object} deps.goalsService
  * @param {Object} deps.logger
  * @param {Object} deps.constants
  * @returns {Object} API du service
  */
-function createBroadcastService({ stateManager, logger, constants }) {
+function createBroadcastService({ stateManager, goalsService, logger, constants }) {
     const { logEvent } = logger;
     const { PORTS } = constants;
     
@@ -102,15 +103,18 @@ function createBroadcastService({ stateManager, logger, constants }) {
     function sendInitialData(ws) {
         if (ws.readyState !== WebSocket.OPEN) return;
         
-        const currentFollowGoal = stateManager.getCurrentFollowGoal();
-        const currentSubGoal = stateManager.getCurrentSubGoal();
+        // Utiliser goalsService qui retourne le format complet
+        const followGoalInfo = goalsService.getCurrentFollowGoal();
+        const subGoalInfo = goalsService.getCurrentSubGoal();
         
         const data = {
             type: 'init',
             follows: stateManager.getFollows(),
             subs: stateManager.getSubs(),
-            followGoal: currentFollowGoal,
-            subGoal: currentSubGoal,
+            followGoal: followGoalInfo,
+            subGoal: subGoalInfo,
+            // Format attendu par overlay.html pour chaque type
+            goal: followGoalInfo.goal, // Par défaut follow, l'overlay filtrera selon son type
             timestamp: new Date().toISOString()
         };
         
@@ -151,13 +155,14 @@ function createBroadcastService({ stateManager, logger, constants }) {
     function broadcastFollowUpdate(batchCount = null) {
         if (!wssCounter) return;
         
-        const currentFollowGoal = stateManager.getCurrentFollowGoal();
+        // Utiliser goalsService qui retourne le format complet attendu par l'overlay
+        const goalInfo = goalsService.getCurrentFollowGoal();
         
         const message = JSON.stringify({
             type: 'follow_update',
             follows: stateManager.getFollows(),
-            followGoal: currentFollowGoal,
-            goal: currentFollowGoal, // Compatibilité overlay.html
+            followGoal: goalInfo,
+            goal: goalInfo.goal, // Format attendu par overlay.html: { current, target, message, isMaxReached }
             batchCount: batchCount,
             isBatch: batchCount > 1,
             timestamp: new Date().toISOString()
@@ -187,13 +192,14 @@ function createBroadcastService({ stateManager, logger, constants }) {
     function broadcastSubUpdate(batchCount = null) {
         if (!wssCounter) return;
         
-        const currentSubGoal = stateManager.getCurrentSubGoal();
+        // Utiliser goalsService qui retourne le format complet attendu par l'overlay
+        const goalInfo = goalsService.getCurrentSubGoal();
         
         const message = JSON.stringify({
             type: 'sub_update',
             subs: stateManager.getSubs(),
-            subGoal: currentSubGoal,
-            goal: currentSubGoal, // Compatibilité overlay.html
+            subGoal: goalInfo,
+            goal: goalInfo.goal, // Format attendu par overlay.html: { current, target, message, isMaxReached }
             batchCount: batchCount,
             isBatch: batchCount > 1,
             timestamp: new Date().toISOString()

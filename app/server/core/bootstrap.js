@@ -151,6 +151,7 @@ function bootstrap() {
         const { createBroadcastService } = require('./factories/broadcast-factory');
         return createBroadcastService({
             stateManager: c.resolve('stateManager'),
+            goalsService: c.resolve('goalsService'),
             logger: c.resolve('logger'),
             constants: c.resolve('constants')
         });
