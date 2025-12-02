@@ -468,13 +468,21 @@
             currentGoal = goal;
 
             if (previousCount !== null && goal.current !== previousCount) {
-                const direction = goal.current > previousCount ? "down" : "up";
+                const delta = goal.current - previousCount;
+                const direction = delta > 0 ? "down" : "up";
+                const absDelta = Math.abs(delta);
+                
                 console.log(`🔄 Direction: ${direction} (${previousCount} → ${goal.current})`);
 
-                if (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) {
-                    console.log(`⚡ Batch détecté: ${batchInfo.batchCount} changements, animation directe`);
-                    animateDirectTransition(previousCount, goal.current, goal, direction);
+                // Animation slot-machine si: batch avec plusieurs events OU delta > 1
+                const shouldUseSlotMachine = (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) || absDelta > 1;
+                
+                if (shouldUseSlotMachine) {
+                    console.log(`🎰 SLOT-MACHINE: ${previousCount} -> ${goal.current}`);
+                    animationQueue = [];
+                    animateSlotMachine(previousCount, goal.current, goal, direction);
                 } else {
+                    console.log(`📊 PROGRESSIVE: ${previousCount} -> ${goal.current}`);
                     animationQueue.push({
                         from: previousCount,
                         to: goal.current,
@@ -496,28 +504,65 @@
             console.log(`📊 ${CONFIG.type} goal mis à jour`);
         }
         
-        function animateDirectTransition(from, to, goal, direction) {
-            console.log(`🎰 Animation directe: ${from} → ${to}`);
+        /**
+         * SLOT-MACHINE animation for grouped changes
+         * Sequential scrolling effect: 390 -> 391 -> 392 -> ... -> 401
+         */
+        function animateSlotMachine(from, to, goal, direction) {
+            console.log(`🎰 Starting slot-machine: ${from} -> ${to}`);
             isAnimating = true;
             
-            // Animation de fade out/in sur le counter entier
-            counterEl.classList.add('count-exit');
+            const delta = to - from;
+            const totalSteps = Math.abs(delta);
+            const step = delta > 0 ? 1 : -1;
             
-            setTimeout(() => {
-                displayGoalText({ ...goal, current: to }, direction);
-                counterEl.classList.remove('count-exit');
-                counterEl.classList.add('count-enter');
+            const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
+            
+            let currentValue = from;
+            let stepIndex = 0;
+            
+            function easeInOutQuad(t) {
+                return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            }
+            
+            function getDelayForStep(index, total) {
+                const progressBefore = index / total;
+                const progressAfter = (index + 1) / total;
+                const easedBefore = easeInOutQuad(progressBefore);
+                const easedAfter = easeInOutQuad(progressAfter);
+                const stepDuration = (easedAfter - easedBefore) * totalDuration;
+                return Math.max(stepDuration, 30);
+            }
+            
+            function displayStep() {
+                animationDirection = direction;
+                const intermediateGoal = { ...goal, current: currentValue };
+                displayGoalText(intermediateGoal);
                 
-                setTimeout(() => {
-                    counterEl.classList.remove('count-enter');
-                    isAnimating = false;
-                    
-                    if (animationQueue.length > 0) {
-                        const next = animationQueue.shift();
-                        animateCounterProgressive(next.from, next.to, next.goal, next.direction);
-                    }
-                }, 300);
-            }, 300);
+                if (currentValue !== to) {
+                    currentValue += step;
+                    stepIndex++;
+                    const delay = getDelayForStep(stepIndex, totalSteps);
+                    setTimeout(displayStep, delay);
+                } else {
+                    finishAnimation();
+                }
+            }
+            
+            function finishAnimation() {
+                animationDirection = direction;
+                displayGoalText(goal);
+                console.log(`✅ Slot-machine completed: ${to}`);
+                isAnimating = false;
+                
+                if (animationQueue.length > 0) {
+                    const next = animationQueue.shift();
+                    isAnimating = true;
+                    animateCounterProgressive(next.from, next.to, next.goal, next.direction);
+                }
+            }
+            
+            displayStep();
         }
 
         function forceRecalculateDisplay() {

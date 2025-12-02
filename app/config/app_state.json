@@ -2,16 +2,17 @@
   "counters": {
     "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-02T19:30:56.315Z"
+    "lastUpdated": "2025-12-02T19:52:38.915Z"
   },
   "goals": {
     "currentFollowGoal": 500,
     "currentSubGoal": 5,
-    "subs": 100
+    "subs": 105,
+    "follows": 105
   },
   "overlay": {
     "font": {
-      "family": "Arial",
+      "family": "Microsoft Uighur",
       "size": "64px",
       "weight": "normal"
     },

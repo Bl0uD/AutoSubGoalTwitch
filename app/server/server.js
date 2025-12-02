@@ -162,7 +162,9 @@ const appState = {
     },
     batching: {
         follow: { count: 0, timer: null, isAnimating: false },
+        followRemove: { count: 0, timer: null, isAnimating: false },
         sub: { count: 0, timer: null, isAnimating: false, tiers: {} },
+        subEnd: { count: 0, timer: null, isAnimating: false },
     },
     watchers: {
         followConfig: null,
@@ -249,9 +251,17 @@ Object.defineProperties(global, {
         get: () => appState.batching.follow,
         set: (val) => { appState.batching.follow = val; }
     },
+    followRemoveBatch: {
+        get: () => appState.batching.followRemove,
+        set: (val) => { appState.batching.followRemove = val; }
+    },
     subBatch: {
         get: () => appState.batching.sub,
         set: (val) => { appState.batching.sub = val; }
+    },
+    subEndBatch: {
+        get: () => appState.batching.subEnd,
+        set: (val) => { appState.batching.subEnd = val; }
     },
     twitchConfig: {
         get: () => appState.config.twitch,

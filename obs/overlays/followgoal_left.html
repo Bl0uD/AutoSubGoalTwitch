@@ -472,10 +472,14 @@
                 const direction = goal.current > previousSubCount ? "down" : "up";
                 console.log(`[INFO] Direction: ${direction} (${previousSubCount} -> ${goal.current})`);
 
-                // Si on a des infos de batch avec plusieurs changements, animation directe
-                if (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) {
-                    console.log(`[BATCH] Batch detected: ${batchInfo.batchCount} changes, direct animation`);
-                    animateDirectTransition(previousSubCount, goal.current, goal, direction);
+                // Si on a des infos de batch avec plusieurs changements OU delta > 1, animation slot-machine
+                const absDelta = Math.abs(goal.current - previousSubCount);
+                const shouldUseSlotMachine = (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) || absDelta > 1;
+                
+                if (shouldUseSlotMachine) {
+                    console.log(`[ANIM] SLOT-MACHINE: ${previousSubCount} -> ${goal.current}`);
+                    animationQueue = [];
+                    animateSlotMachine(previousSubCount, goal.current, goal, direction);
                 } else {
                     // Animation progressive normale pour changement unique
                     animationQueue.push({
@@ -499,38 +503,81 @@
             console.log('[INFO] Followgoal updated');
         }
         
-        // Nouvelle fonction pour transition directe (slot-machine) lors de batch
-        function animateDirectTransition(from, to, goal, direction) {
-            console.log(`[ANIM] Direct animation: ${from} -> ${to}`);
+        /**
+         * SLOT-MACHINE animation for grouped changes
+         * Sequential scrolling effect: 390 -> 391 -> 392 -> ... -> 401
+         * Accelerates at start, slows at end (easing)
+         */
+        function animateSlotMachine(from, to, goal, direction) {
+            console.log(`[ANIM] Starting slot-machine: ${from} -> ${to}`);
             isAnimating = true;
             
-            const countElement = document.getElementById('currentCount');
-            const slashElement = document.getElementById('slash');
-            const goalElement = document.getElementById('goalCount');
+            const delta = to - from;
+            const totalSteps = Math.abs(delta);
+            const step = delta > 0 ? 1 : -1; // +1 ou -1 selon la direction
             
-            // Animation de sortie
-            countElement.classList.add('count-exit');
+            // Total duration adapted to number of steps
+            const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
             
-            setTimeout(() => {
-                // Update text during animation
-                countElement.textContent = to;
-                countElement.classList.remove('count-exit');
-                countElement.classList.add('count-enter');
+            let currentValue = from;
+            let stepIndex = 0;
+            
+            console.log(`[ANIM] ${totalSteps} steps in ${totalDuration}ms`);
+            
+            function easeInOutQuad(t) {
+                // Accelerate at start, slow at end
+                return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            }
+            
+            function getDelayForStep(index, total) {
+                // Calculate delay for this step based on easing
+                const progressBefore = index / total;
+                const progressAfter = (index + 1) / total;
+                const easedBefore = easeInOutQuad(progressBefore);
+                const easedAfter = easeInOutQuad(progressAfter);
+                const stepDuration = (easedAfter - easedBefore) * totalDuration;
                 
-                // Update goal
-                goalElement.textContent = goal.target;
+                // Minimum 30ms between steps to be visible
+                return Math.max(stepDuration, 30);
+            }
+            
+            function displayStep() {
+                // Afficher la valeur actuelle
+                animationDirection = direction;
+                const intermediateGoal = { ...goal, current: currentValue };
+                displayGoalText(intermediateGoal);
                 
-                setTimeout(() => {
-                    countElement.classList.remove('count-enter');
-                    isAnimating = false;
+                // Move to next step
+                if (currentValue !== to) {
+                    currentValue += step;
+                    stepIndex++;
                     
-                    // Process animation queue if needed
-                    if (animationQueue.length > 0) {
-                        const next = animationQueue.shift();
-                        animateCounterProgressive(next.from, next.to, next.goal, next.direction);
-                    }
-                }, 300);
-            }, 300);
+                    const delay = getDelayForStep(stepIndex, totalSteps);
+                    setTimeout(displayStep, delay);
+                } else {
+                    // Animation completed
+                    finishAnimation();
+                }
+            }
+            
+            function finishAnimation() {
+                // Ensure final value is displayed
+                animationDirection = direction;
+                displayGoalText(goal);
+                
+                console.log(`[OK] Slot-machine completed: ${to}`);
+                isAnimating = false;
+                
+                // Process animation queue if needed
+                if (animationQueue.length > 0) {
+                    const next = animationQueue.shift();
+                    isAnimating = true;
+                    animateCounterProgressive(next.from, next.to, next.goal, next.direction);
+                }
+            }
+            
+            // Start scrolling
+            displayStep();
         }
 
         function forceRecalculateDisplay() {

@@ -1077,6 +1077,21 @@
             log('⛔ Tous les tests arrêtés', 'success');
         }
 
+        // Fonction de chargement du mot de passe admin (authentification locale)
+        async function loadAdminPassword() {
+            try {
+                // Vérifier que le serveur est accessible
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Erreur vérification serveur:', error);
+                return false;
+            }
+        }
+        
         // Initialisation au chargement de la page
         (async function init() {
             log('🚀 Initialisation de l\'interface admin...', 'info');
@@ -1084,9 +1099,9 @@
             // Charger le mot de passe admin automatiquement
             const authSuccess = await loadAdminPassword();
             if (authSuccess) {
-                log('✅ Authentification transparente activée', 'success');
+                log('✅ Serveur accessible', 'success');
             } else {
-                log('❌ Erreur d\'authentification - Vérifiez que le serveur est démarré', 'error');
+                log('❌ Erreur de connexion - Vérifiez que le serveur est démarré', 'error');
             }
             
             // Connexions et mise à jour
