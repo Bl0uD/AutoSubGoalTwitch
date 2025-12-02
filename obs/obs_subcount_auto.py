@@ -266,6 +266,32 @@ def get_windows_fonts():
             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
         )
         
+        # Méthode 3: Scanner le dossier des polices utilisateur
+        # Windows 10/11 stocke les polices utilisateur dans %LOCALAPPDATA%\Microsoft\Windows\Fonts
+        user_fonts_dir = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows', 'Fonts')
+        if os.path.exists(user_fonts_dir):
+            for font_file in os.listdir(user_fonts_dir):
+                if font_file.lower().endswith(('.ttf', '.otf', '.ttc')):
+                    # Extraire le nom sans extension
+                    font_name = os.path.splitext(font_file)[0]
+                    clean_name = extract_base_font_name(font_name)
+                    if clean_name and not is_variant(font_name):
+                        fonts.add(clean_name)
+            log_message(f"📂 Polices utilisateur scannées depuis: {user_fonts_dir}", level="info")
+        
+        # Méthode 4: Scanner aussi le dossier Windows\Fonts (polices système)
+        system_fonts_dir = os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts')
+        if os.path.exists(system_fonts_dir):
+            try:
+                for font_file in os.listdir(system_fonts_dir):
+                    if font_file.lower().endswith(('.ttf', '.otf', '.ttc')):
+                        font_name = os.path.splitext(font_file)[0]
+                        clean_name = extract_base_font_name(font_name)
+                        if clean_name and not is_variant(font_name):
+                            fonts.add(clean_name)
+            except PermissionError:
+                pass  # Ignorer les erreurs de permission
+        
         # Convertir en liste triée
         font_list = sorted(list(fonts), key=str.lower)
         
@@ -1044,14 +1070,42 @@ def is_valid_css_color(color):
     
     return False
 
+def apply_overlay_font_custom(props, prop, settings):
+    """Applique la police saisie manuellement (prioritaire)"""
+    global global_settings
+    global_settings = settings
+    
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("❌ Module overlay_config_manager non disponible", level="error")
+        return False
+    
+    custom_font = obs.obs_data_get_string(settings, "overlay_font_custom")
+    font_size = obs.obs_data_get_int(settings, "overlay_font_size")
+    
+    if custom_font and custom_font.strip():
+        try:
+            overlay_config.update_font(family=custom_font.strip(), size=f"{font_size}px")
+            log_message(f"✅ Police personnalisée appliquée: {custom_font.strip()} @ {font_size}px", level="info")
+        except NameError:
+            log_message("❌ overlay_config non initialisé", level="error")
+            return False
+    
+    return True
+
 def apply_overlay_font(props, prop, settings):
-    """Applique la police sélectionnée aux overlays"""
+    """Applique la police sélectionnée aux overlays (liste déroulante)"""
     global global_settings
     global_settings = settings  # Mettre à jour les settings globaux
     
     if not OVERLAY_CONFIG_AVAILABLE:
         log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
+    
+    # Vérifier d'abord si une police personnalisée est définie (prioritaire)
+    custom_font = obs.obs_data_get_string(settings, "overlay_font_custom")
+    if custom_font and custom_font.strip():
+        # La police personnalisée a la priorité, ne pas appliquer la liste
+        return True
     
     font_family = obs.obs_data_get_string(settings, "overlay_font")
     font_size = obs.obs_data_get_int(settings, "overlay_font_size")
@@ -1234,6 +1288,7 @@ def script_defaults(settings):
     """Définit les valeurs par défaut"""
     if OVERLAY_CONFIG_AVAILABLE:
         obs.obs_data_set_default_string(settings, "overlay_font", "Arial")
+        obs.obs_data_set_default_string(settings, "overlay_font_custom", "")  # Vide par défaut
         obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
         obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
         obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
@@ -1296,16 +1351,38 @@ def script_properties():
             obs.OBS_TEXT_INFO
         )
         
-        # Dropdown Police
+        # Champ texte libre pour entrer manuellement le nom de la police
+        obs.obs_properties_add_text(
+            props,
+            "overlay_font_custom",
+            "  ✏️  Police (saisie libre)",
+            obs.OBS_TEXT_DEFAULT
+        )
+        obs.obs_property_set_modified_callback(
+            obs.obs_properties_get(props, "overlay_font_custom"),
+            apply_overlay_font_custom
+        )
+        
+        # Info: priorité au champ texte
+        obs.obs_properties_add_text(
+            props,
+            "font_info",
+            "     ℹ️ Tapez le nom exact de la police ci-dessus,\n        ou sélectionnez dans la liste ci-dessous.",
+            obs.OBS_TEXT_INFO
+        )
+        
+        # Dropdown Police (liste)
         font_list = obs.obs_properties_add_list(
             props,
             "overlay_font",
-            "  📝  Police",
-            obs.OBS_COMBO_TYPE_EDITABLE,
+            "  📝  Liste des polices",
+            obs.OBS_COMBO_TYPE_LIST,
             obs.OBS_COMBO_FORMAT_STRING
         )
         
-        # Récupérer toutes les polices installées
+        # Récupérer toutes les polices installées (forcer le rechargement)
+        global CACHED_FONTS
+        CACHED_FONTS = None  # Invalider le cache
         all_fonts = get_windows_fonts()
         for font in all_fonts:
             obs.obs_property_list_add_string(font_list, font, font)
