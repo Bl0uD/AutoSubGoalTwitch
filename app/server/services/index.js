@@ -11,6 +11,8 @@
  * - broadcast : Diffusion WebSocket aux clients
  * - counters : Gestion des compteurs follows/subs
  * - files : Mise à jour des fichiers overlays
+ * - polling : Polling des follows en backup d'EventSub
+ * - event-handlers : Handlers pour les événements follows/subs
  */
 
 const appState = require('./app-state');
@@ -19,6 +21,8 @@ const goalsService = require('./goals');
 const batchingService = require('./batching');
 const countersService = require('./counters');
 const filesService = require('./files');
+const pollingService = require('./polling');
+const eventHandlersService = require('./event-handlers');
 const { createBroadcastService } = require('./broadcast');
 
 module.exports = {
@@ -31,6 +35,8 @@ module.exports = {
     batchingService,
     countersService,
     filesService,
+    pollingService,
+    eventHandlersService,
     
     // Service avec pattern factory
     createBroadcastService,

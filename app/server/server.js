@@ -24,12 +24,14 @@ const {
 const {
     APP_STATE_PATH, loadAppState, saveAppState, updateCounter,
     getOverlayConfig, updateOverlayConfig, getVersionInfo, getCounters, setCounters,
-    // Services modulaires (Phase 3.6)
+    // Services modulaires (Phase 3.6 + Phase 5)
     twitchService,
     goalsService,
     batchingService,
     countersService,
     filesService,
+    pollingService,
+    eventHandlersService,
     createBroadcastService,
 } = require('./services');
 
@@ -1023,191 +1025,30 @@ async function initializeSubCounter() {
     }
 }
 
-// 📄 SYSTÈME DE POLLING POUR LES FOLLOWS (Alternative à EventSub)
-function startFollowPolling(intervalSeconds = 10) {
-    if (followPollingInterval) {
-        timerRegistry.clearInterval('followPolling');
-    }
-    
-    if (!twitchConfig.configured) {
-        logEvent('WARN', '⚠️ Configuration Twitch manquante - polling non démarré');
-        return;
-    }
-    
-    logEvent('INFO', `📄 Démarrage du polling intelligent des follows (toutes les ${intervalSeconds}s)`);
-    logEvent('INFO', `📡 Mode: ${sessionId ? 'BACKUP EventSub' : 'PRINCIPAL (EventSub inactif)'}`);
-    isPollingActive = true;
-    
-    // Première vérification immédiate
-    pollFollowCount();
-    
-    // Puis vérifications périodiques
-    followPollingInterval = timerRegistry.setInterval('followPolling', async () => {
-        await pollFollowCount();
-    }, intervalSeconds * 1000);
-}
+// ========================================
+// 📡 WRAPPERS POLLING (délégation à pollingService)
+// ========================================
+// Note: Ces wrappers seront supprimés une fois la migration complète
 
-async function pollFollowCount() {
-    try {
-        if (!isPollingActive) return;
-        
-        const result = await getTwitchFollowCount();
-        
-        if (!result.success) {
-            logEvent('ERROR', `❌ Erreur polling follows: ${result.error} (${result.code})`);
-            return;
-        }
-        
-        const newFollowCount = result.data;
-        
-        // Si c'est la première fois ou s'il y a un changement
-        if (lastKnownFollowCount === 0) {
-            lastKnownFollowCount = newFollowCount;
-            updateFollowCount(newFollowCount);
-            logEvent('INFO', `📊 Count initial: ${newFollowCount} follows`);
-        } else if (newFollowCount !== lastKnownFollowCount) {
-            const difference = newFollowCount - lastKnownFollowCount;
-            const source = sessionId ? '(synchronisation API)' : '(polling)';
-            logEvent('INFO', `🎉 Follow count mis à jour ${source}: ${lastKnownFollowCount} → ${newFollowCount} (${difference > 0 ? '+' : ''}${difference})`);
-            
-            lastKnownFollowCount = newFollowCount;
-            updateFollowCount(newFollowCount);
-            
-            // Sauvegarder le nouveau count
-            saveFollowBackup();
-        } else if (sessionId) {
-            // Si EventSub actif et pas de changement, log de confirmation occasionnel
-            if (Math.random() > 0.9) {
-                logEvent('INFO', `✅ Synchronisation OK: ${newFollowCount} follows`);
-            }
-        }
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur lors du polling des follows:', error.message);
-    }
-}
+const startFollowPolling = (intervalSeconds = 10) => pollingService.startFollowPolling(intervalSeconds);
+const stopFollowPolling = () => pollingService.stopFollowPolling();
+const pollFollowCount = () => pollingService.pollFollowCount();
 
-function stopFollowPolling() {
-    if (followPollingInterval) {
-        timerRegistry.clearInterval('followPolling');
-        followPollingInterval = null;
-        isPollingActive = false;
-        logEvent('INFO', '⏹️ Polling des follows arrêté');
-    }
-}
+// ========================================
+// 🎯 WRAPPERS EVENT HANDLERS (délégation à eventHandlersService)
+// ========================================
+// Note: Ces wrappers seront supprimés une fois la migration complète
+
+const handleFollowEvent = (data) => eventHandlersService.handleFollowEvent(data);
+const handleSubEvent = (data) => eventHandlersService.handleSubEvent(data);
+const handleSubEndEvent = (data) => eventHandlersService.handleSubEndEvent(data);
+const handleSyncEvent = (data) => eventHandlersService.handleSyncEvent(data);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🔥 NOUVEAU SYSTÈME D'ÉVÉNEMENTS - EventQueue (Thread-Safe)
 // ═══════════════════════════════════════════════════════════════════════════════
 // Note: L'ancien système eventBuffer a été remplacé par EventQueue
-// Toutes les fonctions utilisent maintenant eventQueue.add()
-
-// Gérer un événement de follow
-function handleFollowEvent(data) {
-    try {
-        const followerName = data.user_name || 'Utilisateur inconnu';
-        const followerId = data.user_id || 'ID inconnu';
-        
-        logEvent('FOLLOW', `👥 Événement follow reçu: ${followerName} (${followerId})`);
-        
-        // Utiliser le système de batching au lieu d'incrémenter directement
-        addFollowToBatch(1);
-        
-        // Affichage console pour debug
-        console.log(`🎉 FOLLOW AJOUTÉ AU BATCH: ${followerName}`);
-        console.log(`📊 Batch actuel: ${followBatch.count} follow(s) en attente`);
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur gestion événement follow:', error.message);
-        logEvent('ERROR', '📄 Stack trace:', error.stack);
-        
-        // En cas d'erreur, forcer une synchronisation via EventQueue
-        try {
-            logEvent('INFO', '📄 Ajout synchronisation de récupération...');
-            eventQueue.add({
-                id: `sync-error-${Date.now()}`,
-                type: VALID_EVENT_TYPES.SYNC,
-                data: {
-                    reason: 'Synchronisation après erreur follow',
-                    error: error.message
-                },
-                timestamp: Date.now()
-            });
-        } catch (queueError) {
-            logEvent('CRITICAL', '❌ Erreur critique ajout synchronisation:', queueError.message);
-        }
-    }
-}
-
-// Gérer un événement de sub
-function handleSubEvent(data) {
-    try {
-        const userName = data.user_name || 'Utilisateur inconnu';
-        const userId = data.user_id || 'ID inconnu';
-        const subType = data.type || 'unknown';
-        const tier = data.tier || '1000';
-        
-        logEvent('SUB', `⭐ Événement sub reçu: ${userName} (Type: ${subType})`);
-        
-        // Traitement selon le type d'événement sub
-        switch (subType) {
-            case 'new_sub':
-                addSubToBatch(1, tier);
-                console.log(`🎉 NOUVEL ABONNEMENT AJOUTÉ AU BATCH: ${userName} (Tier ${tier})`);
-                break;
-                
-            case 'gift_sub':
-                const giftCount = data.gifted_count || 1;
-                addSubToBatch(giftCount, tier);
-                console.log(`🎁 SUBS OFFERTS AJOUTÉS AU BATCH: ${userName} a offert ${giftCount} subs (Tier ${tier})`);
-                break;
-                
-            case 'end_sub':
-                // Pour les fins d'abonnement, utiliser un batching de suppressions
-                // afin de fusionner plusieurs unsubs rapprochés en une seule animation
-                addSubEndToBatch(1);
-                console.log(`⏹️ FIN D'ABONNEMENT ajouté au batch: ${userName}`);
-                break;
-                
-            default:
-                logEvent('WARN', `⚠️ Type de sub inconnu: ${subType}`);
-                return;
-        }
-        
-        console.log(`📊 Batch actuel: ${subBatch.count} sub(s) en attente`);
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur gestion événement sub:', error.message);
-        logEvent('ERROR', '📄 Stack trace:', error.stack);
-        
-        // En cas d'erreur, pas de synchronisation pour les subs (pas d'API disponible)
-        logEvent('WARN', '⚠️ Pas de synchronisation auto pour les subs');
-    }
-}
-
-// Gérer un événement de sub_end (séparé pour clarté)
-function handleSubEndEvent(data) {
-    try {
-        const userName = data.user_name || 'Utilisateur inconnu';
-        logEvent('SUB_END', `⏹️ Événement fin d'abonnement: ${userName}`);
-        addSubEndToBatch(1);
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur gestion événement sub end:', error.message);
-    }
-}
-
-// Gérer un événement de synchronisation
-async function handleSyncEvent(data) {
-    try {
-        logEvent('INFO', `📄 Événement synchronisation: ${data.reason || 'Non spécifié'}`);
-        
-        // Exécuter une synchronisation complète avec l'API Twitch
-        await syncTwitchFollows(data.reason || 'Synchronisation depuis tampon');
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur gestion événement sync:', error.message);
-    }
-}
+// Les handlers sont maintenant dans eventHandlersService
 
 // Version sécurisée de updateFollowCount avec protection contre les erreurs
 function updateFollowCountSafe(newCount) {
@@ -2630,9 +2471,32 @@ const serviceContext = {
     broadcastSubUpdate,
 };
 
+// Contexte pour pollingService
+const pollingContext = {
+    timerRegistry,
+    getTwitchConfig: () => twitchConfig,
+    getSessionId: () => sessionId,
+    getTwitchFollowCount,
+    updateFollowCount,
+    saveFollowBackup,
+};
+
+// Contexte pour eventHandlersService
+const eventHandlersContext = {
+    addFollowToBatch,
+    addSubToBatch,
+    addSubEndToBatch,
+    getFollowBatch: () => followBatch,
+    getSubBatch: () => subBatch,
+    eventQueue,
+    syncTwitchFollows,
+};
+
 // Initialiser les services avec le contexte
 goalsService.initContext(serviceContext);
 batchingService.initContext(serviceContext);
+pollingService.initContext(pollingContext);
+eventHandlersService.initContext(eventHandlersContext);
 
 // Ajouter les services au contexte (disponibles pour les routes)
 appContext.services = {
@@ -2642,9 +2506,11 @@ appContext.services = {
     twitch: twitchService,
     counters: countersService,
     files: filesService,
+    polling: pollingService,
+    eventHandlers: eventHandlersService,
 };
 
-logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch, counters, files)');
+logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch, counters, files, polling, eventHandlers)');
 
 // Initialiser les contextes des routes
 initAllContexts(appContext);
