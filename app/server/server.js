@@ -24,10 +24,10 @@ const {
 const {
     APP_STATE_PATH, loadAppState, saveAppState, updateCounter,
     getOverlayConfig, updateOverlayConfig, getVersionInfo, getCounters, setCounters,
-    // Factory functions pour services modulaires (Phase 3.3)
-    createTwitchService,
-    createGoalsService,
-    createBatchingService,
+    // Services modulaires (Phase 3.6)
+    twitchService,
+    goalsService,
+    batchingService,
     createBroadcastService,
 } = require('./services');
 
@@ -3104,55 +3104,14 @@ const appContext = {
 };
 
 // ==================================================================
-// 🔧 INSTANCIATION DES SERVICES MODULAIRES (Phase 3.5)
+// 🔧 INITIALISATION DES SERVICES MODULAIRES (Phase 3.6)
 // ==================================================================
-// Les services sont instanciés avec le contexte de l'application.
-// Ils peuvent être utilisés par les routes pour remplacer progressivement
-// les fonctions inline.
+// Les services sont initialisés avec le contexte de l'application.
+// Ils sont disponibles via appContext.services pour les routes.
+// Note: Les fonctions inline restent actives pour compatibilité.
 
-// Note: Les services ne sont pas encore utilisés activement.
-// Ils seront intégrés progressivement dans les prochaines phases.
-// Pour l'instant, les fonctions inline restent la source de vérité.
-
-/*
-const goalsService = createGoalsService({
-    ROOT_DIR,
-    fs,
-    path,
-    timerRegistry,
-    followGoals,
-    subGoals,
-    get currentFollows() { return currentFollows; },
-    get currentSubs() { return currentSubs; },
-    broadcastFollowUpdate,
-    broadcastSubUpdate,
-    updateFollowFiles,
-    updateSubFiles,
-    logEvent,
-});
-
-const batchingService = createBatchingService({
-    timerRegistry,
-    logEvent,
-    BATCH_DELAY,
-    ANIMATION_DURATION,
-    get currentFollows() { return currentFollows; },
-    set currentFollows(val) { currentFollows = val; },
-    get currentSubs() { return currentSubs; },
-    set currentSubs(val) { currentSubs = val; },
-    get lastKnownFollowCount() { return lastKnownFollowCount; },
-    set lastKnownFollowCount(val) { lastKnownFollowCount = val; },
-    get followBatch() { return followBatch; },
-    get followRemoveBatch() { return followRemoveBatch; },
-    get subBatch() { return subBatch; },
-    get subEndBatch() { return subEndBatch; },
-    updateFollowFiles,
-    updateSubFiles,
-    broadcastFollowUpdate,
-    broadcastSubUpdate,
-});
-
-const broadcastService = createBroadcastService({
+// Initialiser le service broadcast (pattern factory)
+const broadcastServiceInstance = createBroadcastService({
     wss,
     overlayWss,
     overlayClients,
@@ -3163,13 +3122,16 @@ const broadcastService = createBroadcastService({
     getCurrentSubs: () => currentSubs,
 });
 
-// Ajouter les services au contexte (pour utilisation future par les routes)
+// Ajouter les services au contexte (disponibles pour les routes)
+// Note: goalsService et batchingService utilisent initContext qui sera appelé plus tard
 appContext.services = {
     goals: goalsService,
     batching: batchingService,
-    broadcast: broadcastService,
+    broadcast: broadcastServiceInstance,
+    twitch: twitchService,
 };
-*/
+
+logEvent('INFO', '✅ Services modulaires disponibles (goals, batching, broadcast, twitch)');
 
 // Initialiser les contextes des routes
 initAllContexts(appContext);

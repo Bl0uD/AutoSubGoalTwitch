@@ -12,18 +12,20 @@
  */
 
 const appState = require('./app-state');
-const { createTwitchService } = require('./twitch');
-const { createGoalsService } = require('./goals');
-const { createBatchingService } = require('./batching');
+const twitchService = require('./twitch');
+const goalsService = require('./goals');
+const batchingService = require('./batching');
 const { createBroadcastService } = require('./broadcast');
 
 module.exports = {
     // App State (exports directs)
     ...appState,
     
-    // Factory functions pour services avec injection de dépendances
-    createTwitchService,
-    createGoalsService,
-    createBatchingService,
+    // Services avec pattern initContext
+    twitchService,
+    goalsService,
+    batchingService,
+    
+    // Service avec pattern factory
     createBroadcastService,
 };
