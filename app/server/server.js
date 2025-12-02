@@ -440,19 +440,8 @@ Object.defineProperties(global, {
     eventProcessingInterval: {
         get: () => appState.timers.eventProcessing,
         set: (val) => { appState.timers.eventProcessing = val; }
-    },
-    eventBuffer: {
-        get: () => appState.eventBuffer.queue,
-        set: (val) => { appState.eventBuffer.queue = val; }
-    },
-    isProcessingEvents: {
-        get: () => appState.eventBuffer.isProcessing,
-        set: (val) => { appState.eventBuffer.isProcessing = val; }
-    },
-    lastEventProcessTime: {
-        get: () => appState.eventBuffer.lastProcessTime,
-        set: (val) => { appState.eventBuffer.lastProcessTime = val; }
     }
+    // Note: eventBuffer, isProcessingEvents, lastEventProcessTime ont été remplacés par EventQueue
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2447,7 +2436,6 @@ function loadFollowGoals() {
             const content = fs.readFileSync(configPath, 'utf8');
             const lines = content.split(/\r?\n/).filter(line => line.trim());
             
-            const oldGoalsSize = followGoals.size;
             followGoals.clear();
             lines.forEach(line => {
                 const match = line.match(/^(\d+):\s*(.*?)\s*$/);
@@ -2480,7 +2468,6 @@ function loadSubGoals() {
             const content = fs.readFileSync(configPath, 'utf8');
             const lines = content.split(/\r?\n/).filter(line => line.trim());
             
-            const oldGoalsSize = subGoals.size;
             subGoals.clear();
             lines.forEach(line => {
                 const match = line.match(/^(\d+):\s*(.*?)\s*$/);
@@ -3967,13 +3954,11 @@ app.get('/api/status', (req, res) => {
         lastUpdate: new Date().toISOString(),
         state: stateInfo, // Architecture centralisée v2.3.0
         websocketClients: wss.clients.size,
-        // 📄 Informations sur le tampon d'événements
-        eventBuffer: {
-            size: eventBuffer.length,
-            isProcessing: isProcessingEvents,
-            lastProcessTime: lastEventProcessTime > 0 ? new Date(lastEventProcessTime).toISOString() : null,
-            maxEventsPerBatch: MAX_EVENTS_PER_BATCH,
-            processingDelay: EVENT_PROCESSING_DELAY
+        // 📄 Informations sur la file d'événements (EventQueue)
+        eventQueue: {
+            size: eventQueue.size(),
+            isProcessing: eventQueue.processing,
+            maxEventsPerBatch: MAX_EVENTS_PER_BATCH
         }
     });
 });
@@ -4142,32 +4127,31 @@ app.get('/api/follow_goal', (req, res) => {
     res.json({ goal });
 });
 
-// 📄 Endpoint pour gérer le tampon d'événements
+// 📄 Endpoint pour gérer la file d'événements (utilise EventQueue)
 app.post('/api/event-buffer/clear', (req, res) => {
     try {
-        const clearedEvents = eventBuffer.length;
-        eventBuffer = [];
-        isProcessingEvents = false;
+        const clearedEvents = eventQueue.size();
+        eventQueue.clear();
         
-        logEvent('INFO', `🧹 Tampon d'événements vidé: ${clearedEvents} événements supprimés`);
+        logEvent('INFO', `🧹 File d'événements vidée: ${clearedEvents} événements supprimés`);
         
         res.json({
             success: true,
-            message: `Tampon vidé: ${clearedEvents} événements supprimés`,
+            message: `File vidée: ${clearedEvents} événements supprimés`,
             clearedEvents: clearedEvents
         });
     } catch (error) {
-        logEvent('ERROR', '❌ Erreur vidage tampon:', error.message);
+        logEvent('ERROR', '❌ Erreur vidage file:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.get('/api/event-buffer/status', (req, res) => {
+    const events = eventQueue.getAll();
     res.json({
-        size: eventBuffer.length,
-        isProcessing: isProcessingEvents,
-        lastProcessTime: lastEventProcessTime > 0 ? new Date(lastEventProcessTime).toISOString() : null,
-        events: eventBuffer.map(e => ({
+        size: events.length,
+        isProcessing: eventQueue.processing,
+        events: events.map(e => ({
             id: e.id,
             type: e.type,
             timestamp: new Date(e.timestamp).toISOString(),
@@ -4733,10 +4717,8 @@ app.listen(PORT, () => {
     // Initialiser les fichiers avec le compteur actuel
     updateFollowFiles(currentFollows);
     
-    // 📄 Initialiser le système de tampon d'événements
-    eventBuffer = [];
-    isProcessingEvents = false;
-    logEvent('INFO', '📄 Système de tampon d\'événements initialisé');
+    // Note: EventQueue est initialisé lors de sa déclaration (remplace l'ancien eventBuffer)
+    logEvent('INFO', '📄 EventQueue initialisée');
     
     console.log('✅ Serveur prêt !');
     
@@ -4797,10 +4779,10 @@ process.on('SIGINT', () => {
         console.log('👁️ Surveillance fichier subs arrêtée');
     }
     
-    // 📄 Arrêter le traitement des événements
-    isProcessingEvents = false;
-    if (eventBuffer && eventBuffer.length > 0) {
-        console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
+    // 📄 Vérifier les événements en attente dans la queue
+    const pendingEvents = eventQueue.size();
+    if (pendingEvents > 0) {
+        console.log(`⚠️ ${pendingEvents} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);
 });
@@ -4824,10 +4806,10 @@ process.on('SIGTERM', () => {
         console.log('👁️ Surveillance fichier subs arrêtée');
     }
     
-    // 📄 Arrêter le traitement des événements
-    isProcessingEvents = false;
-    if (eventBuffer && eventBuffer.length > 0) {
-        console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
+    // 📄 Vérifier les événements en attente dans la queue
+    const pendingEvents = eventQueue.size();
+    if (pendingEvents > 0) {
+        console.log(`⚠️ ${pendingEvents} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);
 });
