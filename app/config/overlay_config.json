@@ -5,7 +5,7 @@
     "weight": "normal"
   },
   "colors": {
-    "text": "rgba(12,245,235,0.5)",
+    "text": "rgba(12,245,235,1)",
     "shadow": "rgba(0,0,0,0.5)",
     "stroke": "black"
   },

@@ -121,6 +121,25 @@
         .animate-up .new {
             animation: slideInUp 0.4s forwards ease-in-out;
         }
+
+        /* Animations pour transition directe (batch) */
+        .count-exit {
+            animation: fadeSlideOut 0.3s forwards ease-in-out;
+        }
+
+        .count-enter {
+            animation: fadeSlideIn 0.3s forwards ease-in-out;
+        }
+
+        @keyframes fadeSlideOut {
+            0%   { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(50%); }
+        }
+
+        @keyframes fadeSlideIn {
+            0%   { opacity: 0; transform: translateY(-50%); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -366,7 +385,11 @@
             requestAnimationFrame(animate);
         }
         
-        function displayGoalText(goal) {
+        function displayGoalText(goal, direction = null) {
+            // Si une direction est fournie (ex: animate from queue), l'appliquer
+            if (direction !== null) {
+                animationDirection = direction;
+            }
             let displayText;
             
             if (goal.isMaxReached) {
@@ -404,10 +427,16 @@
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'follow_update' && data.goal) {
-                            updateFollowgoal(data.goal);
+                            // Passer les infos de batch si disponibles
+                            const batchInfo = {
+                                batchCount: data.batchCount || 0,
+                                isBatch: data.isBatch || false,
+                                isRemoval: data.isRemoval || false
+                            };
+                            updateFollowgoal(data.goal, batchInfo);
                         }
                     } catch (error) {
-                        console.error('âŒ Erreur parsing message:', error);
+                        console.error('âŒ Erreur parsing message:', error);
                     }
                 };
 
@@ -438,34 +467,128 @@
             }
         }
         
-        function updateFollowgoal(goal) {
+        function updateFollowgoal(goal, batchInfo = {}) {
             currentFollowgoal = goal;
-            
+
             if (previousSubCount !== null && goal.current !== previousSubCount) {
-                const direction = goal.current > previousSubCount ? "down" : "up";
-                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current})`);
+                const delta = goal.current - previousSubCount;
+                const direction = delta > 0 ? "down" : "up";
+                const absDelta = Math.abs(delta);
                 
-                animationQueue.push({
-                    from: previousSubCount,
-                    to: goal.current,
-                    goal: goal,
-                    direction: direction
-                });
+                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current}), delta: ${delta}`);
+                console.log(`ðŸ“¦ BatchInfo: isBatch=${batchInfo.isBatch}, batchCount=${batchInfo.batchCount}, isRemoval=${batchInfo.isRemoval}`);
+
+                // DÃ©cider du type d'animation basÃ© sur le batch ET le delta
+                // Animation slot-machine si: batch avec plusieurs events OU delta > 1
+                const shouldUseSlotMachine = (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) || absDelta > 1;
                 
-                if (!isAnimating) {
-                    isAnimating = true;
-                    const animation = animationQueue.shift();
-                    animateCounterProgressive(animation.from, animation.to, animation.goal, animation.direction);
+                if (shouldUseSlotMachine) {
+                    console.log(`ðŸŽ° Animation SLOT-MACHINE: ${previousSubCount} â†’ ${goal.current} (${absDelta} unitÃ©s)`);
+                    // Vider la queue et faire une animation directe
+                    animationQueue = [];
+                    animateSlotMachine(previousSubCount, goal.current, goal, direction);
+                } else {
+                    console.log(`ðŸ“ Animation PROGRESSIVE: ${previousSubCount} â†’ ${goal.current}`);
+                    // Animation progressive normale pour changement unique
+                    animationQueue.push({
+                        from: previousSubCount,
+                        to: goal.current,
+                        goal: goal,
+                        direction: direction
+                    });
+
+                    if (!isAnimating) {
+                        isAnimating = true;
+                        const animation = animationQueue.shift();
+                        animateCounterProgressive(animation.from, animation.to, animation.goal, animation.direction);
+                    }
                 }
             } else {
                 displayGoalText(goal);
             }
-            
+
             previousSubCount = goal.current;
             console.log('ðŸ“Š Followgoal mis Ã  jour');
         }
         
-        function forceRecalculateDisplay() {
+                /**
+         * Animation SLOT-MACHINE pour les changements groupÃ©s
+         * Effet de dÃ©filement sÃ©quentiel : 390 â†’ 391 â†’ 392 â†’ ... â†’ 401
+         * AccÃ©lÃ¨re au dÃ©but, ralentit vers la fin (easing)
+         */
+        function animateSlotMachine(from, to, goal, direction) {
+            console.log(`ðŸŽ° DÃ©marrage slot-machine: ${from} â†’ ${to}`);
+            isAnimating = true;
+            
+            const delta = to - from;
+            const totalSteps = Math.abs(delta);
+            const step = delta > 0 ? 1 : -1; // +1 ou -1 selon la direction
+            
+            // DurÃ©e totale adaptÃ©e au nombre d'Ã©tapes (min 500ms, max 1500ms)
+            const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
+            
+            let currentValue = from;
+            let stepIndex = 0;
+            
+            console.log(`ðŸ”¢ ${totalSteps} Ã©tapes Ã  afficher en ${totalDuration}ms`);
+            
+            function easeInOutQuad(t) {
+                // AccÃ©lÃ¨re au dÃ©but, ralentit Ã  la fin
+                return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            }
+            
+            function getDelayForStep(index, total) {
+                // Calculer le dÃ©lai pour cette Ã©tape basÃ© sur l'easing
+                // Plus rapide au milieu, plus lent au dÃ©but et Ã  la fin
+                const progressBefore = index / total;
+                const progressAfter = (index + 1) / total;
+                const easedBefore = easeInOutQuad(progressBefore);
+                const easedAfter = easeInOutQuad(progressAfter);
+                const stepDuration = (easedAfter - easedBefore) * totalDuration;
+                
+                // Minimum 30ms entre chaque Ã©tape pour que ce soit visible
+                return Math.max(stepDuration, 30);
+            }
+            
+            function displayStep() {
+                // Afficher la valeur actuelle
+                animationDirection = direction;
+                const intermediateGoal = { ...goal, current: currentValue };
+                displayGoalText(intermediateGoal);
+                
+                // Passer Ã  l'Ã©tape suivante
+                if (currentValue !== to) {
+                    currentValue += step;
+                    stepIndex++;
+                    
+                    const delay = getDelayForStep(stepIndex, totalSteps);
+                    setTimeout(displayStep, delay);
+                } else {
+                    // Animation terminÃ©e
+                    finishAnimation();
+                }
+            }
+            
+            function finishAnimation() {
+                // S'assurer que la valeur finale est affichÃ©e
+                animationDirection = direction;
+                displayGoalText(goal);
+                
+                console.log(`âœ… Slot-machine terminÃ©e: ${to}`);
+                isAnimating = false;
+                
+                // Traiter la file d'attente si nÃ©cessaire
+                if (animationQueue.length > 0) {
+                    const next = animationQueue.shift();
+                    isAnimating = true;
+                    animateCounterProgressive(next.from, next.to, next.goal, next.direction);
+                }
+            }
+            
+            // DÃ©marrer le dÃ©filement
+            displayStep();
+        }
+function forceRecalculateDisplay() {
             console.log(' Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
             currentText = "";

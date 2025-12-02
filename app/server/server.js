@@ -1482,11 +1482,10 @@ function handleSubEvent(data) {
                 break;
                 
             case 'end_sub':
-                // Pour les fins d'abonnement, retirer immédiatement (pas de batching négatif)
-                currentSubs = Math.max(0, currentSubs - 1);
-                updateSubFiles(currentSubs);
-                broadcastSubUpdate(1);
-                console.log(`⏹️ FIN D'ABONNEMENT: ${userName}`);
+                // Pour les fins d'abonnement, utiliser un batching de suppressions
+                // afin de fusionner plusieurs unsubs rapprochés en une seule animation
+                addSubEndToBatch(1);
+                console.log(`⏹️ FIN D'ABONNEMENT ajouté au batch: ${userName}`);
                 break;
                 
             default:
@@ -1502,6 +1501,17 @@ function handleSubEvent(data) {
         
         // En cas d'erreur, pas de synchronisation pour les subs (pas d'API disponible)
         logEvent('WARN', '⚠️ Pas de synchronisation auto pour les subs');
+    }
+}
+
+// Gérer un événement de sub_end (séparé pour clarté)
+function handleSubEndEvent(data) {
+    try {
+        const userName = data.user_name || 'Utilisateur inconnu';
+        logEvent('SUB_END', `⏹️ Événement fin d'abonnement: ${userName}`);
+        addSubEndToBatch(1);
+    } catch (error) {
+        logEvent('ERROR', '❌ Erreur gestion événement sub end:', error.message);
     }
 }
 
@@ -1574,6 +1584,8 @@ function updateSubCount(newCount) {
     
     // Mettre à jour les fichiers
     updateSubFiles(currentSubs);
+    // Sauvegarder le compteur subs pour persistance
+    try { saveSubCountToFile(currentSubs); } catch (e) { /* ignore */ }
     
     // Diffuser aux clients WebSocket
     broadcastSubUpdate();
@@ -1999,12 +2011,9 @@ async function handleEventSubNotification(message) {
                 console.log(`👤 Utilisateur: ${endUserName}`);
                 console.log(`⭐ Tier: ${endTier}`);
                 
-                // Décrémenter immédiatement (pas de batching pour les fins)
-                currentSubs = Math.max(0, currentSubs - 1);
-                appState.counters.subs = currentSubs;
-                updateSubFiles(currentSubs);
-                broadcastSubUpdate(-1);
-                saveSubCountToFile(currentSubs);
+                // Utiliser batching pour les fins d'abonnement afin de fusionner plusieurs unsubs
+                // ✅ C'est ici que la fusion s'opère pour le "slot machine" côté client
+                addSubEndToBatch(1);
                 break;
                 
             // ❌ NE PAS GÉRER channel.subscription.renew
@@ -2740,6 +2749,134 @@ function flushSubBatch() {
 }
 
 // ========================================
+// BATCHING POUR LES UNSUBS (fin d'abonnement)
+// ========================================
+// Objet local pour accumuler les unsubs rapprochés
+const subEndBatch = { count: 0, timer: null, isAnimating: false };
+
+// ========================================
+// BATCHING POUR LES UNFOLLOWS (retrait de follows)
+// ========================================
+// Objet local pour accumuler les unfollows rapprochés
+const followRemoveBatch = { count: 0, timer: null, isAnimating: false };
+
+function addFollowRemoveToBatch(count = 1) {
+    followRemoveBatch.count += count;
+
+    // Annuler le timer précédent si existe
+    if (followRemoveBatch.timer) {
+        clearTimeout(followRemoveBatch.timer);
+    }
+
+    // Si une animation de suppression est en cours, juste accumuler
+    if (followRemoveBatch.isAnimating) {
+        logEvent('INFO', `⏳ Animation unfollows en cours - Accumulation unfollows: ${followRemoveBatch.count}`);
+        return;
+    }
+
+    // Attendre un court délai pour agréger plusieurs unfollows
+    timerRegistry.clearTimeout('followRemoveBatch');
+    followRemoveBatch.timer = timerRegistry.setTimeout('followRemoveBatch', () => {
+        flushFollowRemoveBatch();
+    }, BATCH_DELAY);
+
+    logEvent('INFO', `🔥 Unfollow ajouté au batch: ${followRemoveBatch.count} (flush dans ${BATCH_DELAY}ms)`);
+}
+
+function flushFollowRemoveBatch() {
+    if (followRemoveBatch.count === 0) return;
+
+    const batchCount = followRemoveBatch.count;
+    followRemoveBatch.count = 0;
+    followRemoveBatch.timer = null;
+
+    // Marquer qu'une animation de suppression est en cours
+    followRemoveBatch.isAnimating = true;
+
+    // Décrémenter le compteur
+    currentFollows = Math.max(0, currentFollows - batchCount);
+    
+    // Synchroniser lastKnownFollowCount
+    lastKnownFollowCount = currentFollows;
+
+    // Mettre à jour les fichiers
+    updateFollowFiles(currentFollows);
+
+    // Diffuser en indiquant une suppression (batchCount négatif)
+    broadcastFollowUpdate(-batchCount);
+
+    logEvent('INFO', `🎬 Animation UNFOLLOW démarrée: -${batchCount} follows (Total: ${currentFollows}) - Durée: ${ANIMATION_DURATION}ms`);
+
+    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
+    timerRegistry.setTimeout('followRemoveAnimation', () => {
+        followRemoveBatch.isAnimating = false;
+        logEvent('INFO', `✅ Animation UNFOLLOW terminée - Batch actuel: ${followRemoveBatch.count} unfollows`);
+
+        // Si des events se sont accumulés pendant l'animation, les traiter
+        if (followRemoveBatch.count > 0) {
+            logEvent('INFO', `📄 Flush automatique du batch unfollows accumulé: ${followRemoveBatch.count}`);
+            flushFollowRemoveBatch();
+        }
+    }, ANIMATION_DURATION);
+}
+
+function addSubEndToBatch(count = 1) {
+    subEndBatch.count += count;
+
+    // Annuler le timer précédent si existe
+    if (subEndBatch.timer) {
+        clearTimeout(subEndBatch.timer);
+    }
+
+    // Si une animation de suppression est en cours, juste accumuler
+    if (subEndBatch.isAnimating) {
+        logEvent('INFO', `⏳ Animation unsubs en cours - Accumulation unsubs: ${subEndBatch.count}`);
+        return;
+    }
+
+    // Attendre un court délai pour agréger plusieurs unsubs
+    timerRegistry.clearTimeout('subEndBatch');
+    subEndBatch.timer = timerRegistry.setTimeout('subEndBatch', () => {
+        flushSubEndBatch();
+    }, BATCH_DELAY);
+
+    logEvent('INFO', `🔥 Unsub ajouté au batch: ${subEndBatch.count} (flush dans ${BATCH_DELAY}ms)`);
+}
+
+function flushSubEndBatch() {
+    if (subEndBatch.count === 0) return;
+
+    const batchCount = subEndBatch.count;
+    subEndBatch.count = 0;
+    subEndBatch.timer = null;
+
+    // Marquer qu'une animation de suppression est en cours
+    subEndBatch.isAnimating = true;
+
+    // Décrémenter le compteur (on utilise batchCount positif ici, la soustraction se fait ici)
+    currentSubs = Math.max(0, currentSubs - batchCount);
+
+    // Mettre à jour les fichiers
+    updateSubFiles(currentSubs);
+
+    // Diffuser en indiquant une suppression (batchCount négatif)
+    broadcastSubUpdate(-batchCount);
+
+    logEvent('INFO', `🎬 Animation UNSUB démarrée: -${batchCount} subs (Total: ${currentSubs}) - Durée: ${ANIMATION_DURATION}ms`);
+
+    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
+    timerRegistry.setTimeout('subEndAnimation', () => {
+        subEndBatch.isAnimating = false;
+        logEvent('INFO', `✅ Animation UNSUB terminée - Batch actuel: ${subEndBatch.count} unsubs`);
+
+        if (subEndBatch.count > 0) {
+            logEvent('INFO', `📄 Flush automatique du batch accumulé (unsubs): ${subEndBatch.count}`);
+            flushSubEndBatch();
+        }
+    }, ANIMATION_DURATION);
+}
+
+// ========================================
 // Fin du système de batching
 // ========================================
 
@@ -2835,12 +2972,15 @@ wss.on('connection', (ws) => {
 
 // Diffuser les mises à jour de follows aux clients WebSocket
 function broadcastFollowUpdate(batchCount = 1) {
+    const isRemoval = batchCount < 0;
+    const absCount = Math.abs(batchCount);
     const data = {
         type: 'follow_update',
         count: currentFollows,
         goal: getCurrentFollowGoal(currentFollows),
-        batchCount: batchCount, // Nombre de follows groupés
-        isBatch: batchCount > 1 // Indique si c'est un event groupé
+        batchCount: batchCount, // Nombre de follows groupés (peut être négatif pour unfollows)
+        isBatch: absCount > 1, // Indique si c'est un event groupé
+        isRemoval: isRemoval // Indique si c'est une suppression
     };
     
     const message = JSON.stringify(data);
@@ -2879,12 +3019,15 @@ function broadcastFollowUpdate(batchCount = 1) {
 
 // Diffuser les mises à jour de subs aux clients WebSocket  
 function broadcastSubUpdate(batchCount = 1, tiers = {}) {
+    const isRemoval = batchCount < 0;
+    const absCount = Math.abs(batchCount);
     const data = {
         type: 'sub_update',
         count: currentSubs,
         goal: getCurrentSubGoal(currentSubs),
-        batchCount: batchCount, // Nombre de subs groupés
-        isBatch: batchCount > 1, // Indique si c'est un event groupé
+        batchCount: batchCount, // Nombre de subs groupés (peut être négatif pour unsubs)
+        isBatch: absCount > 1, // Indique si c'est un event groupé
+        isRemoval: isRemoval, // Indique si c'est une suppression
         tiers: tiers // Détails des tiers groupés
     };
     
@@ -3065,17 +3208,11 @@ app.post('/admin/remove-follows', (req, res) => {
     try {
         const { amount } = req.body;
         
-        // Utiliser la variable globale
-        currentFollows = Math.max(0, currentFollows - amount);
+        // Utiliser le système de batching pour gérer le spam (comme add-follows)
+        addFollowRemoveToBatch(amount);
         
-        // Mettre à jour les fichiers avec la fonction existante
-        updateFollowFiles(currentFollows);
-        
-        // Broadcast avec la fonction existante
-        broadcastFollowUpdate();
-        
-        logEvent('INFO', `➖ Admin: -${amount} follows (Total: ${currentFollows})`);
-        res.json({ success: true, total: currentFollows });
+        logEvent('INFO', `➖ Admin: Ajout de -${amount} follows au batch`);
+        res.json({ success: true, total: Math.max(0, currentFollows - followRemoveBatch.count) });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur remove follows', { error: error.message });
         res.status(500).json({ error: error.message });
@@ -3125,17 +3262,11 @@ app.post('/admin/remove-subs', (req, res) => {
     try {
         const { amount } = req.body;
         
-        // Utiliser la variable globale
-        currentSubs = Math.max(0, currentSubs - amount);
+        // Utiliser le système de batching pour gérer le spam (comme remove-follows)
+        addSubEndToBatch(amount);
         
-        // Mettre à jour les fichiers avec la fonction existante
-        updateSubFiles(currentSubs);
-        
-        // Broadcast avec la fonction existante
-        broadcastSubUpdate();
-        
-        logEvent('INFO', `➖ Admin: -${amount} subs (Total: ${currentSubs})`);
-        res.json({ success: true, total: currentSubs });
+        logEvent('INFO', `➖ Admin: Ajout de -${amount} subs au batch`);
+        res.json({ success: true, total: Math.max(0, currentSubs - subEndBatch.count) });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur remove subs', { error: error.message });
         res.status(500).json({ error: error.message });
@@ -4640,4 +4771,3 @@ process.on('unhandledRejection', (reason, promise) => {
     
     // Ne pas arrêter le serveur, juste loguer l'erreur
 });
-
