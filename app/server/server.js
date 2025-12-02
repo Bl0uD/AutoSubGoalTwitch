@@ -28,6 +28,8 @@ const {
     twitchService,
     goalsService,
     batchingService,
+    countersService,
+    filesService,
     createBroadcastService,
 } = require('./services');
 
@@ -750,61 +752,15 @@ async function canGrantSelfModerator() {
     }
 }
 
-// Sauvegarder le nombre de follows sur disque pour la persistence
-function saveFollowCountToFile(count) {
-    try {
-        // Utiliser le système centralisé app_state.json
-        const state = loadAppState();
-        state.counters.follows = count;
-        saveAppState(state);
-        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
-    } catch (error) {
-        console.error('❌ Erreur sauvegarde compteur follows:', error.message);
-    }
-}
+// ========================================
+// 📊 WRAPPERS COMPTEURS (délégation à countersService)
+// ========================================
+// Note: Ces wrappers seront supprimés une fois la migration complète
 
-// Charger le nombre de follows depuis le disque
-function loadFollowCountFromFile() {
-    try {
-        // Utiliser le système centralisé app_state.json
-        const state = loadAppState();
-        if (state.counters.follows > 0) {
-            console.log(`📂 Compteur restauré: ${state.counters.follows} follows (depuis app_state.json)`);
-            return state.counters.follows;
-        }
-    } catch (error) {
-        console.error('❌ Erreur chargement compteur follows:', error.message);
-    }
-    return 0;
-}
-
-// Sauvegarder le nombre de subs sur disque pour la persistence
-function saveSubCountToFile(count) {
-    try {
-        // Utiliser le système centralisé app_state.json
-        const state = loadAppState();
-        state.counters.subs = count;
-        saveAppState(state);
-        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
-    } catch (error) {
-        console.error('❌ Erreur sauvegarde compteur subs:', error.message);
-    }
-}
-
-// Charger le nombre de subs depuis le disque
-function loadSubCountFromFile() {
-    try {
-        // Utiliser le système centralisé app_state.json
-        const state = loadAppState();
-        if (state.counters.subs > 0) {
-            console.log(`📂 Compteur restauré: ${state.counters.subs} subs (depuis app_state.json)`);
-            return state.counters.subs;
-        }
-    } catch (error) {
-        console.error('❌ Erreur chargement compteur subs sauvegardé:', error.message);
-    }
-    return 0;
-}
+const saveFollowCountToFile = (count) => countersService.saveFollowCountToFile(count);
+const loadFollowCountFromFile = () => countersService.loadFollowCountFromFile();
+const saveSubCountToFile = (count) => countersService.saveSubCountToFile(count);
+const loadSubCountFromFile = () => countersService.loadSubCountFromFile();
 
 // Fonction pour renouveler automatiquement le token d'accès
 async function refreshTwitchToken() {
@@ -2595,7 +2551,7 @@ const appContext = {
 };
 
 // ==================================================================
-// 🔧 INITIALISATION DES SERVICES MODULAIRES (Phase 3.7)
+// 🔧 INITIALISATION DES SERVICES MODULAIRES (Phase 4.0)
 // ==================================================================
 // Les services sont initialisés avec le contexte de l'application.
 // Ils remplacent les fonctions inline précédemment définies.
@@ -2611,6 +2567,33 @@ const broadcastServiceInstance = createBroadcastService({
     getCurrentFollows: () => currentFollows,
     getCurrentSubs: () => currentSubs,
 });
+
+// Contexte pour filesService (dépend de goalsService)
+const filesContext = {
+    getCurrentFollowGoal,
+    getCurrentSubGoal,
+};
+
+// Initialiser filesService en premier
+filesService.initContext(filesContext);
+
+// Contexte pour countersService (dépend de filesService et broadcastService)
+const countersContext = {
+    loadAppState,
+    saveAppState,
+    getCurrentFollows: () => currentFollows,
+    setCurrentFollows: (val) => { currentFollows = val; },
+    getCurrentSubs: () => currentSubs,
+    setCurrentSubs: (val) => { currentSubs = val; },
+    setLastKnownFollowCount: (val) => { lastKnownFollowCount = val; },
+    updateFollowFiles: filesService.updateFollowFiles,
+    updateSubFiles: filesService.updateSubFiles,
+    broadcastFollowUpdate,
+    broadcastSubUpdate,
+};
+
+// Initialiser countersService
+countersService.initContext(countersContext);
 
 // Contexte enrichi pour les services avec pattern initContext
 const serviceContext = {
@@ -2640,9 +2623,9 @@ const serviceContext = {
     BATCH_DELAY,
     ANIMATION_DURATION,
     
-    // Functions
-    updateFollowFiles,
-    updateSubFiles,
+    // Functions (délégation aux services)
+    updateFollowFiles: filesService.updateFollowFiles,
+    updateSubFiles: filesService.updateSubFiles,
     broadcastFollowUpdate,
     broadcastSubUpdate,
 };
@@ -2657,9 +2640,11 @@ appContext.services = {
     batching: batchingService,
     broadcast: broadcastServiceInstance,
     twitch: twitchService,
+    counters: countersService,
+    files: filesService,
 };
 
-logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch)');
+logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch, counters, files)');
 
 // Initialiser les contextes des routes
 initAllContexts(appContext);

@@ -9,12 +9,16 @@
  * - goals : Gestion des objectifs follows/subs
  * - batching : Système de batching intelligent pour les événements
  * - broadcast : Diffusion WebSocket aux clients
+ * - counters : Gestion des compteurs follows/subs
+ * - files : Mise à jour des fichiers overlays
  */
 
 const appState = require('./app-state');
 const twitchService = require('./twitch');
 const goalsService = require('./goals');
 const batchingService = require('./batching');
+const countersService = require('./counters');
+const filesService = require('./files');
 const { createBroadcastService } = require('./broadcast');
 
 module.exports = {
@@ -25,6 +29,8 @@ module.exports = {
     twitchService,
     goalsService,
     batchingService,
+    countersService,
+    filesService,
     
     // Service avec pattern factory
     createBroadcastService,
