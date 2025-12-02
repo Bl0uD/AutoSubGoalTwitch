@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>SubCount Auto - Unified Overlay</title>
+    <style>
+        @font-face {
+            font-family: 'SEA';
+            src: local('SEA'), url('SEA.ttf') format('truetype');
+            font-display: swap;
+        }
+        
+        :root {
+            /* Variables CSS dynamiques (modifiées par le serveur JS) */
+            --font-family: 'Arial';
+            --font-size: 64px;
+            --font-weight: normal;
+            --text-color: white;
+            --shadow-color: rgba(0,0,0,0.5);
+            --stroke-color: black;
+            --anim-duration: 1s;
+            --anim-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --padding-left: 20px;
+            --padding-right: 20px;
+            --gap: 0;
+            /* Alignement dynamique basé sur le paramètre 'align' */
+            --justify-content: flex-start;
+        }
+        
+        body {
+            background: transparent;
+            margin: 0;
+            font-family: var(--font-family), Arial, system-ui, sans-serif;
+            display: flex;
+            justify-content: var(--justify-content);
+            align-items: center;
+            height: 100vh;
+            color: var(--text-color);
+            padding-left: var(--padding-left);
+            padding-right: var(--padding-right);
+        }
+
+        .counter {
+            display: flex;
+            font-size: var(--font-size);
+            font-weight: var(--font-weight);
+            gap: var(--gap);
+            white-space: pre;
+            text-shadow: 3px 3px 3px var(--shadow-color);
+            -webkit-text-stroke: 1px var(--stroke-color);
+        }
+
+        .digit-container {
+            position: relative;
+            width: auto;
+            min-width: 0.3em;
+            height: 1.3em;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .space-container {
+            width: 0.25em;
+            display: inline-block;
+        }
+
+        .digit {
+            position: absolute;
+            width: auto;
+            white-space: nowrap;
+            left: 0;
+            text-align: left;
+            transition: transform var(--anim-duration) var(--anim-easing);
+        }
+
+        .old { transform: translateY(0); }
+        .new { transform: translateY(-100%); }
+
+        .animate .old, .animate .new { animation: none; }
+
+        @keyframes slideOut {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(100%); }
+        }
+
+        @keyframes slideIn {
+            0%   { transform: translateY(-100%); }
+            100% { transform: translateY(0); }
+        }
+
+        @keyframes slideOutUp {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+
+        @keyframes slideInUp {
+            0%   { transform: translateY(100%); }
+            100% { transform: translateY(0); }
+        }
+
+        .animate-down .old { animation: slideOut 0.4s forwards ease-in-out; }
+        .animate-down .new { animation: slideIn 0.4s forwards ease-in-out; }
+        .animate-up .old { animation: slideOutUp 0.4s forwards ease-in-out; }
+        .animate-up .new { animation: slideInUp 0.4s forwards ease-in-out; }
+
+        /* Animations pour transition directe (batch) */
+        .count-exit { animation: fadeSlideOut 0.3s forwards ease-in-out; }
+        .count-enter { animation: fadeSlideIn 0.3s forwards ease-in-out; }
+
+        @keyframes fadeSlideOut {
+            0%   { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(50%); }
+        }
+
+        @keyframes fadeSlideIn {
+            0%   { opacity: 0; transform: translateY(-50%); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="counter" id="counter">Chargement...</div>
+
+    <script>
+        // ==================================================================
+        // 🔧 CONFIGURATION VIA PARAMÈTRES URL
+        // ==================================================================
+        // Usage: overlay.html?type=follow&align=left
+        // - type: 'follow' ou 'sub' (défaut: 'follow')
+        // - align: 'left' ou 'right' (défaut: 'left')
+        // ==================================================================
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const OVERLAY_TYPE = urlParams.get('type') || 'follow'; // 'follow' ou 'sub'
+        const OVERLAY_ALIGN = urlParams.get('align') || 'left'; // 'left' ou 'right'
+        
+        // Configuration dynamique basée sur les paramètres
+        const CONFIG = {
+            type: OVERLAY_TYPE === 'sub' ? 'sub' : 'follow',
+            align: OVERLAY_ALIGN === 'right' ? 'right' : 'left',
+            wsEventType: OVERLAY_TYPE === 'sub' ? 'sub_update' : 'follow_update',
+            apiEndpoint: OVERLAY_TYPE === 'sub' ? '/api/sub_goal' : '/api/follow_goal',
+        };
+        
+        console.log(`🎯 Overlay configuré: type=${CONFIG.type}, align=${CONFIG.align}`);
+        console.log(`📡 Écoute: ${CONFIG.wsEventType}, API: ${CONFIG.apiEndpoint}`);
+        
+        // Appliquer l'alignement
+        document.documentElement.style.setProperty(
+            '--justify-content', 
+            CONFIG.align === 'right' ? 'flex-end' : 'flex-start'
+        );
+        
+        // ==================================================================
+        // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // ==================================================================
+        
+        let configWs = null;
+        
+        function connectConfigWebSocket() {
+            try {
+                configWs = new WebSocket('ws://localhost:8084');
+                
+                configWs.onopen = () => {
+                    console.log('✅ Config WebSocket connecté (port 8084)');
+                };
+                
+                configWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'config_update' && data.config) {
+                            console.log('🎨 Configuration reçue:', data.config);
+                            applyConfig(data.config);
+                        }
+                    } catch (error) {
+                        console.error('❌ Erreur parsing config:', error);
+                    }
+                };
+                
+                configWs.onerror = (error) => {
+                    console.error('❌ Erreur Config WebSocket:', error);
+                };
+                
+                configWs.onclose = () => {
+                    console.log('🔌 Config WebSocket déconnecté, reconnexion dans 5s...');
+                    setTimeout(connectConfigWebSocket, 5000);
+                };
+            } catch (error) {
+                console.error('❌ Erreur connexion Config WebSocket:', error);
+                setTimeout(connectConfigWebSocket, 5000);
+            }
+        }
+        
+        function applyConfig(config) {
+            const root = document.documentElement;
+            
+            // Appliquer la police
+            if (config.font) {
+                if (config.font.family) root.style.setProperty('--font-family', config.font.family);
+                if (config.font.size) root.style.setProperty('--font-size', config.font.size);
+                if (config.font.weight) root.style.setProperty('--font-weight', config.font.weight);
+            }
+            
+            // Appliquer les couleurs
+            if (config.colors) {
+                if (config.colors.text) root.style.setProperty('--text-color', config.colors.text);
+                if (config.colors.shadow) root.style.setProperty('--shadow-color', config.colors.shadow);
+                if (config.colors.stroke) root.style.setProperty('--stroke-color', config.colors.stroke);
+            }
+            
+            // Appliquer l'animation
+            if (config.animation) {
+                if (config.animation.duration) root.style.setProperty('--anim-duration', config.animation.duration);
+                if (config.animation.easing) root.style.setProperty('--anim-easing', config.animation.easing);
+            }
+            
+            // Appliquer la mise en page
+            if (config.layout) {
+                if (config.layout.paddingLeft) root.style.setProperty('--padding-left', config.layout.paddingLeft);
+                if (config.layout.paddingRight) root.style.setProperty('--padding-right', config.layout.paddingRight);
+                if (config.layout.gap) root.style.setProperty('--gap', config.layout.gap);
+            }
+            
+            console.log('✅ Configuration appliquée avec succès');
+            setTimeout(forceRecalculateDisplay, 100);
+        }
+        
+        async function loadInitialConfig() {
+            try {
+                const response = await fetch('http://localhost:8082/api/overlay-config');
+                if (response.ok) {
+                    const config = await response.json();
+                    console.log('🎨 Configuration initiale chargée:', config);
+                    applyConfig(config);
+                }
+            } catch (error) {
+                console.error('❌ Erreur chargement config initiale:', error);
+            }
+        }
+        
+        loadInitialConfig();
+        connectConfigWebSocket();
+        
+        // ==================================================================
+        // 📊 WEBSOCKET COMPTEUR ET ANIMATIONS
+        // ==================================================================
+        
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        const counterEl = document.getElementById("counter");
+        let currentText = "";
+        let previousCount = null;
+        let animationDirection = "down";
+        let currentGoal = null;
+        let isAnimating = false;
+        let animationQueue = [];
+
+        function createDigitElement(char, className, delay) {
+            const div = document.createElement("div");
+            div.className = className + " digit";
+            div.textContent = char;
+            div.style.animationDelay = `${delay}ms`;
+            return div;
+        }
+
+        function updateCounter(newText) {
+            if (newText === currentText) return;
+
+            const chars = newText.split("");
+            counterEl.innerHTML = "";
+            
+            // Div de mesure avec les mêmes styles que counter
+            const measureDiv = document.createElement("div");
+            measureDiv.style.visibility = "hidden";
+            measureDiv.style.position = "absolute";
+            measureDiv.style.whiteSpace = "nowrap";
+            measureDiv.style.display = "inline-block";
+            
+            const counterStyles = getComputedStyle(counterEl);
+            measureDiv.style.fontSize = counterStyles.fontSize;
+            measureDiv.style.fontFamily = counterStyles.fontFamily;
+            measureDiv.style.fontWeight = counterStyles.fontWeight;
+            measureDiv.style.fontStyle = counterStyles.fontStyle;
+            measureDiv.style.letterSpacing = counterStyles.letterSpacing;
+            measureDiv.style.textShadow = counterStyles.textShadow;
+            measureDiv.style.webkitTextStroke = counterStyles.webkitTextStroke;
+            
+            document.body.appendChild(measureDiv);
+
+            const totalChars = Math.max(chars.length, currentText.length);
+            let changedCount = 0;
+
+            for (let i = 0; i < totalChars; i++) {
+                if ((currentText[i] || "") !== (chars[i] || "")) {
+                    changedCount++;
+                }
+            }
+
+            const changeRatio = changedCount / totalChars;
+            const isFullReset = changeRatio > 0.5;
+
+            chars.forEach((char, index) => {
+                if (char === " ") {
+                    const spaceContainer = document.createElement("div");
+                    spaceContainer.className = "space-container";
+                    spaceContainer.innerHTML = "&nbsp;";
+                    counterEl.appendChild(spaceContainer);
+                } else {
+                    const container = document.createElement("div");
+                    container.className = "digit-container";
+
+                    measureDiv.textContent = char;
+                    const charWidth = measureDiv.getBoundingClientRect().width;
+                    container.style.width = `${Math.max(charWidth, 10)}px`;
+
+                    const currentChar = currentText[index] || "";
+                    const charChanged = char !== currentChar;
+                    const delay = isFullReset ? 0 : index * 50;
+
+                    if (!charChanged && !isFullReset) {
+                        const staticDigit = createDigitElement(char, "static", 0);
+                        staticDigit.style.transform = "translateY(0)";
+                        container.appendChild(staticDigit);
+                    } else {
+                        const oldDigit = createDigitElement(currentChar === " " ? " " : currentChar, "old", delay);
+                        const newDigit = createDigitElement(char, "new", delay);
+
+                        container.appendChild(oldDigit);
+                        container.appendChild(newDigit);
+                        container.classList.add("animate");
+                        container.classList.add(`animate-${animationDirection}`);
+                    }
+
+                    counterEl.appendChild(container);
+                }
+            });
+
+            document.body.removeChild(measureDiv);
+            currentText = newText;
+        }
+        
+        function animateCounterProgressive(fromCount, toCount, goal, direction) {
+            const steps = Math.abs(toCount - fromCount);
+            
+            if (steps === 0) {
+                displayGoalText(goal, direction);
+                return;
+            }
+            
+            const totalDuration = 1000;
+            const startTime = performance.now();
+            
+            console.log(`🎰 Animation: ${fromCount} → ${toCount} (${steps} étapes)`);
+            
+            let lastDisplayedValue = fromCount;
+            
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / totalDuration, 1);
+                const easedProgress = easeOutCubic(progress);
+                const currentValue = Math.round(fromCount + (toCount - fromCount) * easedProgress);
+                
+                if (currentValue !== lastDisplayedValue || progress === 1) {
+                    lastDisplayedValue = currentValue;
+                    const intermediateGoal = { ...goal, current: currentValue };
+                    displayGoalText(intermediateGoal, direction);
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    const finalGoal = { ...goal, current: toCount };
+                    displayGoalText(finalGoal, direction);
+                    isAnimating = false;
+                    processAnimationQueue();
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function displayGoalText(goal, direction = null) {
+            if (direction !== null) {
+                animationDirection = direction;
+            }
+            
+            let displayText;
+            
+            if (goal.isMaxReached) {
+                displayText = goal.current.toString();
+            } else {
+                if (!goal.message || goal.message.trim() === '') {
+                    displayText = `${goal.current}/${goal.target}`;
+                } else {
+                    displayText = `${goal.current}/${goal.target} : ${goal.message}`;
+                }
+            }
+            
+            updateCounter(displayText);
+        }
+        
+        function processAnimationQueue() {
+            if (animationQueue.length > 0 && !isAnimating) {
+                const nextAnimation = animationQueue.shift();
+                isAnimating = true;
+                animateCounterProgressive(nextAnimation.from, nextAnimation.to, nextAnimation.goal, nextAnimation.direction);
+            }
+        }
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://localhost:8083');
+
+                ws.onopen = () => {
+                    console.log('✅ Connecté au WebSocket (compteur)');
+                    reconnectAttempts = 0;
+                    fetchCurrentData();
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        // Filtrer selon le type d'overlay configuré
+                        if (data.type === CONFIG.wsEventType && data.goal) {
+                            updateGoal(data.goal, {
+                                batchCount: data.batchCount || 1,
+                                isBatch: data.isBatch || false
+                            });
+                        }
+                    } catch (error) {
+                        console.error('❌ Erreur parsing message:', error);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('❌ Erreur WebSocket (compteur):', error);
+                };
+
+                ws.onclose = () => {
+                    console.log('🔌 WebSocket compteur déconnecté, reconnexion dans 3s...');
+                    setTimeout(connectWebSocket, 3000);
+                };
+            } catch (error) {
+                console.error('❌ Erreur connexion WebSocket:', error);
+                setTimeout(connectWebSocket, 3000);
+            }
+        }
+        
+        async function fetchCurrentData() {
+            try {
+                const cacheBuster = Date.now();
+                const response = await fetch(`http://localhost:8082${CONFIG.apiEndpoint}?_=${cacheBuster}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateGoal(data.goal);
+                }
+            } catch (error) {
+                console.error(`❌ Erreur récupération données ${CONFIG.type} goal:`, error);
+            }
+        }
+        
+        function updateGoal(goal, batchInfo = {}) {
+            currentGoal = goal;
+
+            if (previousCount !== null && goal.current !== previousCount) {
+                const direction = goal.current > previousCount ? "down" : "up";
+                console.log(`🔄 Direction: ${direction} (${previousCount} → ${goal.current})`);
+
+                if (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) {
+                    console.log(`⚡ Batch détecté: ${batchInfo.batchCount} changements, animation directe`);
+                    animateDirectTransition(previousCount, goal.current, goal, direction);
+                } else {
+                    animationQueue.push({
+                        from: previousCount,
+                        to: goal.current,
+                        goal: goal,
+                        direction: direction
+                    });
+
+                    if (!isAnimating) {
+                        isAnimating = true;
+                        const animation = animationQueue.shift();
+                        animateCounterProgressive(animation.from, animation.to, animation.goal, animation.direction);
+                    }
+                }
+            } else {
+                displayGoalText(goal);
+            }
+
+            previousCount = goal.current;
+            console.log(`📊 ${CONFIG.type} goal mis à jour`);
+        }
+        
+        function animateDirectTransition(from, to, goal, direction) {
+            console.log(`🎰 Animation directe: ${from} → ${to}`);
+            isAnimating = true;
+            
+            // Animation de fade out/in sur le counter entier
+            counterEl.classList.add('count-exit');
+            
+            setTimeout(() => {
+                displayGoalText({ ...goal, current: to }, direction);
+                counterEl.classList.remove('count-exit');
+                counterEl.classList.add('count-enter');
+                
+                setTimeout(() => {
+                    counterEl.classList.remove('count-enter');
+                    isAnimating = false;
+                    
+                    if (animationQueue.length > 0) {
+                        const next = animationQueue.shift();
+                        animateCounterProgressive(next.from, next.to, next.goal, next.direction);
+                    }
+                }, 300);
+            }, 300);
+        }
+
+        function forceRecalculateDisplay() {
+            console.log('🔧 Recalcul forcé des dimensions avec la police actuelle');
+            const currentDisplayText = currentText;
+            currentText = "";
+            counterEl.innerHTML = "";
+            void counterEl.offsetHeight;
+            updateCounter(currentDisplayText);
+        }
+        
+        // Initialisation
+        connectWebSocket();
+        setTimeout(fetchCurrentData, 1000);
+        setTimeout(() => {
+            console.log('🔄 Refresh complet - recalcul des dimensions...');
+            forceRecalculateDisplay();
+        }, 15000);
+    </script>
+</body>
+</html>
