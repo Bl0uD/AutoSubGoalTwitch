@@ -30,6 +30,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - **161 polices** détectées (filtrées des 176 brutes)
 - **Logs détaillés** : Callback police avec traçage complet
 
+### 🧹 Nettoyage
+- **server-legacy.js** : Supprimé (remplacé par architecture DI)
+- **app/server/services/** : Supprimé (remplacé par core/factories/)
+- **5724 lignes** de code legacy supprimées
+
 ---
 
 ## [3.1.0] - 2025-12-02
