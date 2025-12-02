@@ -287,11 +287,70 @@ function migrateToEncrypted(filePath) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// FONCTIONS HAUT NIVEAU POUR CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Chiffre un objet de configuration
+ * @param {Object} config - Configuration à chiffrer
+ * @returns {string} Configuration chiffrée en base64
+ */
+function encryptConfig(config) {
+    const json = JSON.stringify(config);
+    return encrypt(json);
+}
+
+/**
+ * Déchiffre une configuration vers objet
+ * @param {string} encrypted - Configuration chiffrée en base64
+ * @returns {Object|null} Configuration déchiffrée
+ */
+function decryptConfig(encrypted) {
+    try {
+        // Nettoie le header si présent
+        let data = encrypted;
+        if (data.startsWith('# ENCRYPTED_CONFIG_V1\n')) {
+            data = data.replace('# ENCRYPTED_CONFIG_V1\n', '').trim();
+        }
+        
+        const decrypted = decrypt(data);
+        
+        // Essaie de parser en JSON
+        try {
+            return JSON.parse(decrypted);
+        } catch (jsonError) {
+            // Ancien format texte: CLIENT_ID=xxx\nACCESS_TOKEN=yyy...
+            // Parse le format texte
+            const result = {};
+            const lines = decrypted.split('\n');
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+                const eqIdx = trimmed.indexOf('=');
+                if (eqIdx > 0) {
+                    const key = trimmed.substring(0, eqIdx).toLowerCase();
+                    const value = trimmed.substring(eqIdx + 1);
+                    result[key] = value;
+                }
+            }
+            return result;
+        }
+    } catch (error) {
+        console.error('❌ Erreur decryptConfig:', error.message);
+        return null;
+    }
+}
+
 module.exports = {
     encrypt,
     decrypt,
     saveEncrypted,
     loadEncrypted,
     setRestrictivePermissions,
-    migrateToEncrypted
+    migrateToEncrypted,
+    
+    // Alias pour compatibilité avec factories
+    encryptConfig,
+    decryptConfig
 };

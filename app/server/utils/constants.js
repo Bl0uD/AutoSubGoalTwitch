@@ -45,7 +45,8 @@ const VALID_SOURCES = Object.freeze(['twitch', 'manual', 'api']);
  */
 const PORTS = Object.freeze({
     HTTP: 8082,
-    WS_DATA: 8083,
+    WS_COUNTER: 8083,   // Alias: WS_DATA
+    WS_DATA: 8083,      // Legacy
     WS_CONFIG: 8084,
 });
 

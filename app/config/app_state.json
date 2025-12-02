@@ -2,13 +2,11 @@
   "counters": {
     "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-02T21:18:36.276Z"
+    "lastUpdated": "2025-12-02T22:28:53.715Z"
   },
   "goals": {
     "currentFollowGoal": 500,
-    "currentSubGoal": 5,
-    "subs": 105,
-    "follows": 105
+    "currentSubGoal": 5
   },
   "overlay": {
     "font": {
@@ -30,43 +28,8 @@
       "gap": "0"
     }
   },
-  "update": {
-    "enabled": true,
-    "checkOnStartup": true,
-    "checkIntervalHours": 24,
-    "autoDownload": false,
-    "notifyOnUpdate": true,
-    "github": {
-      "repo": "Bl0uD/AutoSubGoalTwitch",
-      "apiUrl": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
-      "timeout": 10
-    },
-    "backup": {
-      "enabled": true,
-      "backupDir": "backups",
-      "keepLast": 3
-    }
-  },
   "version": {
-    "current": "3.0.0",
-    "releaseDate": "2025-12-02",
-    "changelog": [
-      "🏗️ Architecture modulaire: 10 services extraits de server.js",
-      "📉 Réduction server.js: 5200 → 2555 lignes (-51%)",
-      "🎰 Animation slot-machine cohérente sur tous les overlays",
-      "🔤 Détection polices utilisateur (HKEY_CURRENT_USER)",
-      "🛠️ Correction boutons retirer follows/subs",
-      "📁 Routes modulaires: pages, api, admin, twitch",
-      "⚡ Utilitaires centralisés: logger, validation, rate-limiter"
-    ],
-    "criticalFiles": [
-      "obs_subcount_auto.py",
-      "server.js",
-      "config-crypto.js",
-      "package.json",
-      "INSTALLER.bat",
-      "START_SERVER.bat",
-      "app_state.json"
-    ]
+    "current": "3.1.0",
+    "releaseDate": "2025-12-02"
   }
 }

@@ -63,15 +63,15 @@ function createTwitchApiService({ stateManager, configCrypto, logger, constants,
             }
             
             // Valider les tokens
-            if (decrypted.access_token && decrypted.user_id) {
+            if (decrypted.access_token && (decrypted.user_id || decrypted.broadcaster_id)) {
                 stateManager.setTwitchAuth(
-                    decrypted.user_id,
-                    decrypted.user_name || null,
+                    decrypted.user_id || decrypted.broadcaster_id,
+                    decrypted.user_name || decrypted.username || null,
                     decrypted.access_token,
                     decrypted.refresh_token
                 );
                 
-                logEvent('INFO', `✅ Tokens Twitch chargés pour ${decrypted.user_name || decrypted.user_id}`);
+                logEvent('INFO', `✅ Tokens Twitch chargés pour ${decrypted.user_name || decrypted.username || decrypted.user_id || decrypted.broadcaster_id}`);
                 
                 // Valider le token
                 const isValid = await validateToken();

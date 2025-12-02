@@ -52,7 +52,7 @@ function bootstrap() {
     // ═══════════════════════════════════════════════════════════════════════════
     
     container.register('stateManager', (c) => {
-        const { loadAppState, saveAppState } = require('../services/files');
+        const { loadAppState, saveAppState } = require('../services/app-state');
         const { logEvent } = c.resolve('logger');
         
         // Charger l'état initial depuis app_state.json
