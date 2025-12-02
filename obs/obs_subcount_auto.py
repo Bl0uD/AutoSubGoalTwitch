@@ -223,9 +223,24 @@ def get_windows_fonts():
         return clean
     
     def add_font_if_valid(name):
-        """Ajoute une police si elle n'est pas une variante"""
+        """Ajoute une police si elle n'est pas une variante ou un fichier système"""
         clean = extract_base_font_name(name)
         if clean and len(clean) > 1:
+            # Exclure les polices système obsolètes (commencent par des chiffres comme 8514fix, 8514oem)
+            if clean[0].isdigit():
+                return
+            
+            # Exclure les polices bitmap/système connues
+            excluded_patterns = [
+                'vga', 'oem', 'fix', 'terminal', 'system', 'fixedsys', 'modern', 'roman', 'script',
+                'small fonts', 'ms sans serif', 'ms serif', 'courier', 'marlett', 'symbol',
+                'wingdings', 'webdings', 'holomdl2', 'segoe mdl2', 'segoe fluent'
+            ]
+            name_lower = clean.lower()
+            for pattern in excluded_patterns:
+                if pattern in name_lower and len(clean) < 15:  # Seulement les noms courts
+                    return
+            
             # Vérifier que le nom nettoyé n'est pas une variante
             if not is_variant_name(clean):
                 fonts.add(clean)
@@ -247,14 +262,15 @@ def get_windows_fonts():
             log_message(f"⚠️ Erreur lecture registre: {e}", level="warning")
     
     def read_fonts_from_directory(dir_path, source_name):
-        """Lit les polices depuis un dossier"""
+        """Lit les polices depuis un dossier (TTF/OTF uniquement, pas les .fon obsolètes)"""
         if not os.path.exists(dir_path):
             return
         
         count = 0
         try:
             for font_file in os.listdir(dir_path):
-                if font_file.lower().endswith(('.ttf', '.otf', '.ttc', '.fon')):
+                # Exclure les .fon (polices bitmap obsolètes comme 8514fix, vgaoem, etc.)
+                if font_file.lower().endswith(('.ttf', '.otf', '.ttc')):
                     # Extraire le nom sans extension
                     name = os.path.splitext(font_file)[0]
                     add_font_if_valid(name)
