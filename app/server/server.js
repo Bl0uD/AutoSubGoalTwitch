@@ -2068,81 +2068,13 @@ function broadcastSubUpdate(batchCount = 1, tiers = {}) {
     logEvent('INFO', `📡 Sub update diffusé à ${successCount}/${wss.clients.size} clients`);
 }
 
-// Charger la configuration Twitch
-function loadTwitchConfig() {
-    try {
-        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'twitch_config.txt');
-        if (fs.existsSync(configPath)) {
-            // Chargement sécurisé avec déchiffrement automatique
-            const content = configCrypto.loadEncrypted(configPath);
-            
-            if (!content) {
-                console.log('🔐 Création du fichier de configuration Twitch...');
-                saveTwitchConfig();
-                return;
-            }
-            
-            const lines = content.split(/\r?\n/);
-            
-            lines.forEach(line => {
-                const [key, value] = line.split('=');
-                if (key && value) {
-                    switch (key.trim()) {
-                        case 'CLIENT_ID':
-                            twitchConfig.client_id = value.trim();
-                            break;
-                        case 'ACCESS_TOKEN':
-                            twitchConfig.access_token = value.trim();
-                            break;
-                        case 'REFRESH_TOKEN':
-                            twitchConfig.refresh_token = value.trim();
-                            break;
-                        case 'BROADCASTER_ID':
-                            twitchConfig.user_id = value.trim();
-                            break;
-                        case 'USERNAME':
-                            twitchConfig.username = value.trim();
-                            break;
-                    }
-                }
-            });
-            
-            // Marquer comme configuré si on a les infos essentielles
-            if (twitchConfig.client_id && twitchConfig.access_token && twitchConfig.user_id) {
-                twitchConfig.configured = true;
-                console.log('✅ Configuration Twitch chargée (sécurisée)');
-            } else {
-                console.log('⚠️ Configuration Twitch incomplète');
-            }
-        } else {
-            console.log('🔐 Création du fichier de configuration Twitch...');
-            saveTwitchConfig();
-        }
-    } catch (error) {
-        console.error('❌ Erreur chargement config Twitch:', error.message);
-        console.error('💡 Si le fichier est corrompu, utilisez le bouton "Déconnecter Twitch" pour réinitialiser');
-    }
-}
-
-// Sauvegarder la configuration Twitch
-function saveTwitchConfig() {
-    try {
-        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'twitch_config.txt');
-        const configContent = [
-            `CLIENT_ID=${twitchConfig.client_id || ''}`,
-            `ACCESS_TOKEN=${twitchConfig.access_token || ''}`,
-            `REFRESH_TOKEN=${twitchConfig.refresh_token || ''}`,
-            `BROADCASTER_ID=${twitchConfig.user_id || ''}`,
-            `USERNAME=${twitchConfig.username || ''}`
-        ].join('\n');
-        
-        // Sauvegarde sécurisée avec chiffrement automatique
-        configCrypto.saveEncrypted(configPath, configContent);
-        console.log('💾 Configuration Twitch sauvegardée (chiffrée)');
-    } catch (error) {
-        console.error('❌ Erreur sauvegarde config Twitch:', error.message);
-    }
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔐 TWITCH CONFIG WRAPPERS (délègue au service twitchConfigService)
+// ═══════════════════════════════════════════════════════════════════════════════
+const loadTwitchConfig = () => twitchConfigService.loadTwitchConfig();
+const saveTwitchConfig = () => twitchConfigService.saveTwitchConfig();
+// Note: refreshTwitchToken reste inline car utilisé par le Device Code Flow
+const resetTwitchConfig = () => twitchConfigService.resetTwitchConfig();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 📌 ROUTES (Anciennes routes supprimées - voir ./routes/)
