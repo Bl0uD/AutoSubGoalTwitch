@@ -1191,6 +1191,9 @@ def script_description():
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
+    global global_settings
+    global_settings = settings  # Sauvegarder les settings pour les réappliquer plus tard
+    
     # Nettoyer les logs avant de commencer
     cleanup_log_file(LOG_FILE, max_size_mb=5, keep_lines=1000)
     
@@ -1215,6 +1218,52 @@ def script_load(settings):
     # Démarrer la surveillance
     monitor_thread = threading.Thread(target=monitor_server, daemon=True)
     monitor_thread.start()
+    
+    # Appliquer la configuration overlay sauvegardée après démarrage du serveur
+    if OVERLAY_CONFIG_AVAILABLE:
+        apply_thread = threading.Thread(target=apply_saved_overlay_config, args=(settings,), daemon=True)
+        apply_thread.start()
+
+
+def apply_saved_overlay_config(settings):
+    """Applique la configuration overlay sauvegardée après le démarrage du serveur"""
+    import time
+    
+    # Attendre que le serveur soit prêt (max 15 secondes)
+    for _ in range(30):
+        time.sleep(0.5)
+        if is_server_running and is_server_healthy():
+            break
+    else:
+        log_message("⚠️ Serveur non prêt, impossible d'appliquer la config sauvegardée", level="warning")
+        return
+    
+    # Attendre un peu plus pour que le serveur soit vraiment stable
+    time.sleep(1)
+    
+    try:
+        # Récupérer les valeurs sauvegardées
+        font_family = obs.obs_data_get_string(settings, "overlay_font")
+        font_size = obs.obs_data_get_int(settings, "overlay_font_size")
+        text_color = obs.obs_data_get_string(settings, "overlay_text_color")
+        custom_color = obs.obs_data_get_string(settings, "overlay_custom_color")
+        
+        # Appliquer la police si définie
+        if font_family:
+            overlay_config.update_font(family=font_family, size=f"{font_size}px")
+            log_message(f"🔄 Config restaurée - Police: {font_family} @ {font_size}px", level="info")
+        
+        # Appliquer la couleur (priorité à la couleur personnalisée si définie)
+        if custom_color and custom_color.strip() and custom_color != "#FFFFFF":
+            overlay_config.update_colors(text=custom_color)
+            log_message(f"🔄 Config restaurée - Couleur: {custom_color}", level="info")
+        elif text_color:
+            final_color = COLOR_MAP.get(text_color, text_color)
+            overlay_config.update_colors(text=final_color)
+            log_message(f"🔄 Config restaurée - Couleur: {text_color}", level="info")
+            
+    except Exception as e:
+        log_message(f"⚠️ Erreur restauration config: {e}", level="warning")
 
 def script_unload():
     """Appelé quand le script est déchargé ou OBS se ferme"""
@@ -1312,12 +1361,12 @@ def script_properties():
             obs.OBS_TEXT_INFO
         )
         
-        # Dropdown Police éditable (sélection OU saisie libre)
+        # Dropdown Police (liste simple)
         font_list = obs.obs_properties_add_list(
             props,
             "overlay_font",
             "  ✏️  Police",
-            obs.OBS_COMBO_TYPE_EDITABLE,
+            obs.OBS_COMBO_TYPE_LIST,
             obs.OBS_COMBO_FORMAT_STRING
         )
         
@@ -1329,14 +1378,6 @@ def script_properties():
             obs.obs_property_list_add_string(font_list, font, font)
         
         obs.obs_property_set_modified_callback(font_list, apply_overlay_font)
-        
-        # Info
-        obs.obs_properties_add_text(
-            props,
-            "font_info",
-            "     ℹ️ Sélectionnez dans la liste ou tapez un nom de police",
-            obs.OBS_TEXT_INFO
-        )
         
         # Slider Taille
         obs.obs_properties_add_int_slider(
