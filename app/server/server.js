@@ -2066,541 +2066,32 @@ async function syncTwitchSubs(reason = 'Synchronisation') {
     }
 }
 
-// Charger la configuration des objectifs pour les follows
-function loadFollowGoals() {
-    try {
-        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'followgoal_config.txt');
-        if (fs.existsSync(configPath)) {
-            const content = fs.readFileSync(configPath, 'utf8');
-            const lines = content.split(/\r?\n/).filter(line => line.trim());
-            
-            followGoals.clear();
-            lines.forEach(line => {
-                const match = line.match(/^(\d+):\s*(.*?)\s*$/);
-                if (match) {
-                    const count = parseInt(match[1]);
-                    const message = match[2]; // Peut être vide, c'est OK
-                    followGoals.set(count, message);
-                }
-            });
-            
-            console.log('✅ Objectifs follows chargés:', followGoals.size, 'objectifs');
-            
-            // Mettre à jour immédiatement les fichiers avec les nouveaux objectifs
-            updateFollowFiles(currentFollows);
-            
-            // Diffuser la mise à jour
-            broadcastFollowUpdate();
-            console.log('📄 Objectifs follows mis à jour et diffusés immédiatement');
-        }
-    } catch (error) {
-        console.error('❌ Erreur chargement objectifs follows:', error.message);
-    }
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔗 FONCTIONS WRAPPER (délèguent aux services modulaires)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ces wrappers maintiennent la compatibilité avec le code existant
+// tout en déléguant aux services modulaires.
 
-// Charger la configuration des objectifs pour les subs
-function loadSubGoals() {
-    try {
-        const configPath = path.join(ROOT_DIR, 'obs', 'data', 'subgoals_config.txt');
-        if (fs.existsSync(configPath)) {
-            const content = fs.readFileSync(configPath, 'utf8');
-            const lines = content.split(/\r?\n/).filter(line => line.trim());
-            
-            subGoals.clear();
-            lines.forEach(line => {
-                const match = line.match(/^(\d+):\s*(.*?)\s*$/);
-                if (match) {
-                    const count = parseInt(match[1]);
-                    const message = match[2]; // Peut être vide, c'est OK
-                    subGoals.set(count, message);
-                }
-            });
-            
-            console.log('✅ Objectifs subs chargés:', subGoals.size, 'objectifs');
-            
-            // Mettre à jour immédiatement les fichiers avec les nouveaux objectifs
-            updateSubFiles(currentSubs);
-            
-            // Diffuser la mise à jour
-            broadcastSubUpdate();
-            console.log('📄 Objectifs subs mis à jour et diffusés immédiatement');
-        }
-    } catch (error) {
-        console.error('❌ Erreur chargement objectifs subs:', error.message);
-    }
-}
+// Goals wrappers
+const loadFollowGoals = () => goalsService.loadFollowGoals();
+const loadSubGoals = () => goalsService.loadSubGoals();
+const loadGoals = () => goalsService.loadGoals();
+const setupConfigWatcher = () => goalsService.setupConfigWatcher();
+const getCurrentFollowGoal = (follows) => goalsService.getCurrentFollowGoal(follows);
+const getCurrentSubGoal = (subs) => goalsService.getCurrentSubGoal(subs);
 
-// Fonction de compatibilité (charge les goals follows par défaut)
-function loadGoals() {
-    loadFollowGoals();
-    loadSubGoals();
-}
-
-// Initialiser la surveillance des fichiers de configuration
-function setupConfigWatcher() {
-    const followConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'followgoal_config.txt');
-    const subConfigPath = path.join(ROOT_DIR, 'obs', 'data', 'subgoals_config.txt');
-    
-    // Arrêter la surveillance précédente si elle existe
-    if (configWatcher) {
-        configWatcher.close();
-    }
-    if (subConfigWatcher) {
-        subConfigWatcher.close();
-    }
-    
-    try {
-        // Surveiller les changements du fichier de configuration des follows
-        configWatcher = fs.watch(followConfigPath, (eventType, filename) => {
-            if (eventType === 'change') {
-                console.log('📄 Fichier followgoal_config.txt modifié - rechargement...');
-                // Petit délai pour s'assurer que l'écriture est terminée
-                timerRegistry.setTimeout('reloadFollowGoals', () => {
-                    loadFollowGoals();
-                }, 100);
-            }
-        });
-        
-        // Surveiller les changements du fichier de configuration des subs
-        subConfigWatcher = fs.watch(subConfigPath, (eventType, filename) => {
-            if (eventType === 'change') {
-                console.log('📄 Fichier subgoals_config.txt modifié - rechargement...');
-                // Petit délai pour s'assurer que l'écriture est terminée
-                timerRegistry.setTimeout('reloadSubGoals', () => {
-                    loadSubGoals();
-                }, 100);
-            }
-        });
-        
-        console.log('👁️ Surveillance des fichiers de configuration activée');
-    } catch (error) {
-        console.error('❌ Erreur surveillance fichiers:', error.message);
-    }
-}
-
-// Trouver l'objectif actuel pour les follows
-function getCurrentFollowGoal(follows) {
-    let nextGoal = null;
-    let lastReachedGoal = null;
-    let progress = 0;
-    
-    const sortedGoals = Array.from(followGoals.keys()).sort((a, b) => a - b);
-    
-    // Vérifier qu'il y a au moins un objectif
-    if (sortedGoals.length === 0) {
-        console.log('⚠️ Aucun objectif follow trouvé dans la configuration');
-        return {
-            current: follows,
-            target: follows,
-            message: follows.toString(),
-            remaining: 0,
-            progress: 100,
-            isMaxReached: true
-        };
-    }
-    
-    // Trouver le dernier objectif atteint et le prochain objectif
-    for (const goalCount of sortedGoals) {
-        if (follows >= goalCount) {
-            lastReachedGoal = goalCount;
-        }
-        if (follows < goalCount && !nextGoal) {
-            nextGoal = goalCount;
-        }
-    }
-    
-    if (nextGoal) {
-        // Il y a un objectif suivant à atteindre
-        const message = followGoals.get(nextGoal);
-        const remaining = nextGoal - follows;
-        progress = ((follows / nextGoal) * 100).toFixed(1);
-        
-        return {
-            current: follows,
-            target: nextGoal,
-            message: message,
-            remaining: remaining,
-            progress: progress
-        };
-    } else if (lastReachedGoal) {
-        // Pas d'objectif suivant, on a dépassé tous les objectifs
-        return {
-            current: follows,
-            target: follows,
-            message: follows.toString(),
-            remaining: 0,
-            progress: 100,
-            isMaxReached: true
-        };
-    } else {
-        // Aucun objectif atteint (moins que le premier objectif)
-        const firstGoal = sortedGoals[0];
-        const message = followGoals.get(firstGoal);
-        const remaining = firstGoal - follows;
-        progress = ((follows / firstGoal) * 100).toFixed(1);
-        
-        return {
-            current: follows,
-            target: firstGoal,
-            message: message,
-            remaining: remaining,
-            progress: progress
-        };
-    }
-}
-
-// Trouver l'objectif actuel pour les subs
-function getCurrentSubGoal(subs) {
-    let nextGoal = null;
-    let lastReachedGoal = null;
-    let progress = 0;
-    
-    const sortedGoals = Array.from(subGoals.keys()).sort((a, b) => a - b);
-    
-    // Vérifier qu'il y a au moins un objectif
-    if (sortedGoals.length === 0) {
-        console.log('⚠️ Aucun objectif sub trouvé dans la configuration');
-        return {
-            current: subs,
-            target: subs,
-            message: subs.toString(),
-            remaining: 0,
-            progress: 100,
-            isMaxReached: true
-        };
-    }
-    
-    // Trouver le dernier objectif atteint et le prochain objectif
-    for (const goalCount of sortedGoals) {
-        if (subs >= goalCount) {
-            lastReachedGoal = goalCount;
-        }
-        if (subs < goalCount && !nextGoal) {
-            nextGoal = goalCount;
-        }
-    }
-    
-    if (nextGoal) {
-        // Il y a un objectif suivant à atteindre
-        const message = subGoals.get(nextGoal);
-        const remaining = nextGoal - subs;
-        progress = ((subs / nextGoal) * 100).toFixed(1);
-        
-        return {
-            current: subs,
-            target: nextGoal,
-            message: message,
-            remaining: remaining,
-            progress: progress
-        };
-    } else if (lastReachedGoal) {
-        // Pas d'objectif suivant, on a dépassé tous les objectifs
-        return {
-            current: subs,
-            target: subs,
-            message: subs.toString(),
-            remaining: 0,
-            progress: 100,
-            isMaxReached: true
-        };
-    } else {
-        // Aucun objectif atteint (moins que le premier objectif)
-        const firstGoal = sortedGoals[0];
-        const message = subGoals.get(firstGoal);
-        const remaining = firstGoal - subs;
-        progress = ((subs / firstGoal) * 100).toFixed(1);
-        
-        return {
-            current: subs,
-            target: firstGoal,
-            message: message,
-            remaining: remaining,
-            progress: progress
-        };
-    }
-}
+// Batching wrappers
+const addFollowToBatch = (count = 1) => batchingService.addFollowToBatch(count);
+const flushFollowBatch = () => batchingService.flushFollowBatch();
+const addSubToBatch = (count = 1, tier = '1000') => batchingService.addSubToBatch(count, tier);
+const flushSubBatch = () => batchingService.flushSubBatch();
+const addFollowRemoveToBatch = (count = 1) => batchingService.addFollowRemoveToBatch(count);
+const flushFollowRemoveBatch = () => batchingService.flushFollowRemoveBatch();
+const addSubEndToBatch = (count = 1) => batchingService.addSubEndToBatch(count);
+const flushSubEndBatch = () => batchingService.flushSubEndBatch();
 
 // ========================================
-// ⚡ SYSTÈME DE BATCHING INTELLIGENT
-// ========================================
-
-/**
- * Ajoute un follow au batch avec file d'attente synchronisée aux animations
- * Pendant qu'une animation est en cours (1s), accumule tous les events
- * Puis flush le batch dans la prochaine animation
- */
-function addFollowToBatch(count = 1) {
-    followBatch.count += count;
-    
-    // Annuler le timer précédent si existe
-    if (followBatch.timer) {
-        clearTimeout(followBatch.timer);
-    }
-    
-    // Si une animation est en cours, juste accumuler (le timer existant gérera le flush)
-    if (followBatch.isAnimating) {
-        logEvent('INFO', `⏳ Animation en cours - Accumulation follows: ${followBatch.count}`);
-        // Ne pas créer de nouveau timer, attendre que l'animation se termine
-        return;
-    }
-    
-    // Aucune animation en cours : attendre un peu pour capturer les events groupés
-    timerRegistry.clearTimeout('followBatch');
-    followBatch.timer = timerRegistry.setTimeout('followBatch', () => {
-        flushFollowBatch();
-    }, BATCH_DELAY);
-    
-    logEvent('INFO', `🔥 Follow ajouté au batch: ${followBatch.count} (flush dans ${BATCH_DELAY}ms)`);
-}
-
-/**
- * Traite et envoie le batch de follows accumulés
- * Lance une animation de 1 seconde pendant laquelle les nouveaux events s'accumulent
- */
-function flushFollowBatch() {
-    if (followBatch.count === 0) return;
-    
-    const batchCount = followBatch.count;
-    followBatch.count = 0;
-    followBatch.timer = null;
-    
-    // Marquer qu'une animation est en cours
-    followBatch.isAnimating = true;
-    
-    // Mettre à jour le compteur
-    currentFollows += batchCount;
-    
-    // Synchroniser lastKnownFollowCount pour que le polling ne se perde pas
-    lastKnownFollowCount = currentFollows;
-    
-    // Mettre à jour les fichiers
-    updateFollowFiles(currentFollows);
-    
-    // Broadcast avec indication du nombre groupé
-    broadcastFollowUpdate(batchCount);
-    
-    logEvent('INFO', `🎬 Animation démarrée: +${batchCount} follows (Total: ${currentFollows}) - Durée: ${ANIMATION_DURATION}ms`);
-    
-    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
-    timerRegistry.setTimeout('followAnimation', () => {
-        followBatch.isAnimating = false;
-        logEvent('INFO', `✅ Animation terminée - Batch actuel: ${followBatch.count} follows`);
-        
-        // Si des events se sont accumulés pendant l'animation, les traiter
-        if (followBatch.count > 0) {
-            logEvent('INFO', `📄 Flush automatique du batch accumulé: ${followBatch.count} follows`);
-            flushFollowBatch(); // Récursif : lance la prochaine animation
-        }
-    }, ANIMATION_DURATION);
-}
-
-/**
- * Ajoute un sub au batch avec file d'attente synchronisée aux animations
- */
-function addSubToBatch(count = 1, tier = '1000') {
-    subBatch.count += count;
-    
-    // Accumuler par tier
-    if (!subBatch.tiers[tier]) {
-        subBatch.tiers[tier] = 0;
-    }
-    subBatch.tiers[tier] += count;
-    
-    // Annuler le timer précédent
-    if (subBatch.timer) {
-        clearTimeout(subBatch.timer);
-    }
-    
-    // Si une animation est en cours, juste accumuler
-    if (subBatch.isAnimating) {
-        logEvent('INFO', `⏳ Animation en cours - Accumulation subs: ${subBatch.count}`);
-        return;
-    }
-    
-    // Aucune animation en cours : attendre un peu pour capturer les events groupés
-    timerRegistry.clearTimeout('subBatch');
-    subBatch.timer = timerRegistry.setTimeout('subBatch', () => {
-        flushSubBatch();
-    }, BATCH_DELAY);
-    
-    logEvent('INFO', `🔥 Sub ajouté au batch: ${subBatch.count} (flush dans ${BATCH_DELAY}ms)`);
-}
-
-/**
- * Traite et envoie le batch de subs accumulés
- * Lance une animation de 1 seconde pendant laquelle les nouveaux events s'accumulent
- */
-function flushSubBatch() {
-    if (subBatch.count === 0) return;
-    
-    const batchCount = subBatch.count;
-    const tiers = { ...subBatch.tiers };
-    
-    subBatch.count = 0;
-    subBatch.tiers = {};
-    subBatch.timer = null;
-    
-    // Marquer qu'une animation est en cours
-    subBatch.isAnimating = true;
-    
-    // Mettre à jour le compteur
-    currentSubs += batchCount;
-    
-    // Mettre à jour les fichiers
-    updateSubFiles(currentSubs);
-    
-    // Broadcast avec détails des tiers
-    broadcastSubUpdate(batchCount, tiers);
-    
-    const tierDetails = Object.entries(tiers)
-        .map(([tier, count]) => `${count}×T${tier.charAt(0)}`)
-        .join(', ');
-    
-    logEvent('INFO', `🎬 Animation démarrée: +${batchCount} subs (${tierDetails}) (Total: ${currentSubs}) - Durée: ${ANIMATION_DURATION}ms`);
-    
-    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
-    timerRegistry.setTimeout('subAnimation', () => {
-        subBatch.isAnimating = false;
-        logEvent('INFO', `✅ Animation terminée - Batch actuel: ${subBatch.count} subs`);
-        
-        // Si des events se sont accumulés pendant l'animation, les traiter
-        if (subBatch.count > 0) {
-            logEvent('INFO', `📄 Flush automatique du batch accumulé: ${subBatch.count} subs`);
-            flushSubBatch(); // Récursif : lance la prochaine animation
-        }
-    }, ANIMATION_DURATION);
-}
-
-// ========================================
-// BATCHING POUR LES UNSUBS (fin d'abonnement)
-// ========================================
-// Objet local pour accumuler les unsubs rapprochés
-const subEndBatch = { count: 0, timer: null, isAnimating: false };
-
-// ========================================
-// BATCHING POUR LES UNFOLLOWS (retrait de follows)
-// ========================================
-// Objet local pour accumuler les unfollows rapprochés
-const followRemoveBatch = { count: 0, timer: null, isAnimating: false };
-
-function addFollowRemoveToBatch(count = 1) {
-    followRemoveBatch.count += count;
-
-    // Annuler le timer précédent si existe
-    if (followRemoveBatch.timer) {
-        clearTimeout(followRemoveBatch.timer);
-    }
-
-    // Si une animation de suppression est en cours, juste accumuler
-    if (followRemoveBatch.isAnimating) {
-        logEvent('INFO', `⏳ Animation unfollows en cours - Accumulation unfollows: ${followRemoveBatch.count}`);
-        return;
-    }
-
-    // Attendre un court délai pour agréger plusieurs unfollows
-    timerRegistry.clearTimeout('followRemoveBatch');
-    followRemoveBatch.timer = timerRegistry.setTimeout('followRemoveBatch', () => {
-        flushFollowRemoveBatch();
-    }, BATCH_DELAY);
-
-    logEvent('INFO', `🔥 Unfollow ajouté au batch: ${followRemoveBatch.count} (flush dans ${BATCH_DELAY}ms)`);
-}
-
-function flushFollowRemoveBatch() {
-    if (followRemoveBatch.count === 0) return;
-
-    const batchCount = followRemoveBatch.count;
-    followRemoveBatch.count = 0;
-    followRemoveBatch.timer = null;
-
-    // Marquer qu'une animation de suppression est en cours
-    followRemoveBatch.isAnimating = true;
-
-    // Décrémenter le compteur
-    currentFollows = Math.max(0, currentFollows - batchCount);
-    
-    // Synchroniser lastKnownFollowCount
-    lastKnownFollowCount = currentFollows;
-
-    // Mettre à jour les fichiers
-    updateFollowFiles(currentFollows);
-
-    // Diffuser en indiquant une suppression (batchCount négatif)
-    broadcastFollowUpdate(-batchCount);
-
-    logEvent('INFO', `🎬 Animation UNFOLLOW démarrée: -${batchCount} follows (Total: ${currentFollows}) - Durée: ${ANIMATION_DURATION}ms`);
-
-    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
-    timerRegistry.setTimeout('followRemoveAnimation', () => {
-        followRemoveBatch.isAnimating = false;
-        logEvent('INFO', `✅ Animation UNFOLLOW terminée - Batch actuel: ${followRemoveBatch.count} unfollows`);
-
-        // Si des events se sont accumulés pendant l'animation, les traiter
-        if (followRemoveBatch.count > 0) {
-            logEvent('INFO', `📄 Flush automatique du batch unfollows accumulé: ${followRemoveBatch.count}`);
-            flushFollowRemoveBatch();
-        }
-    }, ANIMATION_DURATION);
-}
-
-function addSubEndToBatch(count = 1) {
-    subEndBatch.count += count;
-
-    // Annuler le timer précédent si existe
-    if (subEndBatch.timer) {
-        clearTimeout(subEndBatch.timer);
-    }
-
-    // Si une animation de suppression est en cours, juste accumuler
-    if (subEndBatch.isAnimating) {
-        logEvent('INFO', `⏳ Animation unsubs en cours - Accumulation unsubs: ${subEndBatch.count}`);
-        return;
-    }
-
-    // Attendre un court délai pour agréger plusieurs unsubs
-    timerRegistry.clearTimeout('subEndBatch');
-    subEndBatch.timer = timerRegistry.setTimeout('subEndBatch', () => {
-        flushSubEndBatch();
-    }, BATCH_DELAY);
-
-    logEvent('INFO', `🔥 Unsub ajouté au batch: ${subEndBatch.count} (flush dans ${BATCH_DELAY}ms)`);
-}
-
-function flushSubEndBatch() {
-    if (subEndBatch.count === 0) return;
-
-    const batchCount = subEndBatch.count;
-    subEndBatch.count = 0;
-    subEndBatch.timer = null;
-
-    // Marquer qu'une animation de suppression est en cours
-    subEndBatch.isAnimating = true;
-
-    // Décrémenter le compteur (on utilise batchCount positif ici, la soustraction se fait ici)
-    currentSubs = Math.max(0, currentSubs - batchCount);
-
-    // Mettre à jour les fichiers
-    updateSubFiles(currentSubs);
-
-    // Diffuser en indiquant une suppression (batchCount négatif)
-    broadcastSubUpdate(-batchCount);
-
-    logEvent('INFO', `🎬 Animation UNSUB démarrée: -${batchCount} subs (Total: ${currentSubs}) - Durée: ${ANIMATION_DURATION}ms`);
-
-    // Après la durée de l'animation, marquer comme terminée et flush si nouveaux events
-    timerRegistry.setTimeout('subEndAnimation', () => {
-        subEndBatch.isAnimating = false;
-        logEvent('INFO', `✅ Animation UNSUB terminée - Batch actuel: ${subEndBatch.count} unsubs`);
-
-        if (subEndBatch.count > 0) {
-            logEvent('INFO', `📄 Flush automatique du batch accumulé (unsubs): ${subEndBatch.count}`);
-            flushSubEndBatch();
-        }
-    }, ANIMATION_DURATION);
-}
-
-// ========================================
-// Fin du système de batching
+// 📁 MISE À JOUR DES FICHIERS
 // ========================================
 
 // Mettre à jour les fichiers pour les follows
@@ -3104,11 +2595,10 @@ const appContext = {
 };
 
 // ==================================================================
-// 🔧 INITIALISATION DES SERVICES MODULAIRES (Phase 3.6)
+// 🔧 INITIALISATION DES SERVICES MODULAIRES (Phase 3.7)
 // ==================================================================
 // Les services sont initialisés avec le contexte de l'application.
-// Ils sont disponibles via appContext.services pour les routes.
-// Note: Les fonctions inline restent actives pour compatibilité.
+// Ils remplacent les fonctions inline précédemment définies.
 
 // Initialiser le service broadcast (pattern factory)
 const broadcastServiceInstance = createBroadcastService({
@@ -3122,8 +2612,46 @@ const broadcastServiceInstance = createBroadcastService({
     getCurrentSubs: () => currentSubs,
 });
 
+// Contexte enrichi pour les services avec pattern initContext
+const serviceContext = {
+    // Paths
+    ROOT_DIR,
+    
+    // State accessors
+    get currentFollows() { return currentFollows; },
+    set currentFollows(val) { currentFollows = val; },
+    get currentSubs() { return currentSubs; },
+    set currentSubs(val) { currentSubs = val; },
+    get lastKnownFollowCount() { return lastKnownFollowCount; },
+    set lastKnownFollowCount(val) { lastKnownFollowCount = val; },
+    
+    // Goals Maps
+    followGoals,
+    subGoals,
+    
+    // Batching state
+    get followBatch() { return followBatch; },
+    get followRemoveBatch() { return followRemoveBatch; },
+    get subBatch() { return subBatch; },
+    get subEndBatch() { return subEndBatch; },
+    
+    // Utilities
+    timerRegistry,
+    BATCH_DELAY,
+    ANIMATION_DURATION,
+    
+    // Functions
+    updateFollowFiles,
+    updateSubFiles,
+    broadcastFollowUpdate,
+    broadcastSubUpdate,
+};
+
+// Initialiser les services avec le contexte
+goalsService.initContext(serviceContext);
+batchingService.initContext(serviceContext);
+
 // Ajouter les services au contexte (disponibles pour les routes)
-// Note: goalsService et batchingService utilisent initContext qui sera appelé plus tard
 appContext.services = {
     goals: goalsService,
     batching: batchingService,
@@ -3131,7 +2659,7 @@ appContext.services = {
     twitch: twitchService,
 };
 
-logEvent('INFO', '✅ Services modulaires disponibles (goals, batching, broadcast, twitch)');
+logEvent('INFO', '✅ Services modulaires initialisés (goals, batching, broadcast, twitch)');
 
 // Initialiser les contextes des routes
 initAllContexts(appContext);
