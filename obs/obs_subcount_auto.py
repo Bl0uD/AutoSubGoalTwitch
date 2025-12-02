@@ -1081,23 +1081,34 @@ def apply_overlay_font(props, prop, settings):
     global global_settings
     global_settings = settings  # Mettre à jour les settings globaux
     
-    if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible", level="error")
-        return False
-    
-    font_family = obs.obs_data_get_string(settings, "overlay_font")
-    font_size = obs.obs_data_get_int(settings, "overlay_font_size")
-    
-    if font_family and font_family.strip():
-        # Vérifier que overlay_config existe avant de l'utiliser
-        try:
-            overlay_config.update_font(family=font_family.strip(), size=f"{font_size}px")
-            log_message(f"✅ Police mise à jour: {font_family.strip()} @ {font_size}px", level="info")
-        except NameError:
-            log_message("❌ overlay_config non initialisé", level="error")
+    try:
+        log_message("🔄 Callback apply_overlay_font appelé", level="info")
+        
+        if not OVERLAY_CONFIG_AVAILABLE:
+            log_message("❌ Module overlay_config_manager non disponible", level="error")
             return False
-    
-    return True
+        
+        font_family = obs.obs_data_get_string(settings, "overlay_font")
+        font_size = obs.obs_data_get_int(settings, "overlay_font_size")
+        
+        log_message(f"📝 Police sélectionnée: '{font_family}' @ {font_size}px", level="info")
+        
+        if font_family and font_family.strip():
+            # Vider le cache pour forcer l'envoi
+            overlay_config.clear_cache()
+            result = overlay_config.update_font(family=font_family.strip(), size=f"{font_size}px")
+            if result:
+                log_message(f"✅ Police appliquée au serveur: {font_family.strip()} @ {font_size}px", level="info")
+            else:
+                log_message(f"⚠️ Échec application police (serveur non accessible?)", level="warning")
+        else:
+            log_message("⚠️ Aucune police sélectionnée", level="warning")
+        
+        return True
+        
+    except Exception as e:
+        log_message(f"❌ Erreur apply_overlay_font: {e}", level="error")
+        return False
 
 def apply_overlay_colors(props, prop, settings):
     """Applique la couleur prédéfinie aux overlays (callback du dropdown)"""
