@@ -26,6 +26,15 @@ const {
     getOverlayConfig, updateOverlayConfig, getVersionInfo, getCounters, setCounters,
 } = require('./services');
 
+// Import des routes modulaires
+const {
+    pagesRouter,
+    apiRouter,
+    adminRouter,
+    twitchRouter,
+    initAllContexts
+} = require('./routes');
+
 // Dossier racine du projet (2 niveaux au-dessus : app/server -> app -> racine)
 const ROOT_DIR = path.join(__dirname, '..', '..');
 
@@ -2809,1345 +2818,17 @@ function saveTwitchConfig() {
     }
 }
 
-// Routes API
-app.get('/', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'dashboard.html'));
-});
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📌 ROUTES (Anciennes routes supprimées - voir ./routes/)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Les routes sont maintenant définies dans les modules :
+// - routes/pages.js   : Pages HTML (/, /dashboard, /config, /test, /admin)
+// - routes/api.js     : API publiques (/api/status, /api/stats, etc.)
+// - routes/admin.js   : Administration (/admin/*)
+// - routes/twitch.js  : Authentification Twitch (/api/auth-status, etc.)
 
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'dashboard.html'));
-});
-
-app.get('/config', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'config.html'));
-});
-
-app.get('/test', (req, res) => {
-    res.send(generateTestPage());
-});
-
-// ========================================
-// 🔧 ADMIN PANEL ROUTES (Hidden)
-// ========================================
-
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(ROOT_DIR, 'app', 'web', 'admin.html'));
-});
-
-// Route pour servir les overlays OBS
+// Route statique pour servir les overlays OBS (reste ici car c'est du middleware statique)
 app.use('/obs/overlays', express.static(path.join(ROOT_DIR, 'obs', 'overlays')));
-
-app.get('/api/stats', (req, res) => {
-    try {
-        // Utiliser app_state.json pour les compteurs et objectifs
-        const appState = loadAppState();
-        
-        res.json({
-            follows: appState.counters.follows,
-            subs: appState.counters.subs,
-            followGoal: appState.goals.follows || 0,
-            subGoal: appState.goals.subs || 0
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur lecture stats admin', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Add Follows
-app.post('/admin/add-follows', (req, res) => {
-    try {
-        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
-        
-        // Utiliser le système de batching pour gérer le spam
-        addFollowToBatch(amount);
-        
-        logEvent('INFO', `➕ Admin: Ajout de ${amount} follows au batch`);
-        res.json({ success: true, total: currentFollows + followBatch.count });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur add follows', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Remove Follows
-app.post('/admin/remove-follows', (req, res) => {
-    try {
-        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
-        
-        // Utiliser le système de batching pour gérer le spam (comme add-follows)
-        addFollowRemoveToBatch(amount);
-        
-        logEvent('INFO', `➖ Admin: Ajout de -${amount} follows au batch`);
-        res.json({ success: true, total: Math.max(0, currentFollows - followRemoveBatch.count) });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur remove follows', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Set Follows
-app.post('/admin/set-follows', (req, res) => {
-    try {
-        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
-        
-        // Utiliser la variable globale
-        currentFollows = count;
-        
-        // Mettre à jour les fichiers avec la fonction existante
-        updateFollowFiles(currentFollows);
-        
-        // Broadcast avec la fonction existante
-        broadcastFollowUpdate();
-        
-        logEvent('INFO', `🔐 Admin: Follows définis à ${count}`);
-        res.json({ success: true, total: count });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur set follows', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Add Subs
-app.post('/admin/add-subs', (req, res) => {
-    try {
-        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
-        const tier = validateTier(req.body.tier);
-        
-        // Utiliser le système de batching pour gérer le spam
-        addSubToBatch(amount, tier);
-        
-        logEvent('INFO', `➕ Admin: Ajout de ${amount} subs tier ${tier} au batch`);
-        res.json({ success: true, total: currentSubs + subBatch.count });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur add subs', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Remove Subs
-app.post('/admin/remove-subs', (req, res) => {
-    try {
-        const amount = validatePositiveInt(req.body.amount, 'amount', 1, 100000);
-        
-        // Utiliser le système de batching pour gérer le spam (comme remove-follows)
-        addSubEndToBatch(amount);
-        
-        logEvent('INFO', `➖ Admin: Ajout de -${amount} subs au batch`);
-        res.json({ success: true, total: Math.max(0, currentSubs - subEndBatch.count) });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur remove subs', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Set Subs
-app.post('/admin/set-subs', (req, res) => {
-    try {
-        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
-        
-        // Utiliser la variable globale
-        currentSubs = count;
-        
-        // Mettre à jour les fichiers avec la fonction existante
-        updateSubFiles(currentSubs);
-        
-        // Broadcast avec la fonction existante
-        broadcastSubUpdate();
-        
-        logEvent('INFO', `🔐 Admin: Subs définis à ${count}`);
-        res.json({ success: true, total: count });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur set subs', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Set Follow Goal
-app.post('/admin/set-follow-goal', (req, res) => {
-    try {
-        const goal = validatePositiveInt(req.body.goal, 'goal', 0, 10000000);
-        
-        // Sauvegarder dans app_state.json
-        const appStateData = loadAppState();
-        appStateData.goals.follows = goal;
-        saveAppState(appStateData);
-        
-        // Broadcast via WebSocket
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    type: 'goal_update',
-                    followGoal: goal
-                }));
-            }
-        });
-        
-        logEvent('INFO', `🎯 Admin: Objectif follows défini à ${goal}`);
-        res.json({ success: true, goal: goal });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur set follow goal', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Set Sub Goal
-app.post('/admin/set-sub-goal', (req, res) => {
-    try {
-        const goal = validatePositiveInt(req.body.goal, 'goal', 0, 10000000);
-        
-        // Sauvegarder dans app_state.json
-        const appStateData = loadAppState();
-        appStateData.goals.subs = goal;
-        saveAppState(appStateData);
-        
-        // Broadcast via WebSocket
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    type: 'goal_update',
-                    subGoal: goal
-                }));
-            }
-        });
-        
-        logEvent('INFO', `🎯 Admin: Objectif subs défini à ${goal}`);
-        res.json({ success: true, goal: goal });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur set sub goal', { error: error.message });
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Sync with Twitch API (compare and update)
-app.get('/admin/sync-twitch', async (req, res) => {
-    try {
-        // Rate limiting
-        if (!syncLimiter.allow()) {
-            return res.status(429).json({ 
-                success: false,
-                error: 'Too many requests',
-                message: 'Attendez 1 minute avant la prochaine synchro',
-                nextResetIn: Math.ceil(syncLimiter.nextResetIn() / 1000)
-            });
-        }
-        
-        logEvent('INFO', '📄 Admin: Synchronisation avec Twitch API');
-        
-        if (!twitchConfig.access_token || !twitchConfig.user_id) {
-            return res.json({ 
-                success: false,
-                error: 'Non authentifié avec Twitch'
-            });
-        }
-        
-        // Sauvegarder les valeurs locales actuelles
-        const localFollows = currentFollows;
-        const localSubs = currentSubs;
-        
-        // Récupérer les valeurs depuis Twitch (Result Pattern)
-        const followsResult = await syncTwitchFollows('Sync admin panel');
-        const subsResult = await syncTwitchSubs('Sync admin panel');
-        
-        // Calculer les différences
-        const followsDiff = followsResult.success ? followsResult.diff : 0;
-        const subsDiff = subsResult.success ? subsResult.diff : 0;
-        const updated = (followsDiff !== 0) || (subsDiff !== 0);
-        
-        logEvent('INFO', `📊 Sync terminée - Follows: ${localFollows}→${followsResult.data} (${followsDiff >= 0 ? '+' : ''}${followsDiff}) | Subs: ${localSubs}→${subsResult.data} (${subsDiff >= 0 ? '+' : ''}${subsDiff})`);
-        
-        res.json({
-            success: followsResult.success && subsResult.success,
-            twitchFollows: followsResult.data,
-            twitchSubs: subsResult.data,
-            localFollows: localFollows,
-            localSubs: localSubs,
-            followsDiff: followsDiff,
-            subsDiff: subsDiff,
-            updated: updated
-        });
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur sync Twitch', { error: error.message });
-        res.status(500).json({ 
-            success: false,
-            error: error.message 
-        });
-    }
-});
-
-// Test Twitch API
-app.get('/admin/test-twitch-api', async (req, res) => {
-    try {
-        logEvent('INFO', '🔐 Admin: Test API Twitch');
-        
-        if (!twitchConfig.access_token || !twitchConfig.user_id) {
-            return res.json({ 
-                status: 'NOT_AUTHENTICATED',
-                message: 'Non authentifié'
-            });
-        }
-        
-        // Test follows
-        const followsResponse = await fetch(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${twitchConfig.user_id}`, {
-            headers: {
-                'Authorization': `Bearer ${twitchConfig.access_token}`,
-                'Client-Id': twitchConfig.client_id
-            }
-        });
-        
-        const followsData = await followsResponse.json();
-        
-        // Test subs
-        const subsResponse = await fetch(`https://api.twitch.tv/helix/subscriptions?broadcaster_id=${twitchConfig.user_id}`, {
-            headers: {
-                'Authorization': `Bearer ${twitchConfig.access_token}`,
-                'Client-Id': twitchConfig.client_id
-            }
-        });
-        
-        const subsData = await subsResponse.json();
-        
-        res.json({
-            status: 'OK',
-            follows: followsData.total || 0,
-            subs: subsData.data ? subsData.data.length : 0,
-            followsResponse: followsData,
-            subsResponse: subsData
-        });
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur test API', { error: error.message });
-        res.status(500).json({ 
-            status: 'ERROR',
-            error: error.message 
-        });
-    }
-});
-
-// Test EventSub
-app.get('/admin/test-eventsub', (req, res) => {
-    try {
-        const status = sessionId ? 'CONNECTED' : 'DISCONNECTED';
-        
-        res.json({
-            status: status,
-            sessionId: sessionId,
-            message: status === 'CONNECTED' ? 'EventSub connecté' : 'EventSub déconnecté'
-        });
-        
-        logEvent('INFO', `📡 Admin: Test EventSub - ${status}`);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Test Polling
-app.get('/admin/test-polling', async (req, res) => {
-    try {
-        logEvent('INFO', '⏱️ Admin: Test polling manuel');
-        
-        // Exécute le polling manuellement
-        await pollFollowCount();
-        
-        res.json({ 
-            success: true,
-            message: 'Polling exécuté'
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur test polling', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Read Files
-app.get('/admin/read-files', (req, res) => {
-    try {
-        // Lire depuis app_state.json
-        const appState = loadAppState();
-        const files = {
-            follows: appState.counters.follows.toString(),
-            subs: appState.counters.subs.toString(),
-            followGoal: (appState.goals.follows || 0).toString(),
-            subGoal: (appState.goals.subs || 0).toString(),
-            twitchConfig: twitchConfig
-        };
-        
-        logEvent('INFO', '📖 Admin: Lecture fichiers');
-        res.json(files);
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur lecture fichiers', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Test File Write
-app.get('/admin/test-file-write', (req, res) => {
-    try {
-        const testPath = path.join(__dirname, 'admin_test_write.txt');
-        const testContent = `Test écriture admin - ${new Date().toISOString()}`;
-        
-        fs.writeFileSync(testPath, testContent, 'utf8');
-        const readBack = fs.readFileSync(testPath, 'utf8');
-        
-        fs.unlinkSync(testPath); // Clean up
-        
-        logEvent('INFO', '💾 Admin: Test écriture OK');
-        res.json({ 
-            success: true,
-            written: testContent,
-            readBack: readBack
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur test écriture', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Backup Data
-app.get('/admin/backup-data', (req, res) => {
-    try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupDir = path.join(__dirname, 'backups');
-        
-        if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir);
-        }
-        
-        // Lire depuis app_state.json
-        const appState = loadAppState();
-        const backupData = {
-            timestamp: timestamp,
-            follows: appState.counters.follows.toString(),
-            subs: appState.counters.subs.toString(),
-            followGoal: (appState.goals.follows || 0).toString(),
-            subGoal: (appState.goals.subs || 0).toString()
-        };
-        
-        const backupPath = path.join(backupDir, `backup_${timestamp}.json`);
-        fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), 'utf8');
-        
-        logEvent('INFO', `📦 Admin: Backup créé - ${backupPath}`);
-        res.json({ 
-            success: true,
-            filename: `backup_${timestamp}.json`,
-            path: backupPath
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur backup', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Restore Backup
-app.get('/admin/restore-backup', (req, res) => {
-    try {
-        const backupDir = path.join(__dirname, 'backups');
-        
-        if (!fs.existsSync(backupDir)) {
-            return res.status(404).json({ error: 'Aucun backup trouvé' });
-        }
-        
-        const backups = fs.readdirSync(backupDir)
-            .filter(f => f.startsWith('backup_') && f.endsWith('.json'))
-            .sort()
-            .reverse();
-        
-        if (backups.length === 0) {
-            return res.status(404).json({ error: 'Aucun backup trouvé' });
-        }
-        
-        const latestBackup = path.join(backupDir, backups[0]);
-        const backupData = JSON.parse(fs.readFileSync(latestBackup, 'utf8'));
-        
-        // Restaurer dans app_state.json
-        const appState = loadAppState();
-        appState.counters.follows = parseInt(backupData.follows) || 0;
-        appState.counters.subs = parseInt(backupData.subs) || 0;
-        appState.goals.follows = parseInt(backupData.followGoal) || 0;
-        appState.goals.subs = parseInt(backupData.subGoal) || 0;
-        saveAppState(appState);
-        
-        // Mettre à jour les variables globales
-        currentFollows = appState.counters.follows;
-        currentSubs = appState.counters.subs;
-        
-        logEvent('INFO', `↩️ Admin: Backup restauré - ${backups[0]}`);
-        res.json({ 
-            success: true,
-            restored: backups[0],
-            data: backupData
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur restore', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Corrupt Data Test
-app.get('/admin/corrupt-data', (req, res) => {
-    try {
-        // Corrompre app_state.json pour test
-        const appStatePath = path.join(ROOT_DIR, 'app', 'config', 'app_state.json');
-        fs.writeFileSync(appStatePath, 'CORRUPTED_DATA_FOR_TEST', 'utf8');
-        
-        logEvent('WARN', '🔥 Admin: Données corrompues pour test');
-        res.json({ 
-            success: true,
-            message: 'Données corrompues - testez la récupération'
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Admin: Erreur corruption', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ========================================
-// End of Admin Routes
-// ========================================
-
-app.post('/api/config', (req, res) => {
-    try {
-        const { client_id } = req.body;
-        
-        twitchConfig.client_id = client_id;
-        saveTwitchConfig();
-        
-        res.json({ success: true, message: 'Configuration sauvegardée' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 🔥 DEVICE CODE GRANT FLOW - Routes API
-app.post('/api/start-device-auth', async (req, res) => {
-    try {
-        if (!twitchConfig.client_id) {
-            return res.status(400).json({ 
-                error: 'Client ID Twitch manquant',
-                success: false 
-            });
-        }
-        
-        // Vérifier si un processus d'authentification est déjà en cours
-        if (deviceCodePolling !== null) {
-            return res.json({
-                success: true,
-                message: 'Authentification déjà en cours',
-                user_code: deviceCodeData.user_code || '',
-                verification_uri: deviceCodeData.verification_uri || '',
-                expires_in: deviceCodeData.expires_in || 0,
-                already_running: true
-            });
-        }
-        
-        console.log('🚀 Démarrage Device Code Grant Flow via API...');
-        const deviceData = await initiateDeviceCodeFlow();
-        
-        res.json({
-            success: true,
-            user_code: deviceData.user_code,
-            verification_uri: deviceData.verification_uri,
-            expires_in: deviceData.expires_in,
-            interval: deviceData.interval,
-            message: 'Device Code Grant Flow démarré avec succès'
-        });
-    } catch (error) {
-        console.error('❌ Erreur start-device-auth:', error.message);
-        res.status(500).json({ 
-            error: error.message,
-            success: false,
-            details: 'Impossible de démarrer l\'authentification Device Code Grant'
-        });
-    }
-});
-
-app.get('/api/auth-status', (req, res) => {
-    try {
-        // Gestion sécurisée du statut d'authentification
-        const now = Date.now();
-        const isPolling = deviceCodePolling !== null;
-        const hasDeviceCode = deviceCodeData && deviceCodeData.device_code;
-        const timeRemaining = hasDeviceCode ? Math.max(0, Math.floor((deviceCodeData.expires_at - now) / 1000)) : 0;
-        
-        // Vérifier si l'authentification est complète
-        const isAuthenticated = twitchConfig.configured && 
-                               twitchConfig.access_token && 
-                               twitchConfig.user_id;
-        
-        res.json({
-            configured: twitchConfig.configured,
-            authenticated: isAuthenticated,
-            username: twitchConfig.username || '',
-            login: twitchConfig.login || '',
-            display_name: twitchConfig.display_name || twitchConfig.username || '',
-            user_id: twitchConfig.user_id || '',
-            polling: isPolling,
-            has_device_code: hasDeviceCode,
-            has_access_token: !!twitchConfig.access_token,
-            expires_at: hasDeviceCode ? deviceCodeData.expires_at : 0,
-            time_remaining: timeRemaining,
-            user_code: hasDeviceCode ? deviceCodeData.user_code : '',
-            verification_uri: hasDeviceCode ? deviceCodeData.verification_uri : '',
-            server_status: 'running',
-            timestamp: now
-        });
-    } catch (error) {
-        console.error('❌ Erreur endpoint auth-status:', error.message);
-        // Ne jamais faire planter cet endpoint - retourner un état par défaut
-        res.json({
-            configured: false,
-            authenticated: false,
-            username: '',
-            login: '',
-            display_name: '',
-            user_id: '',
-            polling: false,
-            has_device_code: false,
-            has_access_token: false,
-            expires_at: 0,
-            time_remaining: 0,
-            user_code: '',
-            verification_uri: '',
-            server_status: 'error',
-            timestamp: Date.now(),
-            error: error.message
-        });
-    }
-});
-
-// Endpoint pour vérifier le statut des privilèges modérateur
-app.get('/api/moderator-status', async (req, res) => {
-    try {
-        if (!twitchConfig.access_token || !twitchConfig.user_id) {
-            return res.json({
-                configured: false,
-                error: 'Non configuré'
-            });
-        }
-
-        const isModerator = await checkIfModerator();
-        const canGrantSelf = await canGrantSelfModerator();
-        
-        res.json({
-            configured: true,
-            user_id: twitchConfig.user_id,
-            username: twitchConfig.username,
-            is_moderator: isModerator,
-            can_grant_self: canGrantSelf,
-            scopes: twitchConfig.scope ? twitchConfig.scope.split(' ') : []
-        });
-    } catch (error) {
-        console.error('❌ Erreur lors de la vérification du statut modérateur:', error.message);
-        res.status(500).json({
-            configured: true,
-            error: error.message
-        });
-    }
-});
-
-app.get('/api/sync-twitch', async (req, res) => {
-    try {
-        // Rate limiting
-        if (!syncLimiter.allow()) {
-            return res.status(429).json({ 
-                success: false,
-                error: 'Too many requests',
-                message: 'Attendez 1 minute avant la prochaine synchro',
-                remaining: syncLimiter.remaining(),
-                nextResetIn: Math.ceil(syncLimiter.nextResetIn() / 1000)
-            });
-        }
-        
-        if (!twitchConfig.configured) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Twitch non configuré - Veuillez vous connecter d\'abord' 
-            });
-        }
-        
-        if (!twitchConfig.access_token) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Token d\'accès manquant - Reconnectez-vous à Twitch' 
-            });
-        }
-        
-        logEvent('INFO', '📄 Démarrage synchronisation manuelle depuis l\'API Twitch...');
-        
-        // Synchroniser follows ET subs depuis l'API Twitch (Result Pattern)
-        const followsResult = await syncTwitchFollows('Synchronisation manuelle');
-        const subsResult = await syncTwitchSubs('Synchronisation manuelle');
-        
-        const hasErrors = !followsResult.success || !subsResult.success;
-        
-        res.json({
-            success: !hasErrors,
-            currentFollows: followsResult.data,
-            currentSubs: subsResult.data,
-            message: hasErrors ? 
-                'Synchronisation partielle avec erreurs' : 
-                'Synchronisation complète réussie ! Follows et Subs récupérés depuis l\'API Twitch',
-            details: {
-                follows: followsResult.success ? 
-                    `${followsResult.data} follows synchronisés depuis Twitch` : 
-                    `Erreur: ${followsResult.error}`,
-                subs: subsResult.success ? 
-                    `${subsResult.data} subs synchronisés depuis Twitch` : 
-                    `Erreur: ${subsResult.error}`
-            },
-            errors: hasErrors ? {
-                follows: followsResult.error,
-                subs: subsResult.error
-            } : null
-        });
-    } catch (error) {
-        logEvent('ERROR', `❌ Erreur générale sync: ${error.message}`);
-        res.status(500).json({ 
-            success: false,
-            error: error.message,
-            details: {
-                message: 'Erreur lors de la synchronisation',
-                stack: error.stack
-            }
-        });
-    }
-});
-
-app.get('/api/status', (req, res) => {
-    const eventSubConnected = twitchEventSubWs && twitchEventSubWs.readyState === WebSocket.OPEN;
-    
-    // Récupérer les infos depuis app_state.json (architecture centralisée v2.3.0)
-    let stateInfo = null;
-    try {
-        const state = loadAppState();
-        stateInfo = {
-            follows: state.counters.follows,
-            subs: state.counters.subs,
-            lastUpdated: state.counters.lastUpdated,
-            version: state.version.current
-        };
-    } catch (error) {
-        stateInfo = { error: 'Erreur lecture app_state.json' };
-    }
-    
-    res.json({
-        status: 'active',
-        version: '2.3.0',
-        currentFollows: currentFollows,
-        currentSubs: currentSubs,
-        goals: followGoals.size + subGoals.size,
-        uptime: Math.floor(process.uptime()),
-        twitchConfigured: twitchConfig.configured,
-        username: twitchConfig.username,
-        eventSubConnected: eventSubConnected,
-        sessionId: sessionId,
-        deviceCodePolling: deviceCodePolling !== null,
-        reconnectAttempts: reconnectAttempts,
-        maxReconnectAttempts: maxReconnectAttempts,
-        lastUpdate: new Date().toISOString(),
-        state: stateInfo, // Architecture centralisée v2.3.0
-        websocketClients: wss.clients.size,
-        // 📄 Informations sur la file d'événements (EventQueue)
-        eventQueue: {
-            size: eventQueue.size(),
-            isProcessing: eventQueue.processing,
-            maxEventsPerBatch: MAX_EVENTS_PER_BATCH
-        }
-    });
-});
-
-// Route pour obtenir les informations des logs
-app.get('/api/logs-info', (req, res) => {
-    try {
-        const logsInfo = {};
-        
-        // Informations sur subcount_logs.txt
-        const subcountLogPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
-        if (fs.existsSync(subcountLogPath)) {
-            const stats = fs.statSync(subcountLogPath);
-            logsInfo.subcountLogs = {
-                exists: true,
-                size: stats.size,
-                sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
-                sizeKB: (stats.size / 1024).toFixed(2),
-                lastModified: stats.mtime.toISOString()
-            };
-        } else {
-            logsInfo.subcountLogs = { exists: false };
-        }
-        
-        // Informations sur obs_subcount_auto.log
-        const obsLogPath = path.join(__dirname, 'obs_subcount_auto.log');
-        if (fs.existsSync(obsLogPath)) {
-            const stats = fs.statSync(obsLogPath);
-            logsInfo.obsLogs = {
-                exists: true,
-                size: stats.size,
-                sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
-                sizeKB: (stats.size / 1024).toFixed(2),
-                lastModified: stats.mtime.toISOString()
-            };
-        } else {
-            logsInfo.obsLogs = { exists: false };
-        }
-        
-        res.json(logsInfo);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Route pour nettoyer les logs
-app.post('/api/clean-logs', (req, res) => {
-    try {
-        const results = {};
-        const { which = 'both' } = req.body; // 'subcount', 'obs', ou 'both'
-        
-        if (which === 'subcount' || which === 'both') {
-            const subcountLogPath = path.join(ROOT_DIR, 'app', 'logs', 'subcount_logs.txt');
-            if (fs.existsSync(subcountLogPath)) {
-                const originalSize = fs.statSync(subcountLogPath).size;
-                const header = `# Log nettoyé manuellement via interface web - ${new Date().toISOString()}\n\n`;
-                fs.writeFileSync(subcountLogPath, header, 'utf8');
-                results.subcountLogs = {
-                    cleaned: true,
-                    originalSizeKB: (originalSize / 1024).toFixed(2),
-                    newSizeKB: (header.length / 1024).toFixed(2)
-                };
-                logEvent('INFO', '🧹 Log subcount_logs.txt nettoyé via interface web');
-            } else {
-                results.subcountLogs = { cleaned: false, reason: 'Fichier non trouvé' };
-            }
-        }
-        
-        if (which === 'obs' || which === 'both') {
-            const obsLogPath = path.join(__dirname, 'obs_subcount_auto.log');
-            if (fs.existsSync(obsLogPath)) {
-                const originalSize = fs.statSync(obsLogPath).size;
-                const header = `# Log nettoyé manuellement via interface web - ${new Date().toISOString()}\n\n`;
-                fs.writeFileSync(obsLogPath, header, 'utf8');
-                results.obsLogs = {
-                    cleaned: true,
-                    originalSizeKB: (originalSize / 1024).toFixed(2),
-                    newSizeKB: (header.length / 1024).toFixed(2)
-                };
-                logEvent('INFO', '🧹 Log obs_subcount_auto.log nettoyé via interface web');
-            } else {
-                results.obsLogs = { cleaned: false, reason: 'Fichier non trouvé' };
-            }
-        }
-        
-        res.json({ success: true, results });
-    } catch (error) {
-        logEvent('ERROR', 'Erreur nettoyage logs via API', { error: error.message });
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/update-follows', (req, res) => {
-    try {
-        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
-        
-        currentFollows = count;
-        updateFollowFiles(currentFollows);
-        broadcastFollowUpdate();
-        
-        // Sauvegarder automatiquement sur disque
-        saveFollowCountToFile(currentFollows);
-        
-        res.json({
-            success: true,
-            currentFollows: currentFollows,
-            goal: getCurrentFollowGoal(currentFollows)
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-app.post('/api/update-subs', (req, res) => {
-    try {
-        const count = validatePositiveInt(req.body.count, 'count', 0, 10000000);
-        
-        currentSubs = count;
-        updateSubFiles(currentSubs);
-        broadcastSubUpdate();
-        
-        // Sauvegarder automatiquement sur disque
-        saveSubCountToFile(currentSubs);
-        
-        res.json({
-            success: true,
-            currentSubs: currentSubs,
-            goal: getCurrentSubGoal(currentSubs)
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-app.get('/api/current', (req, res) => {
-    res.json({
-        currentFollows: currentFollows,
-        currentSubs: currentSubs,
-        followGoal: getCurrentFollowGoal(currentFollows),
-        subGoal: getCurrentSubGoal(currentSubs)
-    });
-});
-
-app.get('/api/current-follows', (req, res) => {
-    res.json({
-        currentFollows: currentFollows,
-        goal: getCurrentFollowGoal(currentFollows)
-    });
-});
-
-app.get('/api/current-subs', (req, res) => {
-    res.json({
-        currentSubs: currentSubs,
-        goal: getCurrentSubGoal(currentSubs)
-    });
-});
-
-// Routes pour les overlays OBS (compatibilité)
-app.get('/api/sub_goal', (req, res) => {
-    const goal = getCurrentSubGoal(currentSubs);
-    res.json({ goal });
-});
-
-app.get('/api/follow_goal', (req, res) => {
-    const goal = getCurrentFollowGoal(currentFollows);
-    res.json({ goal });
-});
-
-// 📄 Endpoint pour gérer la file d'événements (utilise EventQueue)
-app.post('/api/event-buffer/clear', (req, res) => {
-    try {
-        const clearedEvents = eventQueue.size();
-        eventQueue.clear();
-        
-        logEvent('INFO', `🧹 File d'événements vidée: ${clearedEvents} événements supprimés`);
-        
-        res.json({
-            success: true,
-            message: `File vidée: ${clearedEvents} événements supprimés`,
-            clearedEvents: clearedEvents
-        });
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur vidage file:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/event-buffer/status', (req, res) => {
-    const events = eventQueue.getAll();
-    res.json({
-        size: events.length,
-        isProcessing: eventQueue.processing,
-        events: events.map(e => ({
-            id: e.id,
-            type: e.type,
-            timestamp: new Date(e.timestamp).toISOString(),
-            data: e.data
-        })),
-        config: {
-            maxEventsPerBatch: MAX_EVENTS_PER_BATCH,
-            processingDelay: EVENT_PROCESSING_DELAY
-        }
-    });
-});
-
-// 🧪 Endpoint de test pour simuler un événement EventSub
-app.post('/api/test/simulate-follow', (req, res) => {
-    try {
-        const { user_name = 'TestUser', user_id = '999999999' } = req.body;
-        
-        logEvent('TEST', `🧪 Simulation événement follow: ${user_name}`);
-        
-        // Créer un événement de test
-        const testEvent = {
-            user_name: user_name,
-            user_id: user_id,
-            followed_at: new Date().toISOString(),
-            timestamp: Date.now(),
-            simulated: true
-        };
-        
-        // Ajouter au EventQueue
-        eventQueue.add({
-            id: `test-follow-${Date.now()}`,
-            type: VALID_EVENT_TYPES.FOLLOW,
-            data: testEvent,
-            timestamp: Date.now()
-        });
-        
-        res.json({
-            success: true,
-            message: `Événement follow simulé pour ${user_name}`,
-            event: testEvent,
-            queueSize: eventQueue.size()
-        });
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur simulation follow:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Endpoint pour tester le renouvellement de token
-app.post('/api/refresh-token', async (req, res) => {
-    try {
-        const success = await refreshTwitchToken();
-        if (success) {
-            res.json({ success: true, message: 'Token renouvelé avec succès' });
-        } else {
-            res.status(500).json({ success: false, error: 'Échec du renouvellement' });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Endpoint pour déconnecter Twitch (multi-streaming)
-app.post('/api/disconnect-twitch', (req, res) => {
-    try {
-        console.log('📌 Déconnexion Twitch demandée...');
-        
-        // Sauvegarder l'ancien username pour le log
-        const oldUsername = twitchConfig.username || 'Utilisateur inconnu';
-        
-        // Fermer la connexion EventSub
-        if (twitchEventSubWs) {
-            twitchEventSubWs.removeAllListeners();
-            twitchEventSubWs.close();
-            twitchEventSubWs = null;
-            sessionId = null;
-            console.log('📌 EventSub WebSocket fermé');
-        }
-        
-        // Arrêter le polling
-        stopFollowPolling();
-        
-        // Arrêter le device code polling si actif
-        if (deviceCodePolling) {
-            timerRegistry.clearInterval('deviceCodePolling');
-            deviceCodePolling = null;
-            console.log('📄 Device Code polling arrêté');
-        }
-        
-        // Réinitialiser la configuration Twitch
-        twitchConfig.access_token = '';
-        twitchConfig.refresh_token = '';
-        twitchConfig.user_id = '';
-        twitchConfig.username = '';
-        twitchConfig.configured = false;
-        
-        // Sauvegarder la config vide
-        saveTwitchConfig();
-        
-        // Reset du compteur de reconnexion
-        reconnectAttempts = 0;
-        
-        logEvent('INFO', `📌 Déconnexion Twitch réussie (@${oldUsername})`);
-        
-        res.json({
-            success: true,
-            message: `Déconnecté de @${oldUsername}`,
-            previousUser: oldUsername
-        });
-        
-    } catch (error) {
-        logEvent('ERROR', '❌ Erreur déconnexion Twitch:', error.message);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
-// Endpoint pour recharger la configuration des objectifs
-app.post('/api/reload-goals', (req, res) => {
-    try {
-        console.log('📄 Rechargement manuel des objectifs...');
-        loadGoals();
-        res.json({ 
-            success: true, 
-            message: 'Configuration rechargée',
-            goalsCount: followGoals.size + subGoals.size 
-        });
-    } catch (error) {
-        console.error('❌ Erreur rechargement:', error.message);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
-        });
-    }
-});
-
-// Endpoint pour forcer la reconnexion EventSub
-app.post('/api/reconnect-eventsub', (req, res) => {
-    try {
-        console.log('📄 Reconnexion forcée EventSub...');
-        
-        // Reset du compteur de tentatives
-        reconnectAttempts = 0;
-        
-        // Fermer la connexion existante
-        if (twitchEventSubWs) {
-            twitchEventSubWs.removeAllListeners();
-            twitchEventSubWs.close();
-            twitchEventSubWs = null;
-            sessionId = null;
-        }
-        
-        // Relancer la connexion
-        timerRegistry.setTimeout('restartEventSub', () => {
-            connectTwitchEventSub();
-        }, 1000);
-        
-        res.json({ 
-            success: true, 
-            message: 'Reconnexion EventSub initiée' 
-        });
-    } catch (error) {
-        console.error('❌ Erreur reconnexion forcée:', error.message);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
-        });
-    }
-});
-
-// Générer la page de test pour diagnostiquer les boutons
-function generateTestPage() {
-    return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>🧪 Test des boutons - SubCount Auto</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0e0e23; color: white; }
-        .header { text-align: center; background: linear-gradient(45deg, #9146ff, #00ffc7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
-        .card { background: #1a1a2e; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #16213e; }
-        button { background: #6441a4; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; margin: 5px; font-size: 14px; }
-        button:hover { background: #7c2d92; }
-        button.success { background: #28a745; }
-        button.warning { background: #ffc107; color: #000; }
-        .flex { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-        .log { background: #2a2a2a; padding: 10px; border-radius: 5px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🧪 Test des boutons</h1>
-        <p>Diagnostic des fonctions JavaScript</p>
-    </div>
-    
-    <div class="card">
-        <h2>🔧 Tests de base</h2>
-        <div class="flex">
-            <button onclick="testAlert()">🚨 Test Alert</button>
-            <button onclick="testConsole()">📝 Test Console</button>
-            <button onclick="testFetch()">🌐 Test Fetch</button>
-        </div>
-    </div>
-    
-    <div class="card">
-        <h2>👥 Tests Follows</h2>
-        <div class="flex">
-            <button onclick="addFollow()" class="success">+1 Follow</button>
-            <button onclick="addFollow(5)" class="success">+5 Follows</button>
-            <button onclick="setFollows()" class="warning">Définir nombre</button>
-        </div>
-    </div>
-    
-    <div class="card">
-        <h2>⭐ Tests Subs</h2>
-        <div class="flex">
-            <button onclick="addSub()" class="success">+1 Sub</button>
-            <button onclick="addSub(5)" class="success">+5 Subs</button>
-            <button onclick="setSubs()" class="warning">Définir nombre</button>
-        </div>
-    </div>
-    
-    <div class="card">
-        <h2>📄 Tests Système</h2>
-        <div class="flex">
-            <button onclick="syncTwitch()" class="success">📄 Synchroniser</button>
-            <button onclick="updateDiagnostic()" class="success">🔐 Diagnostic</button>
-        </div>
-    </div>
-    
-    <div class="card">
-        <h2>📋 Journal des événements</h2>
-        <div id="log" class="log">Aucun événement...</div>
-        <button onclick="clearLog()">🧹 Vider le journal</button>
-    </div>
-    
-    <script>
-        function log(message) {
-            const logDiv = document.getElementById('log');
-            const timestamp = new Date().toLocaleTimeString();
-            logDiv.innerHTML += \`[\${timestamp}] \${message}<br>\`;
-            logDiv.scrollTop = logDiv.scrollHeight;
-            console.log(message);
-        }
-        
-        function clearLog() {
-            document.getElementById('log').innerHTML = 'Journal vidé...';
-        }
-        
-        function testAlert() {
-            log('🚨 Test Alert appelé');
-            alert('Test Alert fonctionne !');
-        }
-        
-        function testConsole() {
-            log('📝 Test Console appelé');
-            console.log('Test Console fonctionne !');
-        }
-        
-        async function testFetch() {
-            log('🌐 Test Fetch appelé...');
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                log('✅ Fetch réussi: ' + JSON.stringify(data).substring(0, 100) + '...');
-            } catch (error) {
-                log('❌ Erreur Fetch: ' + error.message);
-            }
-        }
-        
-        function addFollow(amount = 1) {
-            log(\`👥 addFollow(\${amount}) appelé\`);
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    log('📊 Status récupéré: ' + data.currentFollows + ' follows');
-                    const newCount = data.currentFollows + amount;
-                    return fetch('/api/update-follows', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ count: newCount })
-                    });
-                })
-                .then(r => r.json())
-                .then(data => {
-                    log('✅ Follows mis à jour: ' + data.currentFollows);
-                    alert('Follows mis à jour: ' + data.currentFollows);
-                })
-                .catch(error => {
-                    log('❌ Erreur addFollow: ' + error.message);
-                    alert('Erreur: ' + error.message);
-                });
-        }
-        
-        function setFollows() {
-            log('🔐 setFollows appelé');
-            const count = prompt('Nombre de follows :');
-            if (count !== null && !isNaN(count)) {
-                fetch('/api/update-follows', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ count: parseInt(count) })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    log('✅ Follows définis: ' + data.currentFollows);
-                    alert('Follows définis: ' + data.currentFollows);
-                })
-                .catch(error => {
-                    log('❌ Erreur setFollows: ' + error.message);
-                });
-            } else {
-                log('⚠️ setFollows annulé');
-            }
-        }
-        
-        function addSub(amount = 1) {
-            log(\`⭐ addSub(\${amount}) appelé\`);
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    const newCount = data.currentSubs + amount;
-                    return fetch('/api/update-subs', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ count: newCount })
-                    });
-                })
-                .then(r => r.json())
-                .then(data => {
-                    log('✅ Subs mis à jour: ' + data.currentSubs);
-                    alert('Subs mis à jour: ' + data.currentSubs);
-                })
-                .catch(error => {
-                    log('❌ Erreur addSub: ' + error.message);
-                });
-        }
-        
-        function setSubs() {
-            log('🔐 setSubs appelé');
-            const count = prompt('Nombre de subs :');
-            if (count !== null && !isNaN(count)) {
-                fetch('/api/update-subs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ count: parseInt(count) })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    log('✅ Subs définis: ' + data.currentSubs);
-                    alert('Subs définis: ' + data.currentSubs);
-                })
-                .catch(error => {
-                    log('❌ Erreur setSubs: ' + error.message);
-                });
-            } else {
-                log('⚠️ setSubs annulé');
-            }
-        }
-        
-        function syncTwitch() {
-            log('📄 syncTwitch appelé');
-            fetch('/api/sync-twitch')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        const message = 'Synchronisation réussie! Follows: ' + data.currentFollows + ', Subs: ' + data.currentSubs;
-                        log('✅ ' + message);
-                        alert('✅ ' + message);
-                    } else {
-                        log('❌ Erreur sync: ' + data.error);
-                        alert('❌ Erreur: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    log('❌ Erreur syncTwitch: ' + error.message);
-                });
-        }
-        
-        function updateDiagnostic() {
-            log('🔐 updateDiagnostic appelé');
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    log('📊 Diagnostic: ' + data.currentFollows + ' follows, ' + data.currentSubs + ' subs');
-                    alert('Diagnostic: ' + data.currentFollows + ' follows, ' + data.currentSubs + ' subs');
-                })
-                .catch(error => {
-                    log('❌ Erreur diagnostic: ' + error.message);
-                });
-        }
-        
-        // Log de démarrage
-        log('🚀 Page de test chargée');
-    </script>
-</body>
-</html>`;
-}
 
 // ==================================================================
 // 🎨 SYSTÈME DE CONFIGURATION DYNAMIQUE DES OVERLAYS
@@ -4279,6 +2960,120 @@ function broadcastConfigUpdate() {
 
 // Charger la config au démarrage
 loadOverlayConfig();
+
+// ==================================================================
+// 📦 CONTEXTE DE L'APPLICATION (pour les routes modulaires)
+// ==================================================================
+// Ce contexte expose toutes les variables et fonctions nécessaires aux routes
+const appContext = {
+    // Variables d'état
+    get currentFollows() { return currentFollows; },
+    set currentFollows(val) { currentFollows = val; },
+    get currentSubs() { return currentSubs; },
+    set currentSubs(val) { currentSubs = val; },
+    
+    // WebSocket servers
+    wss,
+    
+    // Event Queue
+    eventQueue,
+    
+    // Goals
+    followGoals,
+    subGoals,
+    
+    // Twitch config
+    get twitchConfig() { return twitchConfig; },
+    get deviceCodeData() { return deviceCodeData; },
+    get twitchEventSubWs() { return twitchEventSubWs; },
+    set twitchEventSubWs(val) { twitchEventSubWs = val; },
+    get sessionId() { return sessionId; },
+    set sessionId(val) { sessionId = val; },
+    get deviceCodePolling() { return deviceCodePolling; },
+    set deviceCodePolling(val) { deviceCodePolling = val; },
+    get reconnectAttempts() { return reconnectAttempts; },
+    set reconnectAttempts(val) { reconnectAttempts = val; },
+    
+    // Batching
+    get followBatch() { return followBatch; },
+    get followRemoveBatch() { return followRemoveBatch; },
+    get subBatch() { return subBatch; },
+    get subEndBatch() { return subEndBatch; },
+    
+    // Overlay config
+    get overlayConfig() { return overlayConfig; },
+    
+    // Rate limiters
+    syncLimiter,
+    timerRegistry,
+    
+    // Functions - Goals
+    getCurrentFollowGoal,
+    getCurrentSubGoal,
+    
+    // Functions - File updates
+    updateFollowFiles,
+    updateSubFiles,
+    
+    // Functions - Broadcasts
+    broadcastFollowUpdate,
+    broadcastSubUpdate,
+    broadcastConfigUpdate,
+    
+    // Functions - Save to file
+    saveFollowCountToFile,
+    saveSubCountToFile,
+    
+    // Functions - Batching
+    addFollowToBatch,
+    addFollowRemoveToBatch,
+    addSubToBatch,
+    addSubEndToBatch,
+    
+    // Functions - Twitch sync
+    syncTwitchFollows,
+    syncTwitchSubs,
+    
+    // Functions - Twitch config
+    saveTwitchConfig,
+    loadGoals,
+    initiateDeviceCodeFlow,
+    refreshTwitchToken,
+    checkIfModerator,
+    canGrantSelfModerator,
+    
+    // Functions - Polling
+    stopFollowPolling,
+    pollFollowCount,
+    
+    // Functions - EventSub
+    connectTwitchEventSub,
+};
+
+// Initialiser les contextes des routes
+initAllContexts(appContext);
+logEvent('INFO', '✅ Contexte d\'application initialisé pour les routes modulaires');
+
+// ==================================================================
+// 📌 MONTAGE DES ROUTES MODULAIRES
+// ==================================================================
+// Note: Les routes sont montées mais les définitions existantes restent
+// pour assurer la compatibilité. Une fois validé, les anciennes routes
+// pourront être supprimées.
+
+// Routes des pages HTML
+app.use('/', pagesRouter);
+
+// Routes API publiques
+app.use('/api', apiRouter);
+
+// Routes d'administration
+app.use('/admin', adminRouter);
+
+// Routes Twitch (montées sur /api car elles utilisent /api/*)
+app.use('/api', twitchRouter);
+
+logEvent('INFO', '✅ Routes modulaires montées (pages, api, admin, twitch)');
 
 // ==================================================================
 // Middleware de gestion d'erreurs centralisé (doit être après toutes les routes)
