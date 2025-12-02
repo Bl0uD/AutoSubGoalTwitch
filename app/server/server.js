@@ -1,14 +1,15 @@
 /**
- * @file server-v2.js
+ * @file server.js
  * @description Serveur Express avec architecture v3.1 (StateManager + DI)
  * @version 3.1.0
  * 
- * Ce fichier utilise la nouvelle architecture modulaire:
- * - StateManager pour l'état centralisé
- * - DependencyContainer pour l'injection de dépendances
- * - Factories pour les services
+ * Architecture modulaire:
+ * - StateManager: état centralisé avec EventEmitter
+ * - DependencyContainer: injection de dépendances (IoC)
+ * - Factories: services découplés et testables
  * 
- * Pour basculer: renommer server.js -> server-legacy.js, server-v2.js -> server.js
+ * @see core/bootstrap.js pour l'initialisation des services
+ * @see server-legacy.js pour l'ancienne version monolithique
  */
 
 const express = require('express');

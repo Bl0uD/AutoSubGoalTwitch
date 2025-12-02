@@ -1,7 +1,7 @@
 {
   "name": "subcount-auto-device-code-grant",
-  "version": "3.0.0",
-  "description": "SubCount Auto v3.0.0 - Architecture modulaire avec 10 services",
+  "version": "3.1.0",
+  "description": "SubCount Auto v3.1.0 - Architecture DI avec StateManager",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
