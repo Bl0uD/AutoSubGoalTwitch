@@ -160,91 +160,85 @@ def get_windows_fonts():
     
     fonts = set()
     
-    # Mots de variantes (séparés par espace dans le nom) - EN + FR
-    variant_words = [
-        # Anglais
-        'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'black', 'heavy',
-        'semibold', 'semi bold', 'semi-bold', 'demibold', 'demi bold', 'demi-bold',
-        'extrabold', 'extra bold', 'extra-bold', 'extralight', 'extra light', 'extra-light',
-        'ultralight', 'ultra light', 'ultra-light', 'ultrabold', 'ultra bold', 'ultra-bold',
-        'condensed', 'extended', 'narrow', 'wide', 'regular', 'normal', 'book', 'roman',
-        'mt bold', 'mt italic', 'ce', 'cyr', 'greek', 'tur', 'baltic', 'hebrew', 'arabic',
-        # Français
-        'gras', 'italique', 'maigre', 'demi gras', 'demi-gras', 'très gras', 'très-gras',
-        'extra gras', 'extra-gras', 'léger', 'étroit', 'étendu', 'condensé',
-        'mt gras', 'mt italique', 'gras italique', 'poster compressed'
+    # Suffixes de variantes à retirer (ordre important: du plus long au plus court)
+    variant_suffixes = [
+        # Composés (les plus longs d'abord)
+        '-BoldItalic', '-SemiBoldItalic', '-LightItalic', '-ExtraBoldItalic',
+        ' Bold Italic', ' Gras Italique', ' Extra Bold', ' Extra Light',
+        ' Semi Bold', ' Demi Bold', ' Ultra Bold', ' Ultra Light',
+        ' Bold Italique', ' Ext Condensed Bold', ' Ultra Bold Condensed',
+        # Simples
+        '-Bold', '-Italic', '-Light', '-Regular', '-Medium', '-Thin', '-Black',
+        '-SemiBold', '-DemiBold', '-ExtraBold', '-ExtraLight', '-Heavy',
+        ' Bold', ' Italic', ' Light', ' Regular', ' Medium', ' Thin', ' Black',
+        ' Heavy', ' SemiBold', ' Semibold', ' DemiBold', ' Demibold',
+        ' ExtraBold', ' ExtraLight', ' UltraLight', ' UltraBold',
+        ' Condensed', ' Extended', ' Narrow', ' Wide', ' Normal', ' Book', ' Roman',
+        ' Oblique', ' Semilight', ' SemiLight',
+        ' Gras', ' Italique', ' Léger', ' Maigre',
+        # Suffixes courts en dernier
+        ' MT', ' ITC', ' LT', ' UI'
     ]
     
-    def is_variant(font_name):
-        """Vérifie si le nom correspond à une variante de police"""
-        name_lower = font_name.lower().strip()
-        
-        # Vérifier les mots de variante (séparés)
+    def is_variant_name(name):
+        """Vérifie si le nom indique une variante"""
+        name_lower = name.lower()
+        # Mots qui indiquent une variante quand ils apparaissent
+        variant_words = [
+            'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'black', 'heavy',
+            'semibold', 'demibold', 'extrabold', 'extralight', 'ultralight', 'ultrabold',
+            'semilight', 'condensed', 'extended', 'narrow', 'wide',
+            'gras', 'italique', 'léger', 'maigre'
+        ]
+        # Vérifier si un mot de variante est présent (séparé par espace ou tiret)
         for word in variant_words:
-            # Chercher le mot comme mot complet (séparé par espaces)
-            if f' {word}' in f' {name_lower} ' or name_lower.endswith(f' {word}'):
+            # Le mot doit être précédé d'un espace ou tiret (pas au début du nom)
+            if f' {word}' in name_lower or f'-{word}' in name_lower:
                 return True
-        
         return False
     
     def extract_base_font_name(font_name):
-        """Extrait le nom de base d'une police en retirant les indicateurs de variante"""
-        clean = font_name
+        """Extrait le nom de base d'une police"""
+        clean = font_name.strip()
         
         # Retirer ce qui est entre parenthèses (TrueType), (OpenType), etc.
-        clean = clean.split('(')[0].strip()
+        if '(' in clean:
+            clean = clean.split('(')[0].strip()
         
-        # Retirer le & parfois présent
-        clean = clean.replace('&', '').strip()
+        # Retirer les & et ce qui suit
+        if ' & ' in clean:
+            clean = clean.split(' & ')[0].strip()
         
-        # Nettoyer les patterns spéciaux Windows
-        # Ex: "Courier 10,12,15" -> "Courier"
-        # Retirer les suffixes numériques avec virgules (tailles de police)
-        clean = re.sub(r'\s+\d+[,\d]+$', '', clean)
-        # Retirer les espaces multiples (ex: "Cambria  Cambria Math" -> premier mot)
-        if '  ' in clean:
-            clean = clean.split('  ')[0].strip()
+        # Retirer les suffixes de variante
+        for suffix in variant_suffixes:
+            if clean.lower().endswith(suffix.lower()):
+                clean = clean[:-len(suffix)].strip()
         
-        # Retirer les suffixes de variante courants (EN + FR)
-        suffixes_to_remove = [
-            # Anglais
-            ' Bold', ' Italic', ' Bold Italic', ' Light', ' Thin', ' Medium', ' Black',
-            ' Heavy', ' SemiBold', ' Semi Bold', ' DemiBold', ' Demi Bold',
-            ' ExtraBold', ' Extra Bold', ' ExtraLight', ' Extra Light',
-            ' UltraLight', ' Ultra Light', ' UltraBold', ' Ultra Bold',
-            ' Condensed', ' Extended', ' Narrow', ' Wide', ' Regular', ' Normal',
-            ' Book', ' Roman', ' Oblique', ' MT', ' CE', ' Cyr', ' Greek', ' Tur',
-            ' Poster Compressed', ' Shadow', ' Outline',
-            # Français
-            ' Gras', ' Italique', ' Gras Italique', ' Maigre', ' Demi Gras', ' Demi-Gras',
-            ' Extra Gras', ' Extra-Gras', ' Très Gras', ' Léger', ' Étroit', ' Étendu',
-            ' Condensé', ' MT Gras', ' MT Italique'
-        ]
+        # Retirer les suffixes comme -Regular, _Regular
+        clean = re.sub(r'[-_](Regular|Normal|Book|Roman)$', '', clean, flags=re.IGNORECASE)
         
-        # Appliquer plusieurs fois pour retirer les suffixes composés
-        for _ in range(3):
-            for suffix in suffixes_to_remove:
-                if clean.lower().endswith(suffix.lower()):
-                    clean = clean[:-len(suffix)].strip()
+        # Retirer les patterns comme [wght] pour les polices variables
+        clean = re.sub(r'\[.*?\]', '', clean).strip()
         
         return clean
     
+    def add_font_if_valid(name):
+        """Ajoute une police si elle n'est pas une variante"""
+        clean = extract_base_font_name(name)
+        if clean and len(clean) > 1:
+            # Vérifier que le nom nettoyé n'est pas une variante
+            if not is_variant_name(clean):
+                fonts.add(clean)
+    
     def read_fonts_from_registry(registry_key, path):
-        """Lit les polices depuis une clé de registre spécifique"""
+        """Lit les polices depuis une clé de registre"""
         try:
             key = winreg.OpenKey(registry_key, path)
             i = 0
             while True:
                 try:
-                    font_name, font_file, _ = winreg.EnumValue(key, i)
-                    
-                    # Extraire le nom de base propre
-                    clean_name = extract_base_font_name(font_name)
-                    
-                    # Filtrer les variantes basées sur le nom
-                    if clean_name and not is_variant(font_name):
-                        fonts.add(clean_name)
-                    
+                    font_name, _, _ = winreg.EnumValue(key, i)
+                    add_font_if_valid(font_name)
                     i += 1
                 except OSError:
                     break
@@ -252,77 +246,73 @@ def get_windows_fonts():
         except Exception as e:
             log_message(f"⚠️ Erreur lecture registre: {e}", level="warning")
     
+    def read_fonts_from_directory(dir_path, source_name):
+        """Lit les polices depuis un dossier"""
+        if not os.path.exists(dir_path):
+            return
+        
+        count = 0
+        try:
+            for font_file in os.listdir(dir_path):
+                if font_file.lower().endswith(('.ttf', '.otf', '.ttc', '.fon')):
+                    # Extraire le nom sans extension
+                    name = os.path.splitext(font_file)[0]
+                    add_font_if_valid(name)
+                    count += 1
+        except PermissionError:
+            pass
+        
+        if count > 0:
+            log_message(f"📂 {count} fichiers scannés depuis {source_name}", level="info")
+    
     try:
-        # Méthode 1: Lire les polices SYSTÈME (HKEY_LOCAL_MACHINE)
+        # 1. Registre système (polices installées pour tous les utilisateurs)
         read_fonts_from_registry(
             winreg.HKEY_LOCAL_MACHINE,
             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
         )
         
-        # Méthode 2: Lire les polices UTILISATEUR (HKEY_CURRENT_USER)
-        # Important pour les polices installées par l'utilisateur (comme SEA)
+        # 2. Registre utilisateur (polices installées pour l'utilisateur courant)
         read_fonts_from_registry(
             winreg.HKEY_CURRENT_USER,
             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
         )
         
-        # Méthode 3: Scanner le dossier des polices utilisateur
-        # Windows 10/11 stocke les polices utilisateur dans %LOCALAPPDATA%\Microsoft\Windows\Fonts
+        # 3. Dossier polices utilisateur (Windows 10/11)
         user_fonts_dir = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows', 'Fonts')
-        if os.path.exists(user_fonts_dir):
-            for font_file in os.listdir(user_fonts_dir):
-                if font_file.lower().endswith(('.ttf', '.otf', '.ttc')):
-                    # Extraire le nom sans extension
-                    font_name = os.path.splitext(font_file)[0]
-                    clean_name = extract_base_font_name(font_name)
-                    if clean_name and not is_variant(font_name):
-                        fonts.add(clean_name)
-            log_message(f"📂 Polices utilisateur scannées depuis: {user_fonts_dir}", level="info")
+        read_fonts_from_directory(user_fonts_dir, "polices utilisateur")
         
-        # Méthode 4: Scanner aussi le dossier Windows\Fonts (polices système)
+        # 4. Dossier polices système
         system_fonts_dir = os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts')
-        if os.path.exists(system_fonts_dir):
-            try:
-                for font_file in os.listdir(system_fonts_dir):
-                    if font_file.lower().endswith(('.ttf', '.otf', '.ttc')):
-                        font_name = os.path.splitext(font_file)[0]
-                        clean_name = extract_base_font_name(font_name)
-                        if clean_name and not is_variant(font_name):
-                            fonts.add(clean_name)
-            except PermissionError:
-                pass  # Ignorer les erreurs de permission
+        read_fonts_from_directory(system_fonts_dir, "polices système")
         
         # Convertir en liste triée
         font_list = sorted(list(fonts), key=str.lower)
         
-        # Polices prioritaires à mettre en premier
-        priority_fonts = ["Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Impact", "Comic Sans MS"]
+        # Polices prioritaires en premier
+        priority = ["SEA", "Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Impact", "Comic Sans MS"]
         result = []
         
-        for font in priority_fonts:
-            # Chercher la police (case-insensitive)
+        for font in priority:
             matching = [f for f in font_list if f.lower() == font.lower()]
             if matching:
                 result.append(matching[0])
                 font_list = [f for f in font_list if f.lower() != font.lower()]
         
-        # Ajouter le reste
         result.extend(font_list)
         
-        # Assurer que Arial est toujours présent
+        # Toujours avoir Arial
         if not any(f.lower() == 'arial' for f in result):
             result.insert(0, 'Arial')
         
-        log_message(f"✅ {len(result)} polices mères chargées (variantes filtrées)", level="info")
+        log_message(f"✅ {len(result)} polices chargées", level="info")
         
-        # Mettre en cache le résultat
-        CACHED_FONTS = result if len(result) > 0 else ["Arial", "Arial", "Verdana", "Georgia", "Impact"]
+        CACHED_FONTS = result
         return CACHED_FONTS
         
     except Exception as e:
         log_message(f"⚠️ Erreur lecture polices: {e}", level="warning")
-        # Mettre en cache les polices par défaut
-        CACHED_FONTS = ["Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
+        CACHED_FONTS = ["Arial", "Verdana", "Georgia", "Impact", "Courier New", "Times New Roman"]
         return CACHED_FONTS
 
 def cleanup_log_file(log_file_path, max_size_mb=5, keep_lines=1000):
@@ -1070,30 +1060,8 @@ def is_valid_css_color(color):
     
     return False
 
-def apply_overlay_font_custom(props, prop, settings):
-    """Applique la police saisie manuellement (prioritaire)"""
-    global global_settings
-    global_settings = settings
-    
-    if not OVERLAY_CONFIG_AVAILABLE:
-        log_message("❌ Module overlay_config_manager non disponible", level="error")
-        return False
-    
-    custom_font = obs.obs_data_get_string(settings, "overlay_font_custom")
-    font_size = obs.obs_data_get_int(settings, "overlay_font_size")
-    
-    if custom_font and custom_font.strip():
-        try:
-            overlay_config.update_font(family=custom_font.strip(), size=f"{font_size}px")
-            log_message(f"✅ Police personnalisée appliquée: {custom_font.strip()} @ {font_size}px", level="info")
-        except NameError:
-            log_message("❌ overlay_config non initialisé", level="error")
-            return False
-    
-    return True
-
 def apply_overlay_font(props, prop, settings):
-    """Applique la police sélectionnée aux overlays (liste déroulante)"""
+    """Applique la police sélectionnée ou saisie aux overlays"""
     global global_settings
     global_settings = settings  # Mettre à jour les settings globaux
     
@@ -1101,20 +1069,14 @@ def apply_overlay_font(props, prop, settings):
         log_message("❌ Module overlay_config_manager non disponible", level="error")
         return False
     
-    # Vérifier d'abord si une police personnalisée est définie (prioritaire)
-    custom_font = obs.obs_data_get_string(settings, "overlay_font_custom")
-    if custom_font and custom_font.strip():
-        # La police personnalisée a la priorité, ne pas appliquer la liste
-        return True
-    
     font_family = obs.obs_data_get_string(settings, "overlay_font")
     font_size = obs.obs_data_get_int(settings, "overlay_font_size")
     
-    if font_family:
+    if font_family and font_family.strip():
         # Vérifier que overlay_config existe avant de l'utiliser
         try:
-            overlay_config.update_font(family=font_family, size=f"{font_size}px")
-            log_message(f"✅ Police mise à jour: {font_family} @ {font_size}px", level="info")
+            overlay_config.update_font(family=font_family.strip(), size=f"{font_size}px")
+            log_message(f"✅ Police mise à jour: {font_family.strip()} @ {font_size}px", level="info")
         except NameError:
             log_message("❌ overlay_config non initialisé", level="error")
             return False
@@ -1288,7 +1250,6 @@ def script_defaults(settings):
     """Définit les valeurs par défaut"""
     if OVERLAY_CONFIG_AVAILABLE:
         obs.obs_data_set_default_string(settings, "overlay_font", "Arial")
-        obs.obs_data_set_default_string(settings, "overlay_font_custom", "")  # Vide par défaut
         obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
         obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
         obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
@@ -1351,32 +1312,12 @@ def script_properties():
             obs.OBS_TEXT_INFO
         )
         
-        # Champ texte libre pour entrer manuellement le nom de la police
-        obs.obs_properties_add_text(
-            props,
-            "overlay_font_custom",
-            "  ✏️  Police (saisie libre)",
-            obs.OBS_TEXT_DEFAULT
-        )
-        obs.obs_property_set_modified_callback(
-            obs.obs_properties_get(props, "overlay_font_custom"),
-            apply_overlay_font_custom
-        )
-        
-        # Info: priorité au champ texte
-        obs.obs_properties_add_text(
-            props,
-            "font_info",
-            "     ℹ️ Tapez le nom exact de la police ci-dessus,\n        ou sélectionnez dans la liste ci-dessous.",
-            obs.OBS_TEXT_INFO
-        )
-        
-        # Dropdown Police (liste)
+        # Dropdown Police éditable (sélection OU saisie libre)
         font_list = obs.obs_properties_add_list(
             props,
             "overlay_font",
-            "  📝  Liste des polices",
-            obs.OBS_COMBO_TYPE_LIST,
+            "  ✏️  Police",
+            obs.OBS_COMBO_TYPE_EDITABLE,
             obs.OBS_COMBO_FORMAT_STRING
         )
         
@@ -1388,6 +1329,14 @@ def script_properties():
             obs.obs_property_list_add_string(font_list, font, font)
         
         obs.obs_property_set_modified_callback(font_list, apply_overlay_font)
+        
+        # Info
+        obs.obs_properties_add_text(
+            props,
+            "font_info",
+            "     ℹ️ Sélectionnez dans la liste ou tapez un nom de police",
+            obs.OBS_TEXT_INFO
+        )
         
         # Slider Taille
         obs.obs_properties_add_int_slider(
