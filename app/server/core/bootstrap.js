@@ -1,7 +1,7 @@
 /**
  * @file bootstrap.js
  * @description Initialisation de l'application avec injection de dépendances
- * @version 3.1.0
+ * @version 3.1.1
  * 
  * Ce fichier est responsable de:
  * - Créer le container IoC
@@ -11,11 +11,52 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const { DependencyContainer } = require('./dependency-container');
 const { StateManager, STATE_EVENTS } = require('./state-manager');
 
 // Chemin racine du projet
 const ROOT_DIR = path.join(__dirname, '..', '..', '..');
+const APP_STATE_FILE = path.join(ROOT_DIR, 'app', 'config', 'app_state.json');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FONCTIONS UTILITAIRES - Persistance État
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Charge l'état depuis app_state.json
+ * @returns {Object} État chargé ou objet vide
+ */
+function loadAppState() {
+    try {
+        if (fs.existsSync(APP_STATE_FILE)) {
+            const data = fs.readFileSync(APP_STATE_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.error('Erreur chargement app_state.json:', error.message);
+    }
+    return {};
+}
+
+/**
+ * Sauvegarde l'état dans app_state.json
+ * @param {Object} state - État à sauvegarder
+ */
+function saveAppState(state) {
+    try {
+        // Créer le dossier si nécessaire
+        const dir = path.dirname(APP_STATE_FILE);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        // Sauvegarder avec indentation
+        fs.writeFileSync(APP_STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Erreur sauvegarde app_state.json:', error.message);
+    }
+}
 
 /**
  * Initialise toutes les dépendances de l'application
@@ -52,7 +93,6 @@ function bootstrap() {
     // ═══════════════════════════════════════════════════════════════════════════
     
     container.register('stateManager', (c) => {
-        const { loadAppState, saveAppState } = require('../services/app-state');
         const { logEvent } = c.resolve('logger');
         
         // Charger l'état initial depuis app_state.json
@@ -108,25 +148,25 @@ function bootstrap() {
     });
     
     // ═══════════════════════════════════════════════════════════════════════════
-    // SERVICES - Files
+    // SERVICES - Files (wrapper autour de StateManager)
     // ═══════════════════════════════════════════════════════════════════════════
     
     container.register('filesService', (c) => {
-        const filesModule = require('../services/files');
         const stateManager = c.resolve('stateManager');
         
-        // Wrapper pour synchroniser avec StateManager
+        // Service de fichiers simplifié - utilise StateManager
         return {
-            ...filesModule,
-            
-            // Override pour utiliser StateManager
             getCounters: () => stateManager.getCounters(),
             setCounters: (follows, subs) => {
                 stateManager.setFollows(follows, 'filesService');
                 stateManager.setSubs(subs, 'filesService');
             },
             getOverlayConfig: () => stateManager.getOverlayConfig(),
-            updateOverlayConfig: (config) => stateManager.updateOverlayConfig(config)
+            updateOverlayConfig: (config) => stateManager.updateOverlayConfig(config),
+            
+            // Fonctions de persistance
+            loadState: loadAppState,
+            saveState: saveAppState
         };
     });
     
