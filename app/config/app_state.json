@@ -1,0 +1,69 @@
+{
+  "counters": {
+    "follows": 390,
+    "subs": 0,
+    "lastUpdated": "2025-12-02T12:06:44.447Z"
+  },
+  "goals": {
+    "currentFollowGoal": 500,
+    "currentSubGoal": 5
+  },
+  "overlay": {
+    "font": {
+      "family": "Impact",
+      "size": "64px",
+      "weight": "normal"
+    },
+    "colors": {
+      "text": "rgba(12,245,235,1)",
+      "shadow": "rgba(0,0,0,0.5)",
+      "stroke": "black"
+    },
+    "animation": {
+      "duration": "1s",
+      "easing": "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+    },
+    "layout": {
+      "paddingLeft": "20px",
+      "gap": "0"
+    }
+  },
+  "update": {
+    "enabled": true,
+    "checkOnStartup": true,
+    "checkIntervalHours": 24,
+    "autoDownload": false,
+    "notifyOnUpdate": true,
+    "github": {
+      "repo": "Bl0uD/AutoSubGoalTwitch",
+      "apiUrl": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
+      "timeout": 10
+    },
+    "backup": {
+      "enabled": true,
+      "backupDir": "backups",
+      "keepLast": 3
+    }
+  },
+  "version": {
+    "current": "2.3.0",
+    "releaseDate": "2025-12-02",
+    "changelog": [
+      "🎨 Filtrage intelligent des polices (variantes exclues)",
+      "🇫🇷 Support français pour les noms de polices (Gras, Italique, etc.)",
+      "🧹 Nettoyage complet des fichiers obsolètes",
+      "🏗️ Architecture centralisée app_state.json consolidée",
+      "📦 Suppression fichiers OBS text (total_*.txt)",
+      "✅ Overlays HTML comme source unique de données"
+    ],
+    "criticalFiles": [
+      "obs_subcount_auto.py",
+      "server.js",
+      "config-crypto.js",
+      "package.json",
+      "INSTALLER.bat",
+      "START_SERVER.bat",
+      "app_state.json"
+    ]
+  }
+}

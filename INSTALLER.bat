@@ -1,12 +1,31 @@
 @echo off
 REM ===================================================================
-REM  INSTALLEUR - AutoSubGoalTwitch v2.2.2
+REM  INSTALLEUR - AutoSubGoalTwitch v2.3.0
 REM ===================================================================
+
+REM Vérification des droits administrateur
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo.
+    echo ===================================================================
+    echo      DROITS ADMINISTRATEUR REQUIS
+    echo ===================================================================
+    echo.
+    echo Ce script doit etre lance en tant qu'administrateur.
+    echo.
+    echo Cliquez droit sur INSTALLER.bat et selectionnez:
+    echo "Executer en tant qu'administrateur"
+    echo.
+    pause
+    exit /b 1
+)
 
 echo.
 echo ===================================================================
-echo      INSTALLEUR AUTOSUBGOALTWITCH v2.2.2
+echo      INSTALLEUR AUTOSUBGOALTWITCH v2.3.0
 echo ===================================================================
+echo.
+echo [OK] Droits administrateur confirmes
 echo.
 echo Demarrage de l'installation...
 echo.

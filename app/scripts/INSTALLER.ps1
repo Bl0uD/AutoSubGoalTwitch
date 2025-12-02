@@ -1,5 +1,5 @@
 ﻿# ===================================================================
-#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.2.2
+#  INSTALLEUR AUTOMATIQUE - AutoSubGoalTwitch v2.3.0
 # ===================================================================
 
 $ErrorActionPreference = "Continue"
@@ -8,10 +8,36 @@ $ErrorActionPreference = "Continue"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
+# ==================================================================
+# VERIFICATION DROITS ADMINISTRATEUR
+# ==================================================================
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-Administrator)) {
+    Write-Host ""
+    Write-Host "===================================================================" -ForegroundColor Red
+    Write-Host "     DROITS ADMINISTRATEUR REQUIS" -ForegroundColor Red
+    Write-Host "===================================================================" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Ce script doit etre lance en tant qu'administrateur." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Cliquez droit sur INSTALLER.bat et selectionnez:" -ForegroundColor White
+    Write-Host "'Executer en tant qu'administrateur'" -ForegroundColor Cyan
+    Write-Host ""
+    pause
+    exit 1
+}
+
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
-Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.2.2" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v2.3.0" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "[OK] Droits administrateur confirmes" -ForegroundColor Green
 Write-Host ""
 
 # Aller dans le dossier racine du projet (remonter de 2 niveaux depuis app/scripts/)
@@ -495,35 +521,76 @@ function Create-ConfigFiles {
         Write-Host "   [SKIP] Fichier existe: data\twitch_config.txt" -ForegroundColor Gray
     }
     
-    # Créer overlay_config.json s'il n'existe pas
-    $overlayConfigPath = Join-Path $configPath "overlay_config.json"
-    if (-not (Test-Path $overlayConfigPath)) {
-        $overlayConfigContent = @"
+    # Créer app_state.json s'il n'existe pas (architecture centralisée v2.3.0)
+    $appStatePath = Join-Path $configPath "app_state.json"
+    if (-not (Test-Path $appStatePath)) {
+        $appStateContent = @"
 {
-  "font": {
-    "family": "SEA",
-    "size": "64px",
-    "weight": "normal"
+  "counters": {
+    "follows": 0,
+    "subs": 0,
+    "lastUpdated": "$((Get-Date).ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))"
   },
-  "colors": {
-    "text": "white",
-    "shadow": "rgba(0,0,0,0.5)",
-    "stroke": "black"
+  "goals": {
+    "currentFollowGoal": 100,
+    "currentSubGoal": 10
   },
-  "animation": {
-    "duration": "1s",
-    "easing": "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+  "overlay": {
+    "font": {
+      "family": "Arial",
+      "size": "64px",
+      "weight": "normal"
+    },
+    "colors": {
+      "text": "white",
+      "shadow": "rgba(0,0,0,0.5)",
+      "stroke": "black"
+    },
+    "animation": {
+      "duration": "1s",
+      "easing": "cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+    },
+    "layout": {
+      "paddingLeft": "20px",
+      "gap": "0"
+    }
   },
-  "layout": {
-    "paddingLeft": "20px",
-    "gap": "0"
+  "update": {
+    "enabled": true,
+    "checkOnStartup": true,
+    "checkIntervalHours": 24,
+    "autoDownload": false,
+    "notifyOnUpdate": true,
+    "github": {
+      "repo": "Bl0uD/AutoSubGoalTwitch",
+      "apiUrl": "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest",
+      "timeout": 10
+    },
+    "backup": {
+      "enabled": true,
+      "backupDir": "backups",
+      "keepLast": 3
+    }
+  },
+  "version": {
+    "current": "2.3.0",
+    "releaseDate": "2025-12-02",
+    "changelog": [],
+    "criticalFiles": [
+      "obs_subcount_auto.py",
+      "server.js",
+      "config-crypto.js",
+      "package.json",
+      "INSTALLER.bat",
+      "START_SERVER.bat"
+    ]
   }
 }
 "@
-        Set-Content -Path $overlayConfigPath -Value $overlayConfigContent -Encoding UTF8
-        Write-Host "   [OK] Fichier cree: config\overlay_config.json" -ForegroundColor Green
+        Set-Content -Path $appStatePath -Value $appStateContent -Encoding UTF8
+        Write-Host "   [OK] Fichier cree: config\app_state.json (architecture centralisee)" -ForegroundColor Green
     } else {
-        Write-Host "   [SKIP] Fichier existe: config\overlay_config.json" -ForegroundColor Gray
+        Write-Host "   [SKIP] Fichier existe: config\app_state.json" -ForegroundColor Gray
     }
     
     return $true

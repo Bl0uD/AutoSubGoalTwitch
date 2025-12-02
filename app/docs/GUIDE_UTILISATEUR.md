@@ -107,17 +107,17 @@ Dans le script OBS, section **"Configuration Overlays"** :
 - Section **"Follows"** → Modifier l'objectif
 
 **Ou manuellement :**
-- Éditer `obs/data/total_subscriber_count_goal.txt`
-- Éditer `obs/data/total_followers_count_goal.txt`
+- Éditer via le dashboard : `http://localhost:8082/config.html`
+- Ou modifier `app/config/app_state.json` (section `goals`)
 
 ### Voir les compteurs actuels
 
-**Option 1 - Dashboard web :**
+**Option 1 - Dashboard web (recommandé) :**
 - Ouvrir : `http://localhost:8082/dashboard.html`
 
-**Option 2 - Fichiers :**
-- `obs/data/total_subscriber_count.txt` - Nombre de subs actuel
-- `obs/data/total_followers_count.txt` - Nombre de follows actuel
+**Option 2 - API REST :**
+- `http://localhost:8082/api/stats` - Compteurs et objectifs au format JSON
+- `http://localhost:8082/api/app-state` - État complet de l'application
 
 ---
 
@@ -193,30 +193,26 @@ SubcountAutomatic/
 ├── INSTALLER.bat           ⭐ Installeur principal
 ├── README.md               📖 Documentation GitHub
 │
-├── data/                   💾 Vos données
-│   ├── twitch_config.txt       (identifiants Twitch)
-│   ├── total_subscriber_count.txt
-│   ├── total_subscriber_count_goal.txt
-│   ├── total_followers_count.txt
-│   └── total_followers_count_goal.txt
-│
-├── config/                 ⚙️ Configuration système
-│   └── overlay_config.json     (apparence overlays)
+├── app/
+│   ├── config/             ⚙️ Configuration centralisée
+│   │   └── app_state.json      (compteurs, objectifs, overlays)
+│   │
+│   ├── server/             🖥️ Serveur Node.js
+│   │   └── server.js
+│   │
+│   ├── web/                🌐 Interfaces web
+│   │   ├── dashboard.html
+│   │   ├── config.html
+│   │   └── admin.html
+│   │
+│   ├── logs/               📋 Logs système
+│   └── backups/            💾 Backups automatiques
 │
 ├── obs/                    🎬 Scripts OBS
 │   ├── obs_subcount_auto.py    ⭐ Script principal
+│   ├── data/                   💾 Configuration Twitch
+│   │   └── twitch_config.txt
 │   └── overlays/               (4 fichiers HTML)
-│
-├── server/                 🖥️ Serveur Node.js
-│   └── server.js
-│
-├── web/                    🌐 Interfaces web
-│   ├── dashboard.html
-│   ├── config.html
-│   └── admin.html
-│
-├── logs/                   📋 Logs système
-└── backups/                💾 Backups automatiques
 ```
 
 ---
@@ -253,6 +249,6 @@ Oui, automatiquement dans `obs/data/*_backup.txt` et `app/backups/`.
 
 ## 🎉 Bon stream ! ✨
 
-**v2.2.2** - Avec configuration dynamique et mise à jour automatique
+**v2.3.0** - Avec configuration dynamique et mise à jour automatique
 
 </div>

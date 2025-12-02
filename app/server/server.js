@@ -10,6 +10,108 @@ const crypto = require('crypto'); // Module natif pour génération sécurisée
 // Dossier racine du projet (2 niveaux au-dessus : app/server -> app -> racine)
 const ROOT_DIR = path.join(__dirname, '..', '..');
 
+// Chemin vers le fichier d'état centralisé
+const APP_STATE_PATH = path.join(__dirname, '..', 'config', 'app_state.json');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📦 GESTION CENTRALISÉE DE L'ÉTAT (app_state.json)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Charge l'état de l'application depuis app_state.json
+ * @returns {Object} L'état de l'application ou valeurs par défaut
+ */
+function loadAppState() {
+    try {
+        if (fs.existsSync(APP_STATE_PATH)) {
+            const data = fs.readFileSync(APP_STATE_PATH, 'utf8');
+            const state = JSON.parse(data);
+            console.log('📦 État de l\'application chargé depuis app_state.json');
+            return state;
+        }
+    } catch (error) {
+        console.error('❌ Erreur chargement app_state.json:', error.message);
+    }
+    
+    // Valeurs par défaut si le fichier n'existe pas
+    return {
+        counters: { follows: 0, subs: 0, lastUpdated: new Date().toISOString() },
+        goals: { currentFollowGoal: 100, currentSubGoal: 10 },
+        overlay: {
+            font: { family: 'Arial', size: '64px', weight: 'normal' },
+            colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
+            animation: { duration: '1s', easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+            layout: { paddingLeft: '20px', gap: '0' }
+        },
+        update: { enabled: true, checkOnStartup: true, checkIntervalHours: 24 },
+        version: { current: '2.3.0', releaseDate: '2025-12-02' }
+    };
+}
+
+/**
+ * Sauvegarde l'état de l'application dans app_state.json (atomique)
+ * @param {Object} state - L'état complet à sauvegarder
+ */
+function saveAppState(state) {
+    try {
+        // Mise à jour du timestamp
+        state.counters.lastUpdated = new Date().toISOString();
+        
+        // Écriture atomique : écrire dans un fichier temporaire puis renommer
+        const tempPath = APP_STATE_PATH + '.tmp';
+        fs.writeFileSync(tempPath, JSON.stringify(state, null, 2), 'utf8');
+        fs.renameSync(tempPath, APP_STATE_PATH);
+        
+        console.log(`💾 État sauvegardé: ${state.counters.follows} follows, ${state.counters.subs} subs`);
+    } catch (error) {
+        console.error('❌ Erreur sauvegarde app_state.json:', error.message);
+    }
+}
+
+/**
+ * Met à jour les compteurs et sauvegarde
+ * @param {string} type - 'follows' ou 'subs'
+ * @param {number} value - Nouvelle valeur
+ */
+function updateCounter(type, value) {
+    const state = loadAppState();
+    state.counters[type] = value;
+    saveAppState(state);
+    // Les overlays HTML utilisent WebSocket, pas de fichiers texte nécessaires
+}
+
+/**
+ * Récupère la configuration overlay depuis l'état
+ * @returns {Object} Configuration overlay
+ */
+function getOverlayConfig() {
+    const state = loadAppState();
+    return state.overlay;
+}
+
+/**
+ * Met à jour la configuration overlay
+ * @param {Object} updates - Mises à jour partielles
+ */
+function updateOverlayConfig(updates) {
+    const state = loadAppState();
+    if (updates.font) state.overlay.font = { ...state.overlay.font, ...updates.font };
+    if (updates.colors) state.overlay.colors = { ...state.overlay.colors, ...updates.colors };
+    if (updates.animation) state.overlay.animation = { ...state.overlay.animation, ...updates.animation };
+    if (updates.layout) state.overlay.layout = { ...state.overlay.layout, ...updates.layout };
+    saveAppState(state);
+    return state.overlay;
+}
+
+/**
+ * Récupère les informations de version
+ * @returns {Object} Version info
+ */
+function getVersionInfo() {
+    const state = loadAppState();
+    return state.version;
+}
+
 // Fonction de logging centralisée
 function logEvent(level, message, data = null) {
     const timestamp = new Date().toISOString();
@@ -1024,11 +1126,11 @@ async function canGrantSelfModerator() {
 // Sauvegarder le nombre de follows sur disque pour la persistence
 function saveFollowCountToFile(count) {
     try {
-        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt');
-        const timestamp = new Date().toISOString();
-        const data = `${count}|${timestamp}`;
-        fs.writeFileSync(backupPath, data, 'utf8');
-        console.log(`💾 Sauvegarde compteur: ${count} follows à ${timestamp.split('T')[1].split('.')[0]}`);
+        // Utiliser le système centralisé app_state.json
+        const state = loadAppState();
+        state.counters.follows = count;
+        saveAppState(state);
+        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
     } catch (error) {
         console.error('❌ Erreur sauvegarde compteur follows:', error.message);
     }
@@ -1037,16 +1139,14 @@ function saveFollowCountToFile(count) {
 // Charger le nombre de follows depuis le disque
 function loadFollowCountFromFile() {
     try {
-        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt');
-        if (fs.existsSync(backupPath)) {
-            const content = fs.readFileSync(backupPath, 'utf8').trim();
-            const [count, timestamp] = content.split('|');
-            const followCount = parseInt(count) || 0;
-            console.log(`📂 Compteur restauré: ${followCount} follows (sauvegardé le ${timestamp?.split('T')[0] || 'inconnu'})`);
-            return followCount;
+        // Utiliser le système centralisé app_state.json
+        const state = loadAppState();
+        if (state.counters.follows > 0) {
+            console.log(`📂 Compteur restauré: ${state.counters.follows} follows (depuis app_state.json)`);
+            return state.counters.follows;
         }
     } catch (error) {
-        console.error('❌ Erreur chargement compteur follows sauvegardé:', error.message);
+        console.error('❌ Erreur chargement compteur follows:', error.message);
     }
     return 0;
 }
@@ -1054,11 +1154,11 @@ function loadFollowCountFromFile() {
 // Sauvegarder le nombre de subs sur disque pour la persistence
 function saveSubCountToFile(count) {
     try {
-        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt');
-        const timestamp = new Date().toISOString();
-        const data = `${count}|${timestamp}`;
-        fs.writeFileSync(backupPath, data, 'utf8');
-        console.log(`💾 Sauvegarde compteur: ${count} subs à ${timestamp.split('T')[1].split('.')[0]}`);
+        // Utiliser le système centralisé app_state.json
+        const state = loadAppState();
+        state.counters.subs = count;
+        saveAppState(state);
+        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
     } catch (error) {
         console.error('❌ Erreur sauvegarde compteur subs:', error.message);
     }
@@ -1067,13 +1167,11 @@ function saveSubCountToFile(count) {
 // Charger le nombre de subs depuis le disque
 function loadSubCountFromFile() {
     try {
-        const backupPath = path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt');
-        if (fs.existsSync(backupPath)) {
-            const content = fs.readFileSync(backupPath, 'utf8').trim();
-            const [count, timestamp] = content.split('|');
-            const subCount = parseInt(count) || 0;
-            console.log(`📂 Compteur restauré: ${subCount} subs (sauvegardé le ${timestamp?.split('T')[0] || 'inconnu'})`);
-            return subCount;
+        // Utiliser le système centralisé app_state.json
+        const state = loadAppState();
+        if (state.counters.subs > 0) {
+            console.log(`📂 Compteur restauré: ${state.counters.subs} subs (depuis app_state.json)`);
+            return state.counters.subs;
         }
     } catch (error) {
         console.error('❌ Erreur chargement compteur subs sauvegardé:', error.message);
@@ -2901,15 +2999,10 @@ function updateFollowFiles(follows) {
     }
     
     try {
-        // Fichier pour les goals de follows
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_followers_count_goal.txt'), goalText);
-        
-        // Fichier de base pour follows
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_followers_count.txt'), follows.toString());
-        
-        console.log(`📊 Fichiers follows mis à jour: ${follows} follows`);
+        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
+        console.log(`📊 Follows mis à jour: ${follows} follows`);
     } catch (error) {
-        console.error('❌ Erreur écriture fichiers follows:', error.message);
+        console.error('❌ Erreur mise à jour follows:', error.message);
     }
 }
 
@@ -2934,15 +3027,10 @@ function updateSubFiles(subs) {
     }
     
     try {
-        // Fichier pour les goals de subs
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), goalText);
-        
-        // Fichier de base pour subs
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), subs.toString());
-        
-        console.log(`📊 Fichiers subs mis à jour: ${subs} subs`);
+        // Les overlays HTML utilisent WebSocket, pas de fichiers texte
+        console.log(`📊 Subs mis à jour: ${subs} subs`);
     } catch (error) {
-        console.error('❌ Erreur écriture fichiers subs:', error.message);
+        console.error('❌ Erreur mise à jour subs:', error.message);
     }
 }
 
@@ -3171,15 +3259,14 @@ app.use('/obs/overlays', express.static(path.join(ROOT_DIR, 'obs', 'overlays')))
 
 app.get('/api/stats', (req, res) => {
     try {
-        // Utiliser les variables globales pour les compteurs
-        const followGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8')) || 0;
-        const subGoal = parseInt(fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8')) || 0;
+        // Utiliser app_state.json pour les compteurs et objectifs
+        const appState = loadAppState();
         
         res.json({
-            follows: currentFollows,
-            subs: currentSubs,
-            followGoal: followGoal,
-            subGoal: subGoal
+            follows: appState.counters.follows,
+            subs: appState.counters.subs,
+            followGoal: appState.goals.follows || 0,
+            subGoal: appState.goals.subs || 0
         });
     } catch (error) {
         logEvent('ERROR', '❌ Erreur lecture stats admin', { error: error.message });
@@ -3299,9 +3386,11 @@ app.post('/admin/set-subs', (req, res) => {
 app.post('/admin/set-follow-goal', (req, res) => {
     try {
         const { goal } = req.body;
-        const goalPath = path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt');
         
-        fs.writeFileSync(goalPath, goal.toString(), 'utf8');
+        // Sauvegarder dans app_state.json
+        const appState = loadAppState();
+        appState.goals.follows = parseInt(goal) || 0;
+        saveAppState(appState);
         
         // Broadcast via WebSocket
         wss.clients.forEach(client => {
@@ -3325,9 +3414,11 @@ app.post('/admin/set-follow-goal', (req, res) => {
 app.post('/admin/set-sub-goal', (req, res) => {
     try {
         const { goal } = req.body;
-        const goalPath = path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt');
         
-        fs.writeFileSync(goalPath, goal.toString(), 'utf8');
+        // Sauvegarder dans app_state.json
+        const appState = loadAppState();
+        appState.goals.subs = parseInt(goal) || 0;
+        saveAppState(appState);
         
         // Broadcast via WebSocket
         wss.clients.forEach(client => {
@@ -3491,11 +3582,13 @@ app.get('/admin/test-polling', async (req, res) => {
 // Read Files
 app.get('/admin/read-files', (req, res) => {
     try {
+        // Lire depuis app_state.json
+        const appState = loadAppState();
         const files = {
-            follows: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'utf8'),
-            subs: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'utf8'),
-            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8'),
-            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8'),
+            follows: appState.counters.follows.toString(),
+            subs: appState.counters.subs.toString(),
+            followGoal: (appState.goals.follows || 0).toString(),
+            subGoal: (appState.goals.subs || 0).toString(),
             twitchConfig: twitchConfig
         };
         
@@ -3540,12 +3633,14 @@ app.get('/admin/backup-data', (req, res) => {
             fs.mkdirSync(backupDir);
         }
         
+        // Lire depuis app_state.json
+        const appState = loadAppState();
         const backupData = {
             timestamp: timestamp,
-            follows: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'utf8'),
-            subs: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'utf8'),
-            followGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), 'utf8'),
-            subGoal: fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), 'utf8')
+            follows: appState.counters.follows.toString(),
+            subs: appState.counters.subs.toString(),
+            followGoal: (appState.goals.follows || 0).toString(),
+            subGoal: (appState.goals.subs || 0).toString()
         };
         
         const backupPath = path.join(backupDir, `backup_${timestamp}.json`);
@@ -3584,10 +3679,17 @@ app.get('/admin/restore-backup', (req, res) => {
         const latestBackup = path.join(backupDir, backups[0]);
         const backupData = JSON.parse(fs.readFileSync(latestBackup, 'utf8'));
         
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), backupData.follows, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), backupData.subs, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_goal.txt'), backupData.followGoal, 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count_goal.txt'), backupData.subGoal, 'utf8');
+        // Restaurer dans app_state.json
+        const appState = loadAppState();
+        appState.counters.follows = parseInt(backupData.follows) || 0;
+        appState.counters.subs = parseInt(backupData.subs) || 0;
+        appState.goals.follows = parseInt(backupData.followGoal) || 0;
+        appState.goals.subs = parseInt(backupData.subGoal) || 0;
+        saveAppState(appState);
+        
+        // Mettre à jour les variables globales
+        currentFollows = appState.counters.follows;
+        currentSubs = appState.counters.subs;
         
         logEvent('INFO', `↩️ Admin: Backup restauré - ${backups[0]}`);
         res.json({ 
@@ -3604,8 +3706,9 @@ app.get('/admin/restore-backup', (req, res) => {
 // Corrupt Data Test
 app.get('/admin/corrupt-data', (req, res) => {
     try {
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'follower_count.txt'), 'CORRUPTED_DATA', 'utf8');
-        fs.writeFileSync(path.join(ROOT_DIR, 'obs', 'data', 'total_subscriber_count.txt'), 'INVALID', 'utf8');
+        // Corrompre app_state.json pour test
+        const appStatePath = path.join(ROOT_DIR, 'app', 'config', 'app_state.json');
+        fs.writeFileSync(appStatePath, 'CORRUPTED_DATA_FOR_TEST', 'utf8');
         
         logEvent('WARN', '🔥 Admin: Données corrompues pour test');
         res.json({ 
@@ -3833,41 +3936,23 @@ app.get('/api/sync-twitch', async (req, res) => {
 app.get('/api/status', (req, res) => {
     const eventSubConnected = twitchEventSubWs && twitchEventSubWs.readyState === WebSocket.OPEN;
     
-    // Backup info pour les follows
-    const followBackupExists = fs.existsSync(path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt'));
-    let followBackupInfo = null;
-    if (followBackupExists) {
-        try {
-            const content = fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'followcount_backup.txt'), 'utf8');
-            const [count, timestamp] = content.split('|');
-            followBackupInfo = {
-                count: parseInt(count) || 0,
-                timestamp: timestamp || 'Inconnu'
-            };
-        } catch (error) {
-            followBackupInfo = { error: 'Erreur lecture backup follows' };
-        }
-    }
-    
-    // Backup info pour les subs
-    const subBackupExists = fs.existsSync(path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt'));
-    let subBackupInfo = null;
-    if (subBackupExists) {
-        try {
-            const content = fs.readFileSync(path.join(ROOT_DIR, 'obs', 'data', 'subcount_backup.txt'), 'utf8');
-            const [count, timestamp] = content.split('|');
-            subBackupInfo = {
-                count: parseInt(count) || 0,
-                timestamp: timestamp || 'Inconnu'
-            };
-        } catch (error) {
-            subBackupInfo = { error: 'Erreur lecture backup subs' };
-        }
+    // Récupérer les infos depuis app_state.json (architecture centralisée v2.3.0)
+    let stateInfo = null;
+    try {
+        const state = loadAppState();
+        stateInfo = {
+            follows: state.counters.follows,
+            subs: state.counters.subs,
+            lastUpdated: state.counters.lastUpdated,
+            version: state.version.current
+        };
+    } catch (error) {
+        stateInfo = { error: 'Erreur lecture app_state.json' };
     }
     
     res.json({
         status: 'active',
-        version: '2.0',
+        version: '2.3.0',
         currentFollows: currentFollows,
         currentSubs: currentSubs,
         goals: followGoals.size + subGoals.size,
@@ -3880,9 +3965,7 @@ app.get('/api/status', (req, res) => {
         reconnectAttempts: reconnectAttempts,
         maxReconnectAttempts: maxReconnectAttempts,
         lastUpdate: new Date().toISOString(),
-        backup: followBackupInfo, // Ancien format pour compatibilité
-        followBackup: followBackupInfo,
-        subBackup: subBackupInfo,
+        state: stateInfo, // Architecture centralisée v2.3.0
         websocketClients: wss.clients.size,
         // 📄 Informations sur le tampon d'événements
         eventBuffer: {
@@ -4064,7 +4147,7 @@ app.post('/api/event-buffer/clear', (req, res) => {
     try {
         const clearedEvents = eventBuffer.length;
         eventBuffer = [];
-        stopEventProcessing();
+        isProcessingEvents = false;
         
         logEvent('INFO', `🧹 Tampon d'événements vidé: ${clearedEvents} événements supprimés`);
         
@@ -4492,30 +4575,18 @@ function generateTestPage() {
 // 🎨 SYSTÈME DE CONFIGURATION DYNAMIQUE DES OVERLAYS
 // ==================================================================
 
-// Charger la configuration des overlays
+// Charger la configuration des overlays (depuis app_state.json centralisé)
 let overlayConfig = {};
-const overlayConfigPath = path.join(ROOT_DIR, 'app', 'config', 'overlay_config.json');
 
 function loadOverlayConfig() {
     try {
-        if (fs.existsSync(overlayConfigPath)) {
-            const data = fs.readFileSync(overlayConfigPath, 'utf8');
-            overlayConfig = JSON.parse(data);
-            logEvent('INFO', '✅ Configuration overlay chargée', overlayConfig);
-        } else {
-            // Configuration par défaut
-            overlayConfig = {
-                font: { family: 'SEA', size: '64px', weight: 'normal' },
-                colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
-                animation: { duration: '1s', easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
-                layout: { paddingLeft: '20px', gap: '0' }
-            };
-            saveOverlayConfig();
-        }
+        // Utiliser le système centralisé app_state.json
+        overlayConfig = getOverlayConfig();
+        logEvent('INFO', '✅ Configuration overlay chargée depuis app_state.json');
     } catch (error) {
         logEvent('ERROR', '❌ Erreur chargement config overlay', { error: error.message });
         overlayConfig = {
-            font: { family: 'SEA', size: '64px', weight: 'normal' },
+            font: { family: 'Arial', size: '64px', weight: 'normal' },
             colors: { text: 'white', shadow: 'rgba(0,0,0,0.5)', stroke: 'black' },
             animation: { duration: '1s', easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
             layout: { paddingLeft: '20px', gap: '0' }
@@ -4525,8 +4596,9 @@ function loadOverlayConfig() {
 
 function saveOverlayConfig() {
     try {
-        fs.writeFileSync(overlayConfigPath, JSON.stringify(overlayConfig, null, 2), 'utf8');
-        logEvent('INFO', '✅ Configuration overlay sauvegardée');
+        // Sauvegarder via le système centralisé
+        updateOverlayConfig(overlayConfig);
+        logEvent('INFO', '✅ Configuration overlay sauvegardée dans app_state.json');
     } catch (error) {
         logEvent('ERROR', '❌ Erreur sauvegarde config overlay', { error: error.message });
     }
@@ -4535,6 +4607,22 @@ function saveOverlayConfig() {
 // API REST pour récupérer la configuration
 app.get('/api/overlay-config', (req, res) => {
     res.json(overlayConfig);
+});
+
+// API REST pour récupérer les informations de version
+app.get('/api/version', (req, res) => {
+    res.json(getVersionInfo());
+});
+
+// API REST pour récupérer l'état complet de l'application
+app.get('/api/app-state', (req, res) => {
+    const state = loadAppState();
+    // Ne pas renvoyer les données sensibles
+    res.json({
+        counters: state.counters,
+        goals: state.goals,
+        version: state.version
+    });
 });
 
 // API REST pour mettre à jour la configuration depuis Python
@@ -4710,8 +4798,8 @@ process.on('SIGINT', () => {
     }
     
     // 📄 Arrêter le traitement des événements
-    stopEventProcessing();
-    if (eventBuffer.length > 0) {
+    isProcessingEvents = false;
+    if (eventBuffer && eventBuffer.length > 0) {
         console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);
@@ -4737,8 +4825,8 @@ process.on('SIGTERM', () => {
     }
     
     // 📄 Arrêter le traitement des événements
-    stopEventProcessing();
-    if (eventBuffer.length > 0) {
+    isProcessingEvents = false;
+    if (eventBuffer && eventBuffer.length > 0) {
         console.log(`⚠️ ${eventBuffer.length} événements en attente perdus lors de l'arrêt`);
     }
     process.exit(0);

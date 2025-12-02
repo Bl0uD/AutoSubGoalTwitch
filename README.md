@@ -1,6 +1,6 @@
 ﻿# AutoSubGoalTwitch
 
-[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.2.2)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v2.3.0)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.6.8-yellow.svg)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/node.js-14+-green.svg)](https://nodejs.org/)
@@ -10,7 +10,7 @@ Système de compteurs Twitch pour OBS Studio avec **configuration dynamique en t
 
 ---
 
-## ✨ Fonctionnalités v2.2.2
+## ✨ Fonctionnalités v2.3.0
 
 ### 🎨 Configuration Dynamique
 - **Modification en temps réel** depuis OBS (police, couleurs, animations)
@@ -135,8 +135,8 @@ SubcountAutomatic/
 
 ## 📖 Documentation
 
-- **Guide complet** : [`app/app/docs/GUIDE_UTILISATEUR.md`](app/app/docs/GUIDE_UTILISATEUR.md)
-- **Release notes** : [`app/app/docs/RELEASE_v2.2.2.md`](app/app/docs/RELEASE_v2.2.2.md)
+- **Guide complet** : [`app/docs/GUIDE_UTILISATEUR.md`](app/docs/GUIDE_UTILISATEUR.md)
+- **Release notes** : [`app/docs/RELEASE_v2.3.0.md`](app/docs/RELEASE_v2.3.0.md)
 - **Changelog** : [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
@@ -169,19 +169,19 @@ netstat -ano | findstr "8082 8083 8084"
 2. Consulter `app/logs/obs_subcount_auto.log`
 3. Redémarrer le serveur (bouton dans le script OBS)
 
-**Plus de solutions** : [`app/app/docs/GUIDE_UTILISATEUR.md`](app/app/docs/GUIDE_UTILISATEUR.md#dépannage)
+**Plus de solutions** : [`app/docs/GUIDE_UTILISATEUR.md`](app/docs/GUIDE_UTILISATEUR.md#dépannage)
 
 ---
 
 ## 🔗 Liens
 
 - 📦 [Releases](https://github.com/Bl0uD/AutoSubGoalTwitch/releases)
-- 📖 [Documentation complète](app/app/docs/GUIDE_UTILISATEUR.md)
+- 📖 [Documentation complète](app/docs/GUIDE_UTILISATEUR.md)
 - 🐛 [Signaler un bug](https://github.com/Bl0uD/AutoSubGoalTwitch/issues)
 
 ---
 
-## 📊 Statistiques v2.2.2
+## 📊 Statistiques v2.3.0
 
 - **Réduction code** : ~3100 lignes dupliquées éliminées
 - **Overlays** : 8 fichiers → 4 fichiers (-50%)
@@ -202,7 +202,7 @@ Voir [`LICENSE`](LICENSE) pour plus de détails.
 
 ### 🎉 Configuration dynamique • Overlays unifiés • Interface redessinée
 
-**v2.2.2** - Prêt pour le stream ! ✨
+**v2.3.0** - Prêt pour le stream ! ✨
 
 ⭐ **Star ce projet si il vous aide !** ⭐
 

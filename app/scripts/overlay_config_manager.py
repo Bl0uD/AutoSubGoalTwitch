@@ -65,7 +65,7 @@ class OverlayConfigManager:
         Mettre à jour la police des overlays
         
         Args:
-            family (str): Nom de la police (ex: 'Arial', 'SEA', 'Courier New')
+            family (str): Nom de la police (ex: 'Arial', 'Courier New')
             size (str): Taille (ex: '64px', '48px')
             weight (str): Épaisseur (ex: 'normal', 'bold', '100'-'900')
         
@@ -374,7 +374,7 @@ if __name__ == "__main__":
     # Mise à jour complète
     print("\n4. Mise à jour complète...")
     config_manager.update_full_config(
-        font={'family': 'SEA', 'size': '64px', 'weight': 'bold'},
+        font={'family': 'Arial', 'size': '64px', 'weight': 'bold'},
         colors={'text': 'white', 'shadow': 'rgba(0,0,0,0.8)', 'stroke': 'black'},
         animation={'duration': '1s', 'easing': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'},
         layout={'paddingLeft': '30px', 'gap': '5px'}

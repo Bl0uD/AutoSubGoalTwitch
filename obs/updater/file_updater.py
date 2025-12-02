@@ -1,9 +1,21 @@
 import os
 import requests
 import json
-from ..utils.logger import log_message
 
-GITHUB_API_URL = "https://api.github.com/repos/yourusername/yourrepository/releases/latest"
+# Import conditionnel du logger (peut ne pas exister)
+try:
+    from ..utils.logger import log_message
+except ImportError:
+    def log_message(msg):
+        print(msg)
+
+GITHUB_API_URL = "https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest"
+
+# Chemins mis à jour pour la nouvelle structure (v2.3.0+)
+UPDATER_DIR = os.path.dirname(__file__)  # obs/updater/
+OBS_DIR = os.path.dirname(UPDATER_DIR)   # obs/
+PROJECT_ROOT = os.path.dirname(OBS_DIR)  # racine
+APP_STATE_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'app_state.json')
 
 def check_for_updates():
     """Check for updates from the GitHub repository."""
@@ -28,16 +40,15 @@ def check_for_updates():
         return None, None
 
 def get_current_version():
-    """Retrieve the current version from version.json."""
-    # Chemins mis à jour pour la nouvelle structure
-    updater_dir = os.path.dirname(__file__)  # obs/updater/
-    obs_dir = os.path.dirname(updater_dir)   # obs/
-    project_root = os.path.dirname(obs_dir)  # racine
-    version_file_path = os.path.join(project_root, 'app', 'config', 'version.json')
-    
-    with open(version_file_path, 'r') as version_file:
-        version_data = json.load(version_file)
-        return version_data['version']
+    """Retrieve the current version from app_state.json (v2.3.0+)."""
+    try:
+        if os.path.exists(APP_STATE_FILE):
+            with open(APP_STATE_FILE, 'r', encoding='utf-8') as f:
+                app_state = json.load(f)
+                return app_state.get('version', {}).get('current', '2.3.0')
+    except Exception as e:
+        log_message(f"Error reading version: {e}")
+    return '2.3.0'
 
 def download_file(url, destination):
     """Download a file from a URL to a specified destination."""

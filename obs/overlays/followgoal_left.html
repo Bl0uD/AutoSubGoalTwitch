@@ -12,7 +12,7 @@
         
         :root {
             /* Variables CSS dynamiques (modifiÃ©es par le serveur JS) */
-            --font-family: 'SEA';
+            --font-family: 'Arial';
             --font-size: 64px;
             --font-weight: normal;
             --text-color: white;
@@ -27,7 +27,7 @@
         body {
             background: transparent;
             margin: 0;
-            font-family: var(--font-family), 'SEA', system-ui, sans-serif;
+            font-family: var(--font-family), Arial, system-ui, sans-serif;
             display: flex;
             justify-content: flex-start;
             align-items: center;
@@ -469,24 +469,14 @@
             currentFollowgoal = goal;
 
             if (previousSubCount !== null && goal.current !== previousSubCount) {
-                const delta = goal.current - previousSubCount;
-                const direction = delta > 0 ? "down" : "up";
-                const absDelta = Math.abs(delta);
-                
-                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current}), delta: ${delta}`);
-                console.log(`ðŸ“¦ BatchInfo: isBatch=${batchInfo.isBatch}, batchCount=${batchInfo.batchCount}, isRemoval=${batchInfo.isRemoval}`);
+                const direction = goal.current > previousSubCount ? "down" : "up";
+                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current})`);
 
-                // DÃ©cider du type d'animation basÃ© sur le batch ET le delta
-                // Animation slot-machine si: batch avec plusieurs events OU delta > 1
-                const shouldUseSlotMachine = (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) || absDelta > 1;
-                
-                if (shouldUseSlotMachine) {
-                    console.log(`ðŸŽ° Animation SLOT-MACHINE: ${previousSubCount} â†’ ${goal.current} (${absDelta} unitÃ©s)`);
-                    // Vider la queue et faire une animation directe
-                    animationQueue = [];
-                    animateSlotMachine(previousSubCount, goal.current, goal, direction);
+                // Si on a des infos de batch avec plusieurs changements, animation directe
+                if (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) {
+                    console.log(`âš¡ Batch dÃ©tectÃ©: ${batchInfo.batchCount} changements, animation directe`);
+                    animateDirectTransition(previousSubCount, goal.current, goal, direction);
                 } else {
-                    console.log(`ðŸ“ Animation PROGRESSIVE: ${previousSubCount} â†’ ${goal.current}`);
                     // Animation progressive normale pour changement unique
                     animationQueue.push({
                         from: previousSubCount,
@@ -509,84 +499,41 @@
             console.log('ðŸ“Š Followgoal mis Ã  jour');
         }
         
-                /**
-         * Animation SLOT-MACHINE pour les changements groupÃ©s
-         * Effet de dÃ©filement sÃ©quentiel : 390 â†’ 391 â†’ 392 â†’ ... â†’ 401
-         * AccÃ©lÃ¨re au dÃ©but, ralentit vers la fin (easing)
-         */
-        function animateSlotMachine(from, to, goal, direction) {
-            console.log(`ðŸŽ° DÃ©marrage slot-machine: ${from} â†’ ${to}`);
+        // Nouvelle fonction pour transition directe (slot-machine) lors de batch
+        function animateDirectTransition(from, to, goal, direction) {
+            console.log(`ðŸŽ° Animation directe: ${from} â†’ ${to}`);
             isAnimating = true;
             
-            const delta = to - from;
-            const totalSteps = Math.abs(delta);
-            const step = delta > 0 ? 1 : -1; // +1 ou -1 selon la direction
+            const countElement = document.getElementById('currentCount');
+            const slashElement = document.getElementById('slash');
+            const goalElement = document.getElementById('goalCount');
             
-            // DurÃ©e totale adaptÃ©e au nombre d'Ã©tapes (min 500ms, max 1500ms)
-            const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
+            // Animation de sortie
+            countElement.classList.add('count-exit');
             
-            let currentValue = from;
-            let stepIndex = 0;
-            
-            console.log(`ðŸ”¢ ${totalSteps} Ã©tapes Ã  afficher en ${totalDuration}ms`);
-            
-            function easeInOutQuad(t) {
-                // AccÃ©lÃ¨re au dÃ©but, ralentit Ã  la fin
-                return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-            }
-            
-            function getDelayForStep(index, total) {
-                // Calculer le dÃ©lai pour cette Ã©tape basÃ© sur l'easing
-                // Plus rapide au milieu, plus lent au dÃ©but et Ã  la fin
-                const progressBefore = index / total;
-                const progressAfter = (index + 1) / total;
-                const easedBefore = easeInOutQuad(progressBefore);
-                const easedAfter = easeInOutQuad(progressAfter);
-                const stepDuration = (easedAfter - easedBefore) * totalDuration;
+            setTimeout(() => {
+                // Mettre Ã  jour le texte pendant l'animation
+                countElement.textContent = to;
+                countElement.classList.remove('count-exit');
+                countElement.classList.add('count-enter');
                 
-                // Minimum 30ms entre chaque Ã©tape pour que ce soit visible
-                return Math.max(stepDuration, 30);
-            }
-            
-            function displayStep() {
-                // Afficher la valeur actuelle
-                animationDirection = direction;
-                const intermediateGoal = { ...goal, current: currentValue };
-                displayGoalText(intermediateGoal);
+                // Mettre Ã  jour l'objectif
+                goalElement.textContent = goal.target;
                 
-                // Passer Ã  l'Ã©tape suivante
-                if (currentValue !== to) {
-                    currentValue += step;
-                    stepIndex++;
+                setTimeout(() => {
+                    countElement.classList.remove('count-enter');
+                    isAnimating = false;
                     
-                    const delay = getDelayForStep(stepIndex, totalSteps);
-                    setTimeout(displayStep, delay);
-                } else {
-                    // Animation terminÃ©e
-                    finishAnimation();
-                }
-            }
-            
-            function finishAnimation() {
-                // S'assurer que la valeur finale est affichÃ©e
-                animationDirection = direction;
-                displayGoalText(goal);
-                
-                console.log(`âœ… Slot-machine terminÃ©e: ${to}`);
-                isAnimating = false;
-                
-                // Traiter la file d'attente si nÃ©cessaire
-                if (animationQueue.length > 0) {
-                    const next = animationQueue.shift();
-                    isAnimating = true;
-                    animateCounterProgressive(next.from, next.to, next.goal, next.direction);
-                }
-            }
-            
-            // DÃ©marrer le dÃ©filement
-            displayStep();
+                    // Traiter la file d'attente si nÃ©cessaire
+                    if (animationQueue.length > 0) {
+                        const next = animationQueue.shift();
+                        animateCounterProgressive(next.from, next.to, next.goal, next.direction);
+                    }
+                }, 300);
+            }, 300);
         }
-function forceRecalculateDisplay() {
+
+        function forceRecalculateDisplay() {
             console.log(' Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
             currentText = "";

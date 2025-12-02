@@ -3,6 +3,8 @@
 """
 Module de vérification des versions pour SubCount Auto
 Compatible Python 3.6+
+
+Mise à jour v2.3.0: Utilise app_state.json centralisé
 """
 
 import os
@@ -13,8 +15,8 @@ UPDATER_DIR = os.path.dirname(__file__)  # obs/updater/
 OBS_DIR = os.path.dirname(UPDATER_DIR)   # obs/
 PROJECT_ROOT = os.path.dirname(OBS_DIR)  # racine du projet
 
-VERSION_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'version.json')
-UPDATE_CONFIG_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'update_config.json')
+# Fichier d'état centralisé (v2.3.0+)
+APP_STATE_FILE = os.path.join(PROJECT_ROOT, 'app', 'config', 'app_state.json')
 
 # Import conditionnel de requests
 try:
@@ -24,24 +26,58 @@ except ImportError:
     REQUESTS_AVAILABLE = False
     print("⚠️ Module requests non disponible - vérification des mises à jour désactivée")
 
-def get_current_version():
-    """Récupère la version actuelle de l'application à partir du fichier version.json."""
+def load_app_state():
+    """Charge l'état de l'application depuis app_state.json."""
     try:
-        with open(VERSION_FILE, 'r', encoding='utf-8') as f:
-            version_info = json.load(f)
-            return version_info.get('version', '0.0.0')
+        if os.path.exists(APP_STATE_FILE):
+            with open(APP_STATE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Erreur lors de la lecture de app_state.json: {e}")
+    
+    # Valeurs par défaut si le fichier n'existe pas
+    return {
+        'version': {'current': '2.3.0'},
+        'update': {
+            'enabled': True,
+            'github': {
+                'apiUrl': 'https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest',
+                'timeout': 10
+            }
+        }
+    }
+
+def get_current_version():
+    """Récupère la version actuelle de l'application depuis app_state.json."""
+    try:
+        app_state = load_app_state()
+        return app_state.get('version', {}).get('current', '2.3.0')
     except Exception as e:
         print(f"Erreur lors de la lecture de la version actuelle: {e}")
-        return '0.0.0'
+        return '2.3.0'
 
 def get_update_config():
-    """Récupère la configuration de mise à jour à partir du fichier update_config.json."""
+    """Récupère la configuration de mise à jour depuis app_state.json."""
     try:
-        with open(UPDATE_CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        app_state = load_app_state()
+        update_config = app_state.get('update', {})
+        
+        # Convertir au format attendu par check_for_updates()
+        return {
+            'update_check_url': update_config.get('github', {}).get('apiUrl', 
+                'https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest'),
+            'github_api': {
+                'timeout': update_config.get('github', {}).get('timeout', 10),
+                'headers': {'Accept': 'application/vnd.github.v3+json'}
+            }
+        }
     except Exception as e:
         print(f"Erreur lors de la lecture de la configuration de mise à jour: {e}")
-        return None
+        # Retourner une config par défaut fonctionnelle
+        return {
+            'update_check_url': 'https://api.github.com/repos/Bl0uD/AutoSubGoalTwitch/releases/latest',
+            'github_api': {'timeout': 10, 'headers': {}}
+        }
 
 def compare_versions(version1, version2):
     """

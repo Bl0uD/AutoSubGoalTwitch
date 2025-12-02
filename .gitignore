@@ -37,6 +37,22 @@ desktop.ini
 # Temp
 *.tmp
 temp/
+app_state.json.tmp
+
+# Anciens fichiers de config (migrés vers app_state.json)
+app/config/overlay_config.json
+app/config/version.json
+app/config/update_config.json
+obs/data/followcount_backup.txt
+obs/data/subcount_backup.txt
+
+# Anciens fichiers OBS text (supprimés - on utilise les overlays HTML)
+obs/data/total_followers_count.txt
+obs/data/total_followers_count_goal.txt
+obs/data/total_subscriber_count.txt
+obs/data/total_subscriber_count_goal.txt
+obs/data/follower_count.txt
+obs/data/follower_goal.txt
 
 # ============================================================
 # FICHIERS DE DÉVELOPPEMENT (non nécessaires pour utilisateurs)

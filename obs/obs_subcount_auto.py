@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script OBS pour SubCount Auto v2.2.2
+Script OBS pour SubCount Auto v2.3.0
 Démarre automatiquement le serveur SubCount Auto avec OBS
 et le ferme proprement à la fermeture d'OBS
 Inclut le système de vérification automatique des mises à jour
@@ -14,7 +14,7 @@ Installation dans OBS :
 
 Auteur: Bl0uD
 Date: 18/11/2025
-Version: 2.2.1 (installeur robuste + guidage OBS amélioré)
+Version: 2.3.0 (filtrage polices amélioré + nettoyage)
 """
 
 import obspython as obs
@@ -26,6 +26,7 @@ import threading
 import logging
 import webbrowser
 import json
+import re
 import winreg  # Pour lire les polices du registre Windows
 
 # Ajouter le répertoire du script au sys.path pour les imports
@@ -75,7 +76,7 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "v2.2.2"
+VERSION = "v2.3.0"
 
 # Variables globales
 server_process = None
@@ -159,24 +160,77 @@ def get_windows_fonts():
     
     fonts = set()
     
-    # Variantes à filtrer (case-insensitive)
-    variants = [
+    # Mots de variantes (séparés par espace dans le nom) - EN + FR
+    variant_words = [
+        # Anglais
         'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'black', 'heavy',
-        'semibold', 'semi bold', 'demibold', 'demi bold', 'extrabold', 'extra bold',
-        'extralight', 'extra light', 'ultralight', 'ultra light', 'ultrabold', 'ultra bold',
-        'condensed', 'extended', 'narrow', 'wide', 'regular', 'normal', 'book', 'roman'
+        'semibold', 'semi bold', 'semi-bold', 'demibold', 'demi bold', 'demi-bold',
+        'extrabold', 'extra bold', 'extra-bold', 'extralight', 'extra light', 'extra-light',
+        'ultralight', 'ultra light', 'ultra-light', 'ultrabold', 'ultra bold', 'ultra-bold',
+        'condensed', 'extended', 'narrow', 'wide', 'regular', 'normal', 'book', 'roman',
+        'mt bold', 'mt italic', 'ce', 'cyr', 'greek', 'tur', 'baltic', 'hebrew', 'arabic',
+        # Français
+        'gras', 'italique', 'maigre', 'demi gras', 'demi-gras', 'très gras', 'très-gras',
+        'extra gras', 'extra-gras', 'léger', 'étroit', 'étendu', 'condensé',
+        'mt gras', 'mt italique', 'gras italique', 'poster compressed'
     ]
     
     def is_variant(font_name):
-        """Vérifie si le nom contient une variante"""
-        name_lower = font_name.lower()
-        for variant in variants:
-            if variant in name_lower:
+        """Vérifie si le nom correspond à une variante de police"""
+        name_lower = font_name.lower().strip()
+        
+        # Vérifier les mots de variante (séparés)
+        for word in variant_words:
+            # Chercher le mot comme mot complet (séparé par espaces)
+            if f' {word}' in f' {name_lower} ' or name_lower.endswith(f' {word}'):
                 return True
+        
         return False
     
+    def extract_base_font_name(font_name):
+        """Extrait le nom de base d'une police en retirant les indicateurs de variante"""
+        clean = font_name
+        
+        # Retirer ce qui est entre parenthèses (TrueType), (OpenType), etc.
+        clean = clean.split('(')[0].strip()
+        
+        # Retirer le & parfois présent
+        clean = clean.replace('&', '').strip()
+        
+        # Nettoyer les patterns spéciaux Windows
+        # Ex: "Courier 10,12,15" -> "Courier"
+        # Retirer les suffixes numériques avec virgules (tailles de police)
+        clean = re.sub(r'\s+\d+[,\d]+$', '', clean)
+        # Retirer les espaces multiples (ex: "Cambria  Cambria Math" -> premier mot)
+        if '  ' in clean:
+            clean = clean.split('  ')[0].strip()
+        
+        # Retirer les suffixes de variante courants (EN + FR)
+        suffixes_to_remove = [
+            # Anglais
+            ' Bold', ' Italic', ' Bold Italic', ' Light', ' Thin', ' Medium', ' Black',
+            ' Heavy', ' SemiBold', ' Semi Bold', ' DemiBold', ' Demi Bold',
+            ' ExtraBold', ' Extra Bold', ' ExtraLight', ' Extra Light',
+            ' UltraLight', ' Ultra Light', ' UltraBold', ' Ultra Bold',
+            ' Condensed', ' Extended', ' Narrow', ' Wide', ' Regular', ' Normal',
+            ' Book', ' Roman', ' Oblique', ' MT', ' CE', ' Cyr', ' Greek', ' Tur',
+            ' Poster Compressed', ' Shadow', ' Outline',
+            # Français
+            ' Gras', ' Italique', ' Gras Italique', ' Maigre', ' Demi Gras', ' Demi-Gras',
+            ' Extra Gras', ' Extra-Gras', ' Très Gras', ' Léger', ' Étroit', ' Étendu',
+            ' Condensé', ' MT Gras', ' MT Italique'
+        ]
+        
+        # Appliquer plusieurs fois pour retirer les suffixes composés
+        for _ in range(3):
+            for suffix in suffixes_to_remove:
+                if clean.lower().endswith(suffix.lower()):
+                    clean = clean[:-len(suffix)].strip()
+        
+        return clean
+    
     try:
-        # Méthode 1: Lire le registre Windows
+        # Méthode principale: Lire le registre Windows (meilleure source)
         try:
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
                                 r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
@@ -185,13 +239,12 @@ def get_windows_fonts():
             while True:
                 try:
                     font_name, font_file, _ = winreg.EnumValue(key, i)
-                    # Extraire le nom de base de la police
-                    clean_name = font_name.split('(')[0].strip()
-                    # Retirer "&" parfois présent
-                    clean_name = clean_name.replace('&', '')
                     
-                    # Filtrer les variantes
-                    if not is_variant(clean_name):
+                    # Extraire le nom de base propre
+                    clean_name = extract_base_font_name(font_name)
+                    
+                    # Filtrer les variantes basées sur le nom
+                    if clean_name and not is_variant(font_name):
                         fonts.add(clean_name)
                     
                     i += 1
@@ -202,31 +255,11 @@ def get_windows_fonts():
         except Exception as e:
             log_message(f"⚠️ Erreur lecture registre: {e}", level="warning")
         
-        # Méthode 2: Scanner le dossier Fonts directement
-        fonts_dir = os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts')
-        if os.path.exists(fonts_dir):
-            for font_file in os.listdir(fonts_dir):
-                if font_file.endswith(('.ttf', '.otf')):
-                    # Extraire le nom sans extension
-                    font_name = os.path.splitext(font_file)[0]
-                    
-                    # Nettoyer les suffixes avec tirets ou espaces
-                    for suffix in ['-Regular', '-Bold', '-Italic', '-Light', '-Medium', '-Black', 
-                                   '-Thin', '-SemiBold', '-ExtraBold', 'Regular', 'Bold', 'Italic', 
-                                   'Light', 'Medium', 'Black', 'Thin']:
-                        font_name = font_name.replace(suffix, '')
-                    
-                    font_name = font_name.strip()
-                    
-                    # Ne garder que si ce n'est pas une variante
-                    if font_name and not is_variant(font_name):
-                        fonts.add(font_name)
-        
         # Convertir en liste triée
         font_list = sorted(list(fonts), key=str.lower)
         
         # Polices prioritaires à mettre en premier
-        priority_fonts = ["SEA", "Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Impact", "Comic Sans MS"]
+        priority_fonts = ["Arial", "Verdana", "Times New Roman", "Courier New", "Georgia", "Impact", "Comic Sans MS"]
         result = []
         
         for font in priority_fonts:
@@ -239,20 +272,20 @@ def get_windows_fonts():
         # Ajouter le reste
         result.extend(font_list)
         
-        # Assurer que SEA est toujours présent
-        if not any(f.lower() == 'sea' for f in result):
-            result.insert(0, 'SEA')
+        # Assurer que Arial est toujours présent
+        if not any(f.lower() == 'arial' for f in result):
+            result.insert(0, 'Arial')
         
         log_message(f"✅ {len(result)} polices mères chargées (variantes filtrées)", level="info")
         
         # Mettre en cache le résultat
-        CACHED_FONTS = result if len(result) > 0 else ["SEA", "Arial", "Verdana", "Georgia", "Impact"]
+        CACHED_FONTS = result if len(result) > 0 else ["Arial", "Arial", "Verdana", "Georgia", "Impact"]
         return CACHED_FONTS
         
     except Exception as e:
         log_message(f"⚠️ Erreur lecture polices: {e}", level="warning")
         # Mettre en cache les polices par défaut
-        CACHED_FONTS = ["SEA", "Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
+        CACHED_FONTS = ["Arial", "Courier New", "Times New Roman", "Verdana", "Georgia", "Impact"]
         return CACHED_FONTS
 
 def cleanup_log_file(log_file_path, max_size_mb=5, keep_lines=1000):
@@ -1101,7 +1134,7 @@ def reset_overlay_config(props, prop):
     # Vérifier que overlay_config existe avant de l'utiliser
     try:
         overlay_config.update_full_config(
-            font={'family': 'SEA', 'size': '64px', 'weight': 'normal'},
+            font={'family': 'Arial', 'size': '64px', 'weight': 'normal'},
             colors={'text': 'white', 'shadow': 'rgba(0,0,0,0.5)', 'stroke': 'black'},
             animation={'duration': '1s', 'easing': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'},
             layout={'paddingLeft': '20px', 'gap': '0'}
@@ -1119,7 +1152,7 @@ def reset_overlay_config(props, prop):
 # Fonctions OBS
 def script_description():
     """Description du script pour OBS"""
-    return """<h2>🎮 SubCount Auto v2.2.2</h2>"""
+    return """<h2>🎮 SubCount Auto v2.3.0</h2>"""
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
@@ -1130,7 +1163,7 @@ def script_load(settings):
     subcount_log_file = os.path.join(PROJECT_ROOT, 'app', 'logs', 'subcount_logs.txt')
     cleanup_log_file(subcount_log_file, max_size_mb=2, keep_lines=500)
     
-    log_message("🎬 Script OBS SubCount Auto v2.2.2 avec Auto-Update chargé", level="info")
+    log_message("🎬 Script OBS SubCount Auto v2.3.0 avec Auto-Update chargé", level="info")
     log_message(f"📂 Répertoire: {SCRIPT_DIR}", level="info")
     log_message(f"🚀 Fichier serveur: {START_SERVER_BAT}", level="info")
     log_message(f"📦 Version: {VERSION}", level="info")
@@ -1181,7 +1214,7 @@ def script_save(settings):
 def script_defaults(settings):
     """Définit les valeurs par défaut"""
     if OVERLAY_CONFIG_AVAILABLE:
-        obs.obs_data_set_default_string(settings, "overlay_font", "SEA")
+        obs.obs_data_set_default_string(settings, "overlay_font", "Arial")
         obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
         obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
         obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
