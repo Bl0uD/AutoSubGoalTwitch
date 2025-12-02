@@ -2,11 +2,12 @@
   "counters": {
     "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-02T12:22:33.882Z"
+    "lastUpdated": "2025-12-02T16:08:17.995Z"
   },
   "goals": {
     "currentFollowGoal": 500,
-    "currentSubGoal": 5
+    "currentSubGoal": 5,
+    "subs": 100
   },
   "overlay": {
     "font": {
