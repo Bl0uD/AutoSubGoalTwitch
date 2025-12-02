@@ -11,7 +11,7 @@
         }
         
         :root {
-            /* Variables CSS dynamiques (modifiées par le serveur JS) */
+            /* Dynamic CSS variables (modified by JS server) */
             --font-family: 'Arial';
             --font-size: 64px;
             --font-weight: normal;
@@ -147,7 +147,7 @@
 
     <script>
         // ==================================================================
-        // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
+        // CONFIG WEBSOCKET - DYNAMIC CONFIGURATION
         // ==================================================================
         
         let configWs = null;
@@ -157,31 +157,31 @@
                 configWs = new WebSocket('ws://localhost:8084');
                 
                 configWs.onopen = () => {
-                    console.log('✅ Config WebSocket connecté (port 8084)');
+                    console.log('[OK] Config WebSocket connected (port 8084)');
                 };
                 
                 configWs.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'config_update' && data.config) {
-                            console.log('🎨 Configuration reçue:', data.config);
+                            console.log('[CONFIG] Configuration received:', data.config);
                             applyConfig(data.config);
                         }
                     } catch (error) {
-                        console.error('❌ Erreur parsing config:', error);
+                        console.error('[ERROR] Config parsing error:', error);
                     }
                 };
                 
                 configWs.onerror = (error) => {
-                    console.error('❌ Erreur Config WebSocket:', error);
+                    console.error('[ERROR] Config WebSocket error:', error);
                 };
                 
                 configWs.onclose = () => {
-                    console.log('🔌 Config WebSocket déconnecté, reconnexion dans 5s...');
+                    console.log('[INFO] Config WebSocket disconnected, reconnecting in 5s...');
                     setTimeout(connectConfigWebSocket, 5000);
                 };
             } catch (error) {
-                console.error('❌ Erreur connexion Config WebSocket:', error);
+                console.error('[ERROR] Config WebSocket connection error:', error);
                 setTimeout(connectConfigWebSocket, 5000);
             }
         }
@@ -189,35 +189,35 @@
         function applyConfig(config) {
             const root = document.documentElement;
             
-            // Appliquer la police
+            // Apply font settings
             if (config.font) {
                 if (config.font.family) root.style.setProperty('--font-family', config.font.family);
                 if (config.font.size) root.style.setProperty('--font-size', config.font.size);
                 if (config.font.weight) root.style.setProperty('--font-weight', config.font.weight);
             }
             
-            // Appliquer les couleurs
+            // Apply colors
             if (config.colors) {
                 if (config.colors.text) root.style.setProperty('--text-color', config.colors.text);
                 if (config.colors.shadow) root.style.setProperty('--shadow-color', config.colors.shadow);
                 if (config.colors.stroke) root.style.setProperty('--stroke-color', config.colors.stroke);
             }
             
-            // Appliquer l'animation
+            // Apply animation
             if (config.animation) {
                 if (config.animation.duration) root.style.setProperty('--anim-duration', config.animation.duration);
                 if (config.animation.easing) root.style.setProperty('--anim-easing', config.animation.easing);
             }
             
-            // Appliquer la mise en page
+            // Apply layout
             if (config.layout) {
                 if (config.layout.paddingLeft) root.style.setProperty('--padding-left', config.layout.paddingLeft);
                 if (config.layout.gap) root.style.setProperty('--gap', config.layout.gap);
             }
             
-            console.log('✅ Configuration appliquée avec succès');
+            console.log('[OK] Configuration applied successfully');
             
-            // Forcer le rafraîchissement de l'affichage
+            // Force display refresh
             setTimeout(forceRecalculateDisplay, 100);
         }
         
@@ -226,20 +226,20 @@
                 const response = await fetch('http://localhost:8082/api/overlay-config');
                 if (response.ok) {
                     const config = await response.json();
-                    console.log('🎨 Configuration initiale chargée:', config);
+                    console.log('[CONFIG] Initial configuration loaded:', config);
                     applyConfig(config);
                 }
             } catch (error) {
-                console.error('❌ Erreur chargement config initiale:', error);
+                console.error('[ERROR] Initial config loading error:', error);
             }
         }
         
-        // Charger la config initiale puis connecter le WebSocket
+        // Load initial config then connect WebSocket
         loadInitialConfig();
         connectConfigWebSocket();
         
         // ==================================================================
-        // RESTE DU CODE ORIGINAL (WebSocket compteur, animations, etc.)
+        // COUNTER WEBSOCKET - ANIMATIONS
         // ==================================================================
         
         // Constantes
@@ -360,7 +360,7 @@
             const startTime = performance.now();
             const updateInterval = totalDuration / Math.max(steps, 60);
             
-            console.log(`🎰 Animation: ${fromCount} → ${toCount} (${steps} étapes)`);
+            console.log(`[ANIM] Animation: ${fromCount} -> ${toCount} (${steps} steps)`);
             
             let lastDisplayedValue = fromCount;
             
@@ -433,7 +433,7 @@
                 ws = new WebSocket('ws://localhost:8083');
 
                 ws.onopen = () => {
-                    console.log('✅ Connecté au WebSocket (compteur)');
+                    console.log('[OK] Counter WebSocket connected');
                     reconnectAttempts = 0;
                     fetchCurrentData();
                 };
@@ -450,7 +450,7 @@
                             });
                         }
                     } catch (error) {
-                        console.error('❌ Erreur parsing message:', error);
+                        console.error('[ERROR] Message parsing error:', error);
                     }
                 };
 
@@ -459,7 +459,7 @@
                 };
 
                 ws.onclose = () => {
-                    console.log('🔌 WebSocket compteur déconnecté, reconnexion dans 3s...');
+                    console.log('[INFO] Counter WebSocket disconnected, reconnecting in 3s...');
                     setTimeout(connectWebSocket, 3000);
                 };
             } catch (error) {
@@ -477,7 +477,7 @@
                     updateSubgoal(data.goal);
                 }
             } catch (error) {
-                console.error('❌ Erreur récupération données SUB goal:', error);
+                console.error('[ERROR] SUB goal fetch error:', error);
             }
         }
         
@@ -489,20 +489,20 @@
                 const direction = delta > 0 ? "down" : "up";
                 const absDelta = Math.abs(delta);
                 
-                console.log(`ðŸ”„ Direction: ${direction} (${previousSubCount} â†’ ${goal.current}), delta: ${delta}`);
-                console.log(`ðŸ“¦ BatchInfo: isBatch=${batchInfo.isBatch}, batchCount=${batchInfo.batchCount}, isRemoval=${batchInfo.isRemoval}`);
+                console.log(`[INFO] Direction: ${direction} (${previousSubCount} -> ${goal.current})`);
+                console.log(`[BATCH] BatchInfo: isBatch=${batchInfo.isBatch}, batchCount=${batchInfo.batchCount}, isRemoval=${batchInfo.isRemoval}`);
 
-                // DÃ©cider du type d'animation basÃ© sur le batch ET le delta
+                // Decide animation type based on batch and delta
                 // Animation slot-machine si: batch avec plusieurs events OU delta > 1
                 const shouldUseSlotMachine = (batchInfo.isBatch && Math.abs(batchInfo.batchCount) > 1) || absDelta > 1;
                 
                 if (shouldUseSlotMachine) {
-                    console.log(`ðŸŽ° Animation SLOT-MACHINE: ${previousSubCount} â†’ ${goal.current} (${absDelta} unitÃ©s)`);
+                    console.log(`[ANIM] SLOT-MACHINE: ${previousSubCount} -> ${goal.current}`);
                     // Vider la queue et faire une animation directe
                     animationQueue = [];
                     animateSlotMachine(previousSubCount, goal.current, goal, direction);
                 } else {
-                    console.log(`ðŸ“ Animation PROGRESSIVE: ${previousSubCount} â†’ ${goal.current}`);
+                    console.log(`[ANIM] PROGRESSIVE: ${previousSubCount} -> ${goal.current}`);
                     // Animation progressive normale pour changement unique
                     animationQueue.push({
                         from: previousSubCount,
@@ -522,45 +522,45 @@
             }
 
             previousSubCount = goal.current;
-            console.log('ðŸ“Š Subgoal mis Ã  jour');
+            console.log('[INFO] Subgoal updated');
         }
         
                 /**
-         * Animation SLOT-MACHINE pour les changements groupÃ©s
-         * Effet de dÃ©filement sÃ©quentiel : 390 â†’ 391 â†’ 392 â†’ ... â†’ 401
-         * AccÃ©lÃ¨re au dÃ©but, ralentit vers la fin (easing)
+         * SLOT-MACHINE animation for grouped changes
+         * Sequential scrolling effect: 390 -> 391 -> 392 -> ... -> 401
+         * Accelerates at start, slows at end (easing)
          */
         function animateSlotMachine(from, to, goal, direction) {
-            console.log(`ðŸŽ° DÃ©marrage slot-machine: ${from} â†’ ${to}`);
+            console.log(`[ANIM] Starting slot-machine: ${from} -> ${to}`);
             isAnimating = true;
             
             const delta = to - from;
             const totalSteps = Math.abs(delta);
             const step = delta > 0 ? 1 : -1; // +1 ou -1 selon la direction
             
-            // DurÃ©e totale adaptÃ©e au nombre d'Ã©tapes (min 500ms, max 1500ms)
+            // Total duration adapted to number of steps
             const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
             
             let currentValue = from;
             let stepIndex = 0;
             
-            console.log(`ðŸ”¢ ${totalSteps} Ã©tapes Ã  afficher en ${totalDuration}ms`);
+            console.log(`[ANIM] ${totalSteps} steps in ${totalDuration}ms`);
             
             function easeInOutQuad(t) {
-                // AccÃ©lÃ¨re au dÃ©but, ralentit Ã  la fin
+                // Accelerate at start, slow at end
                 return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
             }
             
             function getDelayForStep(index, total) {
-                // Calculer le dÃ©lai pour cette Ã©tape basÃ© sur l'easing
-                // Plus rapide au milieu, plus lent au dÃ©but et Ã  la fin
+                // Calculate delay for this step based on easing
+                // Faster in middle, slower at start and end
                 const progressBefore = index / total;
                 const progressAfter = (index + 1) / total;
                 const easedBefore = easeInOutQuad(progressBefore);
                 const easedAfter = easeInOutQuad(progressAfter);
                 const stepDuration = (easedAfter - easedBefore) * totalDuration;
                 
-                // Minimum 30ms entre chaque Ã©tape pour que ce soit visible
+                // Minimum 30ms between steps to be visible
                 return Math.max(stepDuration, 30);
             }
             
@@ -570,7 +570,7 @@
                 const intermediateGoal = { ...goal, current: currentValue };
                 displayGoalText(intermediateGoal);
                 
-                // Passer Ã  l'Ã©tape suivante
+                // Move to next step
                 if (currentValue !== to) {
                     currentValue += step;
                     stepIndex++;
@@ -578,20 +578,20 @@
                     const delay = getDelayForStep(stepIndex, totalSteps);
                     setTimeout(displayStep, delay);
                 } else {
-                    // Animation terminÃ©e
+                    // Animation completed
                     finishAnimation();
                 }
             }
             
             function finishAnimation() {
-                // S'assurer que la valeur finale est affichÃ©e
+                // Ensure final value is displayed
                 animationDirection = direction;
                 displayGoalText(goal);
                 
-                console.log(`âœ… Slot-machine terminÃ©e: ${to}`);
+                console.log(`[OK] Slot-machine completed: ${to}`);
                 isAnimating = false;
                 
-                // Traiter la file d'attente si nÃ©cessaire
+                // Process animation queue if needed
                 if (animationQueue.length > 0) {
                     const next = animationQueue.shift();
                     isAnimating = true;
@@ -599,7 +599,7 @@
                 }
             }
             
-            // DÃ©marrer le dÃ©filement
+            // Start scrolling
             displayStep();
         }
 function forceRecalculateDisplay() {
