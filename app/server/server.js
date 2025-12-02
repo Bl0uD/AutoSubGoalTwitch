@@ -24,6 +24,11 @@ const {
 const {
     APP_STATE_PATH, loadAppState, saveAppState, updateCounter,
     getOverlayConfig, updateOverlayConfig, getVersionInfo, getCounters, setCounters,
+    // Factory functions pour services modulaires (Phase 3.3)
+    createTwitchService,
+    createGoalsService,
+    createBatchingService,
+    createBroadcastService,
 } = require('./services');
 
 // Import des routes modulaires
@@ -37,6 +42,37 @@ const {
 
 // Dossier racine du projet (2 niveaux au-dessus : app/server -> app -> racine)
 const ROOT_DIR = path.join(__dirname, '..', '..');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 📐 ARCHITECTURE MODULAIRE v3.0.0
+// ═══════════════════════════════════════════════════════════════════════════════
+// 
+// Services disponibles (Phase 3.3) - Pattern Factory avec injection de contexte:
+// 
+// 1. createTwitchService(context)
+//    - Device Code Flow (initiate, polling, reset)
+//    - Token management (refresh, save, load)
+//    - API calls (getUserInfo, getFollowCount, getSubCount)
+//    - Synchronisation (syncTwitchFollows, syncTwitchSubs)
+// 
+// 2. createGoalsService(context)
+//    - Chargement objectifs (loadFollowGoals, loadSubGoals)
+//    - Calcul objectifs (getCurrentFollowGoal, getCurrentSubGoal)
+//    - Surveillance fichiers (setupConfigWatcher)
+// 
+// 3. createBatchingService(context)
+//    - Batching follows (addFollowToBatch, flushFollowBatch)
+//    - Batching subs (addSubToBatch, flushSubBatch)
+//    - Batching removals (addFollowRemoveToBatch, addSubEndToBatch)
+// 
+// 4. createBroadcastService(context)
+//    - Diffusion WebSocket (broadcastFollowUpdate, broadcastSubUpdate)
+//    - Config overlay (broadcastConfigUpdate)
+//    - Données initiales (sendInitialData, sendInitialConfig)
+// 
+// Note: Les fonctions inline restent pour compatibilité.
+// Migration progressive vers les services modulaires en cours.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // Note: Logger, logEvent, LOG_LEVELS, validation functions, et les classes utilitaires
 // sont maintenant importés de ./utils et ./services
