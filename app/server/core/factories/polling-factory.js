@@ -5,6 +5,10 @@
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère le polling périodique de l'API Twitch pour les compteurs
+ * 
+ * Stratégie:
+ * - Follows: Polling toutes les 10s (pas d'événement unfollow dans EventSub)
+ * - Subs: Polling toutes les 60s (EventSub gère les événements temps réel)
  */
 
 /**
@@ -21,7 +25,9 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     const { logEvent } = logger;
     const { LIMITS } = constants;
     
-    const POLLING_INTERVAL = LIMITS.POLLING_INTERVAL || 60000; // 1 minute
+    // Intervalles différents pour follows et subs
+    const POLLING_INTERVAL_FOLLOWS = LIMITS.POLLING_INTERVAL_FOLLOWS || 10000; // 10s pour unfollows
+    const POLLING_INTERVAL_SUBS = LIMITS.POLLING_INTERVAL_SUBS || 60000;       // 60s pour subs (EventSub gère le temps réel)
     const INITIAL_SYNC_DELAY = 5000; // 5 secondes après démarrage
     
     let isPolling = false;
@@ -52,14 +58,17 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
             await syncAll('initial');
         }, INITIAL_SYNC_DELAY);
         
-        // Polling périodique
-        const interval = timerRegistry.setInterval('polling', async () => {
-            await syncAll('polling');
-        }, POLLING_INTERVAL);
+        // Polling follows toutes les 10 secondes (pour détecter unfollows)
+        timerRegistry.setInterval('pollingFollows', async () => {
+            await syncFollowsOnly('polling');
+        }, POLLING_INTERVAL_FOLLOWS);
         
-        stateManager.setTimer('followPolling', interval);
+        // Polling subs toutes les 60 secondes (backup pour EventSub)
+        timerRegistry.setInterval('pollingSubs', async () => {
+            await syncSubsOnly('polling');
+        }, POLLING_INTERVAL_SUBS);
         
-        logEvent('INFO', `✅ Polling démarré (intervalle: ${POLLING_INTERVAL/1000}s)`);
+        logEvent('INFO', `✅ Polling démarré (follows: ${POLLING_INTERVAL_FOLLOWS/1000}s, subs: ${POLLING_INTERVAL_SUBS/1000}s)`);
     }
     
     /**
@@ -72,8 +81,8 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
         stateManager.setPollingActive(false);
         
         timerRegistry.clearTimeout('initialSync');
-        timerRegistry.clearInterval('polling');
-        stateManager.clearTimer('followPolling');
+        timerRegistry.clearInterval('pollingFollows');
+        timerRegistry.clearInterval('pollingSubs');
         
         logEvent('INFO', '🛑 Polling arrêté');
     }
@@ -133,7 +142,37 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     }
     
     /**
-     * Synchronise uniquement les follows
+     * Synchronise uniquement les follows (appelé toutes les 10s)
+     * @param {string} source
+     * @returns {Promise<Object>}
+     */
+    async function syncFollowsOnly(source = 'polling') {
+        if (!twitchApiService.isAuthenticated()) return { success: false };
+        
+        const result = await twitchApiService.syncFollows(source);
+        if (result.diff !== 0) {
+            logEvent('INFO', `📊 Follows sync: ${result.diff > 0 ? '+' : ''}${result.diff} (total: ${result.data})`);
+        }
+        return result;
+    }
+    
+    /**
+     * Synchronise uniquement les subs (appelé toutes les 60s - backup EventSub)
+     * @param {string} source
+     * @returns {Promise<Object>}
+     */
+    async function syncSubsOnly(source = 'polling') {
+        if (!twitchApiService.isAuthenticated()) return { success: false };
+        
+        const result = await twitchApiService.syncSubs(source);
+        if (result.diff !== 0) {
+            logEvent('INFO', `📊 Subs sync: ${result.diff > 0 ? '+' : ''}${result.diff} (total: ${result.data})`);
+        }
+        return result;
+    }
+    
+    /**
+     * Synchronise uniquement les follows (API publique)
      * @param {string} source
      * @returns {Promise<Object>}
      */
@@ -142,7 +181,7 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     }
     
     /**
-     * Synchronise uniquement les subs
+     * Synchronise uniquement les subs (API publique)
      * @param {string} source
      * @returns {Promise<Object>}
      */
@@ -208,7 +247,10 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     function getStatus() {
         return {
             active: isPolling,
-            interval: POLLING_INTERVAL,
+            intervals: {
+                follows: POLLING_INTERVAL_FOLLOWS,
+                subs: POLLING_INTERVAL_SUBS
+            },
             authenticated: twitchApiService.isAuthenticated(),
             lastFollows: stateManager.getLastKnownFollowCount(),
             lastSubs: stateManager.getLastKnownSubCount()
@@ -216,17 +258,11 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     }
     
     /**
-     * Change l'intervalle de polling (nécessite restart)
+     * Change l'intervalle de polling (info seulement)
      * @param {number} interval - Nouvel intervalle en ms
      */
     function setInterval(interval) {
-        if (interval < 30000) {
-            logEvent('WARN', '⚠️ Intervalle minimum: 30s');
-            return;
-        }
-        
-        // Note: L'intervalle est une constante, cette fonction est pour info
-        logEvent('INFO', `ℹ️ Pour changer l'intervalle, modifiez LIMITS.POLLING_INTERVAL`);
+        logEvent('INFO', `ℹ️ Pour changer les intervalles, modifiez LIMITS.POLLING_INTERVAL_FOLLOWS et LIMITS.POLLING_INTERVAL_SUBS`);
     }
     
     // ═══════════════════════════════════════════════════════════════════════════

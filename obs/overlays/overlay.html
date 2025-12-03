@@ -599,16 +599,31 @@
         /**
          * SLOT-MACHINE animation for grouped changes
          * Sequential scrolling effect: 390 -> 391 -> 392 -> ... -> 401
+         * 
+         * Plafonnement pour les grands deltas:
+         * - Follows: max 50 étapes visuelles (durée ~1.5s)
+         * - Subs: max 200 étapes visuelles (durée ~1.5s)
          */
         function animateSlotMachine(from, to, goal, direction) {
             console.log(`🎰 Starting slot-machine: ${from} -> ${to}`);
             isAnimating = true;
             
             const delta = to - from;
-            const totalSteps = Math.abs(delta);
-            const step = delta > 0 ? 1 : -1;
+            const absDelta = Math.abs(delta);
+            const stepSign = delta > 0 ? 1 : -1;
             
-            const totalDuration = Math.min(Math.max(totalSteps * 80, 500), 1500);
+            // Limites selon le type d'overlay (follows = 50, subs = 200)
+            const maxVisualSteps = CONFIG.type === 'sub' ? 200 : 50;
+            const FIXED_DURATION = 1500; // 1.5 secondes max pour grands deltas
+            
+            // Si delta > limite, on réduit le nombre d'étapes visuelles
+            const visualSteps = Math.min(absDelta, maxVisualSteps);
+            const skipFactor = absDelta > maxVisualSteps ? Math.ceil(absDelta / maxVisualSteps) : 1;
+            
+            // Durée totale: proportionnelle aux étapes visuelles, plafonnée à 1.5s
+            const totalDuration = Math.min(Math.max(visualSteps * 80, 500), FIXED_DURATION);
+            
+            console.log(`📊 Delta: ${absDelta}, Visual steps: ${visualSteps}, Skip: ${skipFactor}, Duration: ${totalDuration}ms`);
             
             let currentValue = from;
             let stepIndex = 0;
@@ -623,7 +638,7 @@
                 const easedBefore = easeInOutQuad(progressBefore);
                 const easedAfter = easeInOutQuad(progressAfter);
                 const stepDuration = (easedAfter - easedBefore) * totalDuration;
-                return Math.max(stepDuration, 30);
+                return Math.max(stepDuration, 20);
             }
             
             function displayStep() {
@@ -631,10 +646,16 @@
                 const intermediateGoal = { ...goal, current: currentValue };
                 displayGoalText(intermediateGoal);
                 
-                if (currentValue !== to) {
-                    currentValue += step;
+                // Calculer la prochaine valeur (avec saut si nécessaire)
+                const remaining = Math.abs(to - currentValue);
+                
+                if (remaining > 0) {
+                    // Sauter des valeurs si delta trop grand
+                    const nextStep = Math.min(skipFactor, remaining) * stepSign;
+                    currentValue += nextStep;
                     stepIndex++;
-                    const delay = getDelayForStep(stepIndex, totalSteps);
+                    
+                    const delay = getDelayForStep(stepIndex, visualSteps);
                     setTimeout(displayStep, delay);
                 } else {
                     finishAnimation();
@@ -642,9 +663,10 @@
             }
             
             function finishAnimation() {
+                // S'assurer qu'on affiche bien la valeur finale
                 animationDirection = direction;
                 displayGoalText(goal);
-                console.log(`✅ Slot-machine completed: ${to}`);
+                console.log(`✅ Slot-machine completed: ${to} (${visualSteps} visual steps in ${totalDuration}ms)`);
                 isAnimating = false;
                 
                 if (animationQueue.length > 0) {
@@ -674,12 +696,10 @@
         // Démarrer l'initialisation robuste
         initializeOverlay();
         
-        // Refresh périodique de sécurité (toutes les 30 secondes)
-        setInterval(() => {
-            if (isDataLoaded && currentGoal) {
-                fetchCurrentData();
-            }
-        }, 30000);
+        // Note: Plus de refresh périodique nécessaire !
+        // - Le WebSocket reçoit les mises à jour en temps réel
+        // - waitForServer() gère la reconnexion au démarrage
+        // - Le polling serveur synchronise toutes les 10s (follows) et 60s (subs)
     </script>
 </body>
 </html>
