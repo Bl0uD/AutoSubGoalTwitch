@@ -1,7 +1,7 @@
 /**
  * @file server.js
  * @description Serveur Express avec architecture v3.1 (StateManager + DI)
- * @version 3.1.1
+ * @version 3.1.0
  * 
  * Architecture modulaire:
  * - StateManager: état centralisé avec EventEmitter
@@ -35,7 +35,7 @@ const ROOT_DIR = path.join(__dirname, '..', '..');
 // ═══════════════════════════════════════════════════════════════════════════════
 
 console.log('\n┌─────────────────────────────────────────────────────────────────┐');
-console.log('│     🚀 SubCount Auto v3.1.1 - Architecture Modulaire          │');
+console.log('│     🚀 SubCount Auto v3.1.0 - Architecture Modulaire          │');
 console.log('└─────────────────────────────────────────────────────────────────┘\n');
 
 // Créer le container avec toutes les dépendances
@@ -131,7 +131,7 @@ app.get('/api/status', (req, res) => {
     res.json({
         success: true,
         status: 'online',
-        version: '3.1.1',
+        version: '3.1.0',
         architecture: 'modular',
         counters: stateManager.getCounters(),
         // Compatibilité avec ancien format
