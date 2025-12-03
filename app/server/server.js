@@ -364,8 +364,8 @@ app.get('/admin/test-eventsub', (req, res) => {
 
 app.get('/admin/test-polling', async (req, res) => {
     try {
-        await pollingService.pollNow();
-        res.json({ success: true, message: 'Polling exécuté' });
+        const result = await pollingService.syncAll('manual');
+        res.json({ success: true, message: 'Polling exécuté', ...result });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
