@@ -280,8 +280,13 @@ function createEventSubService({ stateManager, twitchApiService, batchingService
                 break;
                 
             case 'channel.subscribe':
-            case 'channel.subscription.message':
                 handleSubscribeEvent(event);
+                break;
+                
+            case 'channel.subscription.message':
+                // Resub = renouvellement, la personne est déjà comptée
+                // Ne PAS incrémenter le compteur
+                logEvent('INFO', `🔄 Resub: ${event.user_name} (${event.cumulative_months} mois)`);
                 break;
                 
             case 'channel.subscription.gift':
