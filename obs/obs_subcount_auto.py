@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script OBS pour SubCount Auto v3.1.1
+Script OBS pour SubCount Auto v3.1.0
 Démarre automatiquement le serveur SubCount Auto avec OBS
 et le ferme proprement à la fermeture d'OBS
 Inclut le système de vérification automatique des mises à jour
@@ -14,7 +14,7 @@ Installation dans OBS :
 
 Auteur: Bl0uD
 Date: 02/12/2025
-Version: 3.1.1 (Architecture DI + Corrections Polices)
+Version: 3.1.0 (Architecture DI + Corrections)
 """
 
 import obspython as obs
@@ -76,7 +76,7 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "v3.1.1"
+VERSION = "v3.1.0"
 
 # Variables globales
 server_process = None
@@ -544,11 +544,11 @@ def check_dependencies():
     # 5. Vérifier les fichiers essentiels
     log_message("5️⃣ Vérification des fichiers...", level="info")
     
+    # Note: twitch_config.txt n'est plus nécessaire - l'auth est gérée par app_state.json
     essential_files = {
         'app/server/server.js': 'Serveur Node.js principal',
         'app/server/package.json': 'Configuration npm',
-        'app/scripts/START_SERVER.bat': 'Script de démarrage',
-        'obs/data/twitch_config.txt': 'Configuration Twitch'
+        'app/scripts/START_SERVER.bat': 'Script de démarrage'
     }
     
     for file, description in essential_files.items():
