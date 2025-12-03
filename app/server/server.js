@@ -239,13 +239,23 @@ app.get('/admin/sync-twitch', async (req, res) => {
     
     try {
         const result = await pollingService.syncAll('admin');
+        
+        // Si non authentifié
+        if (!result.success && result.reason === 'not_authenticated') {
+            return res.status(401).json({
+                success: false,
+                error: 'Non authentifié',
+                message: 'Connectez-vous à Twitch depuis le dashboard'
+            });
+        }
+        
         res.json({
             success: result.success,
-            twitchFollows: result.follows.value,
-            twitchSubs: result.subs.value,
-            followsDiff: result.follows.diff,
-            subsDiff: result.subs.diff,
-            updated: result.follows.diff !== 0 || result.subs.diff !== 0
+            twitchFollows: result.follows?.value ?? 0,
+            twitchSubs: result.subs?.value ?? 0,
+            followsDiff: result.follows?.diff ?? 0,
+            subsDiff: result.subs?.diff ?? 0,
+            updated: (result.follows?.diff ?? 0) !== 0 || (result.subs?.diff ?? 0) !== 0
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
