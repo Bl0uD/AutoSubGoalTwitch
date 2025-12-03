@@ -1,15 +1,17 @@
 {
   "counters": {
-    "follows": 100,
+    "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-03T00:41:44.151Z"
+    "lastUpdated": "2025-12-03T00:50:26.677Z"
   },
   "goals": {
-    "currentFollowGoal": 150,
+    "currentFollowGoal": 500,
     "currentSubGoal": 5
   },
   "overlay": {
-    "type": "follow"
+    "colors": {
+      "text": "rgba(255,12,95,1)"
+    }
   },
   "version": {
     "current": "3.1.0",

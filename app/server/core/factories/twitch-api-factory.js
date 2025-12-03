@@ -104,6 +104,13 @@ function createTwitchApiService({ stateManager, configCrypto, logger, constants,
                 refresh_token: stateManager.getTwitchRefreshToken()
             };
             
+            // S'assurer que le dossier existe
+            const dir = path.dirname(CONFIG_PATH);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+                logEvent('INFO', `📁 Dossier créé: ${dir}`);
+            }
+            
             const encrypted = configCrypto.encryptConfig(config);
             fs.writeFileSync(CONFIG_PATH, encrypted, 'utf8');
             
@@ -262,18 +269,24 @@ function createTwitchApiService({ stateManager, configCrypto, logger, constants,
                     );
                     
                     stateManager.clearDeviceCodeData();
-                    saveTokens();
+                    
+                    // Sauvegarder les tokens de manière chiffrée
+                    const saved = saveTokens();
+                    if (saved) {
+                        logEvent('INFO', '🔒 Tokens sauvegardés de manière sécurisée');
+                    }
                     
                     logEvent('INFO', `✅ Authentifié en tant que ${userInfo.login}`);
                     return true;
                 }
             } else {
-                const error = await response.json();
-                if (error.message === 'authorization_pending') {
+                const errorData = await response.json();
+                // Twitch retourne "error" pas "message"
+                if (errorData.error === 'authorization_pending') {
                     // Normal, l'utilisateur n'a pas encore autorisé
                     return false;
                 }
-                logEvent('WARN', '⚠️ Device code poll', { error: error.message });
+                logEvent('WARN', '⚠️ Device code poll', { error: errorData.error || errorData.message });
             }
             
             return false;
