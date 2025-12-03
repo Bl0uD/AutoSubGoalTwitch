@@ -7,37 +7,31 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
-## [3.1.1] - 2025-12-03
+## [3.1.0] - 2025-12-03
+
+### ✨ Nouvelles fonctionnalités
+- **Architecture DI complète** : StateManager + DependencyContainer + 6 factories
+- **Authentification Twitch persistante** : Tokens chiffrés AES-256-GCM
+- **Overlay robuste** : `waitForServer()` pour démarrage OBS avant serveur
+
+### ⚡ Optimisations
+- **Polling différencié** : Follows toutes les 10s, Subs toutes les 60s
+- **Animations plafonnées** : Max 1.5s pour grands deltas (+1000)
+  - Follows: max 50 étapes visuelles
+  - Subs: max 200 étapes visuelles
+- **WebSocket optimisé** : Suppression du refresh périodique inutile
 
 ### 🐛 Corrections
-
-#### Détection des Polices
-- **Polices utilisateur** : Détection des polices installées dans `LocalAppData/Microsoft/Windows/Fonts`
-- **Filtrage variantes** : Exclusion des Bold, Italic, Light, etc. de la liste
-- **Polices système** : Exclusion des polices obsolètes (8514fix, vgaoem, etc.)
-- **Fichiers .fon** : Exclusion des polices bitmap Windows 3.x
-
-#### Interface OBS
-- **Dropdown police** : Liste simple (non éditable) pour éviter les erreurs de saisie
-- **Persistance config** : Police, taille et couleur sauvegardées entre les sessions OBS
-- **Restauration auto** : Configuration restaurée automatiquement au démarrage
-
-#### Overlay HTML
-- **Format goal** : Correction du format `{current, target}` au lieu de `undefined`
-- **Police Sea** : Correction du nom de police dans `@font-face`
-
-### 📊 Métriques
-- **161 polices** détectées (filtrées des 176 brutes)
-- **Logs détaillés** : Callback police avec traçage complet
+- **Fix doublon gift sub** : `is_gift` ignoré dans `channel.subscribe`
+- **Fix device code polling** : Check `error` au lieu de `message`
+- **Fix sauvegarde tokens** : Persistance dans `obs/data/twitch_config.txt`
+- **Fix dossier obs/data/** : Création automatique
 
 ### 🧹 Nettoyage
-- **server-legacy.js** : Supprimé (remplacé par architecture DI)
-- **app/server/services/** : Supprimé (remplacé par core/factories/)
-- **5724 lignes** de code legacy supprimées
-
----
-
-## [3.1.0] - 2025-12-02
+- **Dossier routes/** supprimé (~1800 lignes de code legacy)
+- **server-legacy.js** supprimé
+- **app/server/services/** supprimé (remplacé par core/factories/)
+- **Total : ~7500 lignes** de code legacy supprimées
 
 ### 🏗️ Architecture DI (Dependency Injection)
 
@@ -45,13 +39,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - **EventEmitter** : Notifications automatiques sur changements d'état
 - **Getters/Setters typés** : Validation des mutations
 - **Persistance automatique** : Debounce pour performance
-- **650 lignes** de gestion d'état propre
 
 #### DependencyContainer - IoC Container
 - **Injection de dépendances** : Services découplés
 - **Détection des cycles** : Évite les dépendances circulaires
 - **Singletons** : Cache automatique des instances
-- **Scopes** : Isolation pour les tests
 
 #### Factories Modulaires
 - `goals-factory.js` - Gestion des objectifs
@@ -61,16 +53,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 - `eventsub-factory.js` - Connexion EventSub
 - `polling-factory.js` - Polling périodique
 
-### 📊 Métriques
-- **server.js** : 2670 → 350 lignes (**-87%**)
-- **Variables globales** : 20+ → 0 (**-100%**)
-- **Couplage** : Fort → Faible
-- **Testabilité** : Difficile → Facile
+### 📁 Structure Serveur
+```
+app/server/
+├── server.js              # Routes inline + bootstrap
+├── config-crypto.js       # Chiffrement AES-256-GCM
+├── core/
+│   ├── bootstrap.js
+│   ├── dependency-container.js
+│   ├── state-manager.js
+│   └── factories/         # 6 factories
+└── utils/                 # Utilitaires
+```
 
-### 🧹 Nettoyage
-- Ancien `server.js` conservé en `server-legacy.js`
-- Mise à jour toutes les versions dans scripts
-- Documentation mise à jour
+### 📊 Métriques
+- **server.js** : 2670 → 700 lignes (**-74%**)
+- **Variables globales** : 20+ → 0 (**-100%**)
+- **Code legacy supprimé** : ~7500 lignes
 
 ---
 
