@@ -28,6 +28,7 @@ const LIMITS = Object.freeze({
     LOG_KEEP_LINES: 500,
     KEEPALIVE_TIMEOUT: 10,
     WEBSOCKET_BUFFER_LIMIT: 1024 * 1024, // 1MB
+    POLLING_INTERVAL: 10000, // 10 secondes pour détecter les unfollows
 });
 
 /**
