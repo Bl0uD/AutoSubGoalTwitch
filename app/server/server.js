@@ -416,6 +416,9 @@ app.post('/api/start-device-auth', async (req, res) => {
     try {
         const data = await twitchApiService.initiateDeviceCodeFlow();
         if (data) {
+            // Démarrer le polling automatique côté serveur
+            startDeviceCodePolling();
+            
             res.json({
                 success: true,
                 user_code: data.user_code,
@@ -429,6 +432,71 @@ app.post('/api/start-device-auth', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// Polling du device code (appelé par le dashboard)
+app.post('/api/poll-device-auth', async (req, res) => {
+    try {
+        const success = await twitchApiService.pollDeviceCode();
+        if (success) {
+            // Authentification réussie - démarrer EventSub et Polling
+            await eventSubService.connect();
+            pollingService.start();
+            
+            res.json({
+                success: true,
+                authenticated: true,
+                ...twitchApiService.getConnectionInfo()
+            });
+        } else {
+            res.json({ success: false, pending: true });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Variable pour le polling automatique du device code
+let deviceCodePollingInterval = null;
+
+function startDeviceCodePolling() {
+    // Arrêter tout polling précédent
+    if (deviceCodePollingInterval) {
+        clearInterval(deviceCodePollingInterval);
+    }
+    
+    // Polling toutes les 5 secondes pendant 5 minutes max
+    let attempts = 0;
+    const maxAttempts = 60; // 5 min / 5 sec = 60 tentatives
+    
+    deviceCodePollingInterval = setInterval(async () => {
+        attempts++;
+        
+        if (attempts > maxAttempts) {
+            clearInterval(deviceCodePollingInterval);
+            deviceCodePollingInterval = null;
+            logEvent('WARN', '⏰ Device code expiré (timeout)');
+            return;
+        }
+        
+        try {
+            const success = await twitchApiService.pollDeviceCode();
+            if (success) {
+                clearInterval(deviceCodePollingInterval);
+                deviceCodePollingInterval = null;
+                
+                // Authentification réussie - démarrer EventSub et Polling
+                await eventSubService.connect();
+                pollingService.start();
+                
+                logEvent('INFO', '✅ Authentification Device Code réussie !');
+            }
+        } catch (error) {
+            logEvent('ERROR', '❌ Erreur polling device code', { error: error.message });
+        }
+    }, 5000);
+    
+    logEvent('INFO', '🔄 Polling device code démarré (toutes les 5s)');
+}
 
 app.get('/api/sync-twitch', async (req, res) => {
     try {
