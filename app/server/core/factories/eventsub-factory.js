@@ -315,6 +315,13 @@ function createEventSubService({ stateManager, twitchApiService, batchingService
      * @param {Object} event
      */
     function handleSubscribeEvent(event) {
+        // IMPORTANT: Ignorer les subs offerts (is_gift = true)
+        // car ils sont déjà comptés via channel.subscription.gift
+        if (event.is_gift) {
+            logEvent('DEBUG', `🎁 Sub gift ignoré (déjà compté via gift event): ${event.user_name}`);
+            return;
+        }
+        
         logEvent('INFO', `⭐ Nouveau sub: ${event.user_name} (${event.tier})`);
         batchingService.addSubToBatch(1);
     }
