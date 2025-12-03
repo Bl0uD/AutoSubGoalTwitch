@@ -343,17 +343,31 @@
                 const response = await fetch('http://localhost:8082/api/status');
                 const data = await response.json();
                 
-                document.getElementById('followCount').textContent = data.currentFollows || 0;
-                document.getElementById('subCount').textContent = data.currentSubs || 0;
+                // Nouvelle structure de données
+                const follows = data.counters?.follows ?? data.currentFollows ?? 0;
+                const subs = data.counters?.subs ?? data.currentSubs ?? 0;
                 
-                // Mettre à jour les objectifs si disponibles
-                if (data.followGoal) {
+                document.getElementById('followCount').textContent = follows;
+                document.getElementById('subCount').textContent = subs;
+                
+                // Charger les objectifs depuis /api/stats
+                const statsResponse = await fetch('http://localhost:8082/api/stats');
+                const stats = await statsResponse.json();
+                
+                if (stats.followGoal) {
+                    const fg = stats.followGoal;
                     document.getElementById('followGoal').textContent = 
-                        data.followGoal.current + '/' + data.followGoal.target + ' - ' + data.followGoal.message;
+                        `${fg.current}/${fg.target} - ${fg.message || ''}`;
+                } else {
+                    document.getElementById('followGoal').textContent = `${follows} follows`;
                 }
-                if (data.subGoal) {
+                
+                if (stats.subGoal) {
+                    const sg = stats.subGoal;
                     document.getElementById('subGoal').textContent = 
-                        data.subGoal.current + '/' + data.subGoal.target + ' - ' + data.subGoal.message;
+                        `${sg.current}/${sg.target} - ${sg.message || ''}`;
+                } else {
+                    document.getElementById('subGoal').textContent = `${subs} subs`;
                 }
             } catch (error) {
                 console.error('Erreur chargement stats:', error);

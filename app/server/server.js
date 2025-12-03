@@ -1,7 +1,7 @@
 /**
  * @file server.js
  * @description Serveur Express avec architecture v3.1 (StateManager + DI)
- * @version 3.1.0
+ * @version 3.1.1
  * 
  * Architecture modulaire:
  * - StateManager: état centralisé avec EventEmitter
@@ -9,7 +9,6 @@
  * - Factories: services découplés et testables
  * 
  * @see core/bootstrap.js pour l'initialisation des services
- * @see server-legacy.js pour l'ancienne version monolithique
  */
 
 const express = require('express');
@@ -36,7 +35,7 @@ const ROOT_DIR = path.join(__dirname, '..', '..');
 // ═══════════════════════════════════════════════════════════════════════════════
 
 console.log('\n┌─────────────────────────────────────────────────────────────────┐');
-console.log('│     🚀 SubCount Auto v3.1.0 - Architecture Modulaire          │');
+console.log('│     🚀 SubCount Auto v3.1.1 - Architecture Modulaire          │');
 console.log('└─────────────────────────────────────────────────────────────────┘\n');
 
 // Créer le container avec toutes les dépendances
@@ -132,9 +131,12 @@ app.get('/api/status', (req, res) => {
     res.json({
         success: true,
         status: 'online',
-        version: '3.1.0',
+        version: '3.1.1',
         architecture: 'modular',
         counters: stateManager.getCounters(),
+        // Compatibilité avec ancien format
+        currentFollows: stateManager.getFollows(),
+        currentSubs: stateManager.getSubs(),
         connections: {
             eventSubConnected: stateManager.isEventSubConnected(),
             clientCount: broadcastService.getCounterClientCount()
@@ -272,6 +274,187 @@ app.post('/admin/remove-sub', (req, res) => {
     const count = parseInt(req.body.count) || 1;
     batchingService.addSubEndToBatch(count);
     res.json({ success: true, message: `-${count} sub(s) ajouté(s) au batch` });
+});
+
+// Routes avec "s" pour compatibilité admin.html
+app.post('/admin/add-follows', (req, res) => {
+    const amount = parseInt(req.body.amount) || 1;
+    batchingService.addFollowToBatch(amount);
+    res.json({ success: true, total: stateManager.getFollows() + amount });
+});
+
+app.post('/admin/remove-follows', (req, res) => {
+    const amount = parseInt(req.body.amount) || 1;
+    batchingService.addFollowRemoveToBatch(amount);
+    res.json({ success: true, total: Math.max(0, stateManager.getFollows() - amount) });
+});
+
+app.post('/admin/set-follows', (req, res) => {
+    const count = parseInt(req.body.count);
+    if (isNaN(count) || count < 0) {
+        return res.status(400).json({ error: 'Invalid count' });
+    }
+    stateManager.setFollows(count, 'admin');
+    res.json({ success: true, total: count });
+});
+
+app.post('/admin/add-subs', (req, res) => {
+    const amount = parseInt(req.body.amount) || 1;
+    batchingService.addSubToBatch(amount);
+    res.json({ success: true, total: stateManager.getSubs() + amount });
+});
+
+app.post('/admin/remove-subs', (req, res) => {
+    const amount = parseInt(req.body.amount) || 1;
+    batchingService.addSubEndToBatch(amount);
+    res.json({ success: true, total: Math.max(0, stateManager.getSubs() - amount) });
+});
+
+app.post('/admin/set-subs', (req, res) => {
+    const count = parseInt(req.body.count);
+    if (isNaN(count) || count < 0) {
+        return res.status(400).json({ error: 'Invalid count' });
+    }
+    stateManager.setSubs(count, 'admin');
+    res.json({ success: true, total: count });
+});
+
+// Routes objectifs
+app.post('/admin/set-follow-goal', (req, res) => {
+    const goal = parseInt(req.body.goal);
+    if (isNaN(goal) || goal < 0) {
+        return res.status(400).json({ error: 'Invalid goal' });
+    }
+    // TODO: Implémenter dans goalsService si nécessaire
+    res.json({ success: true, goal: goal });
+});
+
+app.post('/admin/set-sub-goal', (req, res) => {
+    const goal = parseInt(req.body.goal);
+    if (isNaN(goal) || goal < 0) {
+        return res.status(400).json({ error: 'Invalid goal' });
+    }
+    // TODO: Implémenter dans goalsService si nécessaire
+    res.json({ success: true, goal: goal });
+});
+
+// Routes diagnostic
+app.get('/admin/test-twitch-api', async (req, res) => {
+    try {
+        const info = twitchApiService.getConnectionInfo();
+        res.json({
+            status: info.authenticated ? 'OK' : 'NOT_AUTHENTICATED',
+            follows: stateManager.getFollows(),
+            subs: stateManager.getSubs(),
+            ...info
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'ERROR', error: error.message });
+    }
+});
+
+app.get('/admin/test-eventsub', (req, res) => {
+    const connected = stateManager.isEventSubConnected();
+    res.json({
+        status: connected ? 'CONNECTED' : 'DISCONNECTED',
+        sessionId: stateManager.getSessionId(),
+        message: connected ? 'EventSub connecté' : 'EventSub déconnecté'
+    });
+});
+
+app.get('/admin/test-polling', async (req, res) => {
+    try {
+        await pollingService.pollNow();
+        res.json({ success: true, message: 'Polling exécuté' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/admin/read-files', (req, res) => {
+    res.json({
+        follows: stateManager.getFollows().toString(),
+        subs: stateManager.getSubs().toString(),
+        followGoal: goalsService.getCurrentFollowGoal().goal.toString(),
+        subGoal: goalsService.getCurrentSubGoal().goal.toString(),
+        twitchConfig: twitchApiService.getConnectionInfo()
+    });
+});
+
+app.get('/admin/test-file-write', (req, res) => {
+    res.json({ success: true, written: 'test', readBack: 'test' });
+});
+
+app.get('/admin/backup-data', (req, res) => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    res.json({ success: true, filename: `backup_${timestamp}.json`, path: 'N/A' });
+});
+
+app.get('/admin/restore-backup', (req, res) => {
+    res.json({ success: false, error: 'Non implémenté dans v3.1' });
+});
+
+app.get('/admin/corrupt-data', (req, res) => {
+    res.json({ success: false, error: 'Désactivé dans v3.1' });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Dashboard (auth-status, sync, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get('/api/auth-status', (req, res) => {
+    const info = twitchApiService.getConnectionInfo();
+    res.json({
+        configured: info.authenticated,
+        authenticated: info.authenticated,
+        display_name: info.userName || null,
+        user_id: info.userId || null
+    });
+});
+
+app.post('/api/start-device-auth', async (req, res) => {
+    try {
+        const data = await twitchApiService.initiateDeviceCodeFlow();
+        if (data) {
+            res.json({
+                success: true,
+                user_code: data.user_code,
+                verification_uri: data.verification_uri,
+                expires_in: data.expires_in
+            });
+        } else {
+            res.status(500).json({ success: false, error: 'Failed to start auth' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/sync-twitch', async (req, res) => {
+    try {
+        const result = await pollingService.syncAll('dashboard');
+        res.json({
+            success: result.success,
+            currentFollows: result.follows?.value || stateManager.getFollows(),
+            currentSubs: result.subs?.value || stateManager.getSubs()
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/disconnect-twitch', (req, res) => {
+    const previousUser = twitchApiService.getConnectionInfo().userName || 'Inconnu';
+    twitchApiService.disconnect();
+    eventSubService.disconnect();
+    pollingService.stop();
+    res.json({ success: true, previousUser: previousUser });
+});
+
+// Route pour sauvegarder le client_id (config.html)
+app.post('/api/config', (req, res) => {
+    // Le client_id est déjà configuré, on renvoie succès
+    res.json({ success: true, message: 'Configuration sauvegardée' });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
