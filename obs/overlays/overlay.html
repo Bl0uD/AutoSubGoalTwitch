@@ -120,7 +120,7 @@
     </style>
 </head>
 <body>
-    <div class="counter" id="counter">Chargement...</div>
+    <div class="counter" id="counter"></div>
 
     <script>
         // ==================================================================
@@ -153,17 +153,97 @@
         );
         
         // ==================================================================
+        // 🚀 SYSTÈME DE DÉMARRAGE ROBUSTE
+        // ==================================================================
+        
+        let isServerReady = false;
+        let isDataLoaded = false;
+        let startupRetryCount = 0;
+        const MAX_STARTUP_RETRIES = 60; // 60 tentatives = 1 minute max
+        const STARTUP_RETRY_DELAY = 1000; // 1 seconde entre les tentatives
+        
+        async function waitForServer() {
+            console.log('⏳ Attente du serveur...');
+            
+            while (!isServerReady && startupRetryCount < MAX_STARTUP_RETRIES) {
+                startupRetryCount++;
+                try {
+                    const response = await fetch('http://localhost:8082/api/status', {
+                        method: 'GET',
+                        cache: 'no-store'
+                    });
+                    if (response.ok) {
+                        isServerReady = true;
+                        console.log(`✅ Serveur prêt après ${startupRetryCount} tentative(s)`);
+                        return true;
+                    }
+                } catch (error) {
+                    console.log(`⏳ Tentative ${startupRetryCount}/${MAX_STARTUP_RETRIES}...`);
+                }
+                await new Promise(resolve => setTimeout(resolve, STARTUP_RETRY_DELAY));
+            }
+            
+            if (!isServerReady) {
+                console.error('❌ Serveur non disponible après 60 tentatives');
+            }
+            return isServerReady;
+        }
+        
+        async function initializeOverlay() {
+            // 1. Attendre que le serveur soit prêt
+            const serverReady = await waitForServer();
+            if (!serverReady) {
+                // Retry indéfiniment en arrière-plan
+                setTimeout(initializeOverlay, 5000);
+                return;
+            }
+            
+            // 2. Charger la config initiale
+            await loadInitialConfig();
+            
+            // 3. Connecter les WebSockets
+            connectConfigWebSocket();
+            connectWebSocket();
+            
+            // 4. Charger les données initiales avec retry
+            await fetchCurrentDataWithRetry();
+            
+            // 5. Recalcul forcé après stabilisation
+            setTimeout(forceRecalculateDisplay, 2000);
+        }
+        
+        async function fetchCurrentDataWithRetry(maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const success = await fetchCurrentData();
+                    if (success) {
+                        isDataLoaded = true;
+                        return true;
+                    }
+                } catch (error) {
+                    console.log(`⏳ Retry données ${i + 1}/${maxRetries}...`);
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            return false;
+        }
+        
+        // ==================================================================
         // 🎨 CONNEXION WEBSOCKET POUR CONFIGURATION DYNAMIQUE
         // ==================================================================
         
         let configWs = null;
+        let configWsReconnectDelay = 1000;
         
         function connectConfigWebSocket() {
+            if (!isServerReady) return;
+            
             try {
                 configWs = new WebSocket('ws://localhost:8084');
                 
                 configWs.onopen = () => {
                     console.log('✅ Config WebSocket connecté (port 8084)');
+                    configWsReconnectDelay = 1000; // Reset delay on success
                 };
                 
                 configWs.onmessage = (event) => {
@@ -183,12 +263,13 @@
                 };
                 
                 configWs.onclose = () => {
-                    console.log('🔌 Config WebSocket déconnecté, reconnexion dans 5s...');
-                    setTimeout(connectConfigWebSocket, 5000);
+                    console.log(`🔌 Config WebSocket déconnecté, reconnexion dans ${configWsReconnectDelay/1000}s...`);
+                    setTimeout(connectConfigWebSocket, configWsReconnectDelay);
+                    configWsReconnectDelay = Math.min(configWsReconnectDelay * 1.5, 10000);
                 };
             } catch (error) {
                 console.error('❌ Erreur connexion Config WebSocket:', error);
-                setTimeout(connectConfigWebSocket, 5000);
+                setTimeout(connectConfigWebSocket, configWsReconnectDelay);
             }
         }
         
@@ -228,27 +309,27 @@
         
         async function loadInitialConfig() {
             try {
-                const response = await fetch('http://localhost:8082/api/overlay-config');
+                const response = await fetch('http://localhost:8082/api/overlay-config', {
+                    cache: 'no-store'
+                });
                 if (response.ok) {
                     const config = await response.json();
                     console.log('🎨 Configuration initiale chargée:', config);
                     applyConfig(config);
+                    return true;
                 }
             } catch (error) {
                 console.error('❌ Erreur chargement config initiale:', error);
             }
+            return false;
         }
-        
-        loadInitialConfig();
-        connectConfigWebSocket();
         
         // ==================================================================
         // 📊 WEBSOCKET COMPTEUR ET ANIMATIONS
         // ==================================================================
         
         let ws;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 10;
+        let wsReconnectDelay = 1000;
         const counterEl = document.getElementById("counter");
         let currentText = "";
         let previousCount = null;
@@ -414,12 +495,15 @@
         }
 
         function connectWebSocket() {
+            if (!isServerReady) return;
+            
             try {
                 ws = new WebSocket('ws://localhost:8083');
 
                 ws.onopen = () => {
                     console.log('✅ Connecté au WebSocket (compteur)');
-                    reconnectAttempts = 0;
+                    wsReconnectDelay = 1000; // Reset delay on success
+                    // Recharger les données à chaque reconnexion
                     fetchCurrentData();
                 };
 
@@ -443,26 +527,33 @@
                 };
 
                 ws.onclose = () => {
-                    console.log('🔌 WebSocket compteur déconnecté, reconnexion dans 3s...');
-                    setTimeout(connectWebSocket, 3000);
+                    console.log(`🔌 WebSocket compteur déconnecté, reconnexion dans ${wsReconnectDelay/1000}s...`);
+                    setTimeout(connectWebSocket, wsReconnectDelay);
+                    wsReconnectDelay = Math.min(wsReconnectDelay * 1.5, 10000);
                 };
             } catch (error) {
                 console.error('❌ Erreur connexion WebSocket:', error);
-                setTimeout(connectWebSocket, 3000);
+                setTimeout(connectWebSocket, wsReconnectDelay);
             }
         }
         
         async function fetchCurrentData() {
             try {
                 const cacheBuster = Date.now();
-                const response = await fetch(`http://localhost:8082${CONFIG.apiEndpoint}?_=${cacheBuster}`);
+                const response = await fetch(`http://localhost:8082${CONFIG.apiEndpoint}?_=${cacheBuster}`, {
+                    cache: 'no-store'
+                });
                 if (response.ok) {
                     const data = await response.json();
-                    updateGoal(data.goal);
+                    if (data.goal) {
+                        updateGoal(data.goal);
+                        return true;
+                    }
                 }
             } catch (error) {
                 console.error(`❌ Erreur récupération données ${CONFIG.type} goal:`, error);
             }
+            return false;
         }
         
         function updateGoal(goal, batchInfo = {}) {
@@ -567,6 +658,7 @@
         }
 
         function forceRecalculateDisplay() {
+            if (!currentText) return; // Ne rien faire si pas encore de données
             console.log('🔧 Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
             currentText = "";
@@ -575,13 +667,19 @@
             updateCounter(currentDisplayText);
         }
         
-        // Initialisation
-        connectWebSocket();
-        setTimeout(fetchCurrentData, 1000);
-        setTimeout(() => {
-            console.log('🔄 Refresh complet - recalcul des dimensions...');
-            forceRecalculateDisplay();
-        }, 15000);
+        // ==================================================================
+        // 🚀 INITIALISATION - Attendre que le serveur soit prêt
+        // ==================================================================
+        
+        // Démarrer l'initialisation robuste
+        initializeOverlay();
+        
+        // Refresh périodique de sécurité (toutes les 30 secondes)
+        setInterval(() => {
+            if (isDataLoaded && currentGoal) {
+                fetchCurrentData();
+            }
+        }, 30000);
     </script>
 </body>
 </html>
