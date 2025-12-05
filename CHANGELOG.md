@@ -28,6 +28,8 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### 🐛 Corrections
 - **Fix mode session** : Le polling ne reset plus le compteur en mode session
+  - **Subs** : `syncSubsOnly()` ignoré en mode session
+  - **Follows** : `syncFollowsOnly()` également ignoré (toutes les 10s)
 - **Fix persistance config** : Police et couleur sont maintenant toutes deux restaurées
 - **Fix EventSub** : `channel.subscription.end` ignoré en mode session
 

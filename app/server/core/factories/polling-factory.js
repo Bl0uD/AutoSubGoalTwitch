@@ -143,11 +143,17 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     
     /**
      * Synchronise uniquement les follows (appelé toutes les 10s)
+     * En mode SESSION, on ne synchronise PAS pour éviter que le compteur ne descende
      * @param {string} source
      * @returns {Promise<Object>}
      */
     async function syncFollowsOnly(source = 'polling') {
         if (!twitchApiService.isAuthenticated()) return { success: false };
+        
+        // En mode session, on ne synchronise pas les follows (on garde les gains)
+        if (stateManager.isSessionMode()) {
+            return { success: true, skipped: true, reason: 'session_mode' };
+        }
         
         const result = await twitchApiService.syncFollows(source);
         if (result.diff !== 0) {

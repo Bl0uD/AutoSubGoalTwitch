@@ -215,8 +215,8 @@ app.get('/api/sub-counter-mode', (req, res) => {
         success: true,
         mode: stateManager.getSubCounterMode(),
         description: stateManager.isSessionMode() 
-            ? 'Mode Session: Les subs ne diminuent pas pendant le stream' 
-            : 'Mode Temps Réel: Les subs augmentent et diminuent en temps réel'
+            ? 'Mode Session: Les compteurs ne diminuent jamais (follows + subs)' 
+            : 'Mode Temps Réel: Les compteurs se synchronisent avec Twitch'
     });
 });
 
@@ -235,15 +235,15 @@ app.post('/api/sub-counter-mode', (req, res) => {
     
     const success = stateManager.setSubCounterMode(mode);
     
-    logEvent('INFO', `⚙️ Mode compteur subs changé: ${mode}`);
+    logEvent('INFO', `⚙️ Mode compteur changé: ${mode}`);
     
     res.json({
         success: true,
         mode: stateManager.getSubCounterMode(),
         changed: success,
         description: stateManager.isSessionMode() 
-            ? 'Mode Session: Les subs ne diminuent pas pendant le stream' 
-            : 'Mode Temps Réel: Les subs augmentent et diminuent en temps réel'
+            ? 'Mode Session: Les compteurs ne diminuent jamais (follows + subs)' 
+            : 'Mode Temps Réel: Les compteurs se synchronisent avec Twitch'
     });
 });
 
