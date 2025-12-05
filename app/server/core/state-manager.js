@@ -683,7 +683,7 @@ class StateManager extends EventEmitter {
             overlay: { ...this.#state.overlay },
             settings: { ...this.#state.settings },
             version: {
-                current: '3.1.0',
+                current: '3.1.1',
                 releaseDate: new Date().toISOString().split('T')[0]
             }
         };
