@@ -7,6 +7,37 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.1.1] - 2025-12-05
+
+### ✨ Nouvelles fonctionnalités
+- **Mode compteur sub switchable** : Choix entre mode "Temps réel" et "Session"
+  - **Temps réel** : Synchronise avec Twitch (comportement par défaut)
+  - **Session** : Compte uniquement les subs reçus depuis le lancement d'OBS
+- **Sélecteur de mode dans dashboard** : Interface carte intuitive avec état visuel
+- **Sélecteur de mode dans OBS** : Dropdown dans les propriétés du script
+- **Persistance du mode** : Le mode choisi est sauvegardé et restauré
+
+### ⚡ Optimisations
+- **Auto-refresh overlays OBS** : Les overlays s'affichent automatiquement au démarrage
+  - Timer OBS natif pour refresh fiable après démarrage serveur
+  - Application automatique de la config sauvegardée (police, couleur)
+- **Overlay simplifié** : Suppression des mécanismes de reload redondants
+  - Code réduit de ~100 lignes
+  - Temps d'attente serveur réduit (30s max au lieu de 2min)
+- **Config overlay unifiée** : Police ET couleur envoyées en une seule requête
+
+### 🐛 Corrections
+- **Fix mode session** : Le polling ne reset plus le compteur en mode session
+- **Fix persistance config** : Police et couleur sont maintenant toutes deux restaurées
+- **Fix EventSub** : `channel.subscription.end` ignoré en mode session
+
+### 🧹 Nettoyage
+- **Suppression page /config** : Interface redondante avec le dashboard
+- **Suppression script_tick** : Remplacé par timer OBS plus fiable
+- **Suppression auto-reload overlay** : Géré côté Python maintenant
+
+---
+
 ## [3.1.0] - 2025-12-03
 
 ### ✨ Nouvelles fonctionnalités

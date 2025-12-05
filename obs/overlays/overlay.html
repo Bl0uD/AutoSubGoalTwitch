@@ -120,7 +120,7 @@
     </style>
 </head>
 <body>
-    <div class="counter" id="counter"></div>
+    <div class="counter" id="counter">...</div>
 
     <script>
         // ==================================================================
@@ -153,13 +153,16 @@
         );
         
         // ==================================================================
-        // 🚀 SYSTÈME DE DÉMARRAGE ROBUSTE
+        // 🚀 SYSTÈME DE DÉMARRAGE SIMPLIFIÉ
+        // ==================================================================
+        // Le script Python OBS gère le refresh des sources navigateur.
+        // L'overlay doit juste attendre le serveur et charger les données.
         // ==================================================================
         
         let isServerReady = false;
         let isDataLoaded = false;
         let startupRetryCount = 0;
-        const MAX_STARTUP_RETRIES = 60; // 60 tentatives = 1 minute max
+        const MAX_STARTUP_RETRIES = 30; // 30 tentatives = 30 secondes max
         const STARTUP_RETRY_DELAY = 1000; // 1 seconde entre les tentatives
         
         async function waitForServer() {
@@ -178,25 +181,33 @@
                         return true;
                     }
                 } catch (error) {
-                    console.log(`⏳ Tentative ${startupRetryCount}/${MAX_STARTUP_RETRIES}...`);
+                    if (startupRetryCount % 5 === 0) {
+                        console.log(`⏳ Tentative ${startupRetryCount}/${MAX_STARTUP_RETRIES}...`);
+                    }
                 }
                 await new Promise(resolve => setTimeout(resolve, STARTUP_RETRY_DELAY));
             }
             
             if (!isServerReady) {
-                console.error('❌ Serveur non disponible après 60 tentatives');
+                console.error('❌ Serveur non disponible après 30 tentatives');
             }
             return isServerReady;
         }
         
         async function initializeOverlay() {
+            console.log('🚀 Initialisation de l\'overlay...');
+            counterEl.textContent = '...';
+            
             // 1. Attendre que le serveur soit prêt
             const serverReady = await waitForServer();
             if (!serverReady) {
-                // Retry indéfiniment en arrière-plan
+                counterEl.textContent = '...';
+                // Réessayer dans 5 secondes
                 setTimeout(initializeOverlay, 5000);
                 return;
             }
+            
+            console.log('✅ Serveur prêt, chargement des données...');
             
             // 2. Charger la config initiale
             await loadInitialConfig();
@@ -205,14 +216,58 @@
             connectConfigWebSocket();
             connectWebSocket();
             
-            // 4. Charger les données initiales avec retry
-            await fetchCurrentDataWithRetry();
+            // 4. Attendre les données via WebSocket
+            await waitForInitialData(2000);
             
-            // 5. Recalcul forcé après stabilisation
-            setTimeout(forceRecalculateDisplay, 2000);
+            // 5. Si pas de données, fetch direct
+            if (!currentText || currentText === '...' || currentText === '') {
+                console.log('⚠️ Données non reçues via WS, fetch direct...');
+                await fetchAndDisplayDirect();
+            }
+            
+            // 6. Recalcul après stabilisation
+            setTimeout(forceRecalculateDisplay, 500);
+            
+            console.log('✅ Overlay initialisé:', currentText);
         }
         
-        async function fetchCurrentDataWithRetry(maxRetries = 5) {
+        async function fetchAndDisplayDirect() {
+            try {
+                const response = await fetch(`http://localhost:8082${CONFIG.apiEndpoint}?_=${Date.now()}`, {
+                    cache: 'no-store'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('📥 Données reçues:', data);
+                    if (data.goal) {
+                        currentGoal = data.goal;
+                        previousCount = data.goal.current;
+                        displayGoalText(data.goal);
+                        isDataLoaded = true;
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Erreur fetch:', error);
+            }
+        }
+        
+        async function waitForInitialData(timeout = 2000) {
+            const startTime = Date.now();
+            while (!isDataLoaded && (Date.now() - startTime) < timeout) {
+                if (currentText && currentText !== '...' && currentText !== '') {
+                    isDataLoaded = true;
+                    return true;
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (!isDataLoaded) {
+                await fetchCurrentDataWithRetry(3);
+            }
+            return isDataLoaded;
+        }
+        
+        async function fetchCurrentDataWithRetry(maxRetries = 3) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const success = await fetchCurrentData();
@@ -221,9 +276,9 @@
                         return true;
                     }
                 } catch (error) {
-                    console.log(`⏳ Retry données ${i + 1}/${maxRetries}...`);
+                    console.log(`⏳ Retry ${i + 1}/${maxRetries}...`);
                 }
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             return false;
         }
@@ -503,8 +558,18 @@
                 ws.onopen = () => {
                     console.log('✅ Connecté au WebSocket (compteur)');
                     wsReconnectDelay = 1000; // Reset delay on success
-                    // Recharger les données à chaque reconnexion
-                    fetchCurrentData();
+                    // Le serveur envoie automatiquement les données initiales à la connexion
+                    // Backup: si pas reçu après 500ms, fetch via API
+                    setTimeout(() => {
+                        if (!isDataLoaded) {
+                            console.log('⏳ Données initiales non reçues, fetch via API...');
+                            fetchCurrentData().then(success => {
+                                if (success) {
+                                    isDataLoaded = true;
+                                }
+                            });
+                        }
+                    }, 500);
                 };
 
                 ws.onmessage = (event) => {
@@ -512,10 +577,19 @@
                         const data = JSON.parse(event.data);
                         // Filtrer selon le type d'overlay configuré
                         if (data.type === CONFIG.wsEventType && data.goal) {
-                            updateGoal(data.goal, {
-                                batchCount: data.batchCount || 1,
-                                isBatch: data.isBatch || false
-                            });
+                            // Si c'est un message initial, ne pas animer
+                            if (data.isInitial) {
+                                console.log('📥 Données initiales reçues via WebSocket');
+                                currentGoal = data.goal;
+                                previousCount = data.goal.current;
+                                displayGoalText(data.goal);
+                                isDataLoaded = true;
+                            } else {
+                                updateGoal(data.goal, {
+                                    batchCount: data.batchCount || 1,
+                                    isBatch: data.isBatch || false
+                                });
+                            }
                         }
                     } catch (error) {
                         console.error('❌ Erreur parsing message:', error);
@@ -528,6 +602,8 @@
 
                 ws.onclose = () => {
                     console.log(`🔌 WebSocket compteur déconnecté, reconnexion dans ${wsReconnectDelay/1000}s...`);
+                    // Reset isDataLoaded pour forcer un rechargement à la reconnexion
+                    isDataLoaded = false;
                     setTimeout(connectWebSocket, wsReconnectDelay);
                     wsReconnectDelay = Math.min(wsReconnectDelay * 1.5, 10000);
                 };
@@ -680,7 +756,12 @@
         }
 
         function forceRecalculateDisplay() {
-            if (!currentText) return; // Ne rien faire si pas encore de données
+            if (!currentText || currentText === '...' || currentText === 'Chargement...') {
+                // Si pas de texte, essayer de recharger
+                console.log('⚠️ Pas de texte, rechargement...');
+                fetchAndDisplayDirect();
+                return;
+            }
             console.log('🔧 Recalcul forcé des dimensions avec la police actuelle');
             const currentDisplayText = currentText;
             currentText = "";
@@ -690,11 +771,47 @@
         }
         
         // ==================================================================
+        // 🔄 VÉRIFICATION PÉRIODIQUE - S'assurer que l'overlay a des données
+        // ==================================================================
+        
+        let healthCheckInterval = null;
+        let healthCheckCount = 0;
+        
+        function startHealthCheck() {
+            // Vérifier rapidement au début (toutes les 2 secondes pendant 30s)
+            // puis toutes les 10 secondes ensuite
+            const checkInterval = () => {
+                healthCheckCount++;
+                const interval = healthCheckCount < 15 ? 2000 : 10000;
+                
+                // Si pas de données valides affichées et serveur prêt
+                const needsData = !currentText || 
+                                  currentText === '...' || 
+                                  currentText === 'Chargement...' ||
+                                  currentText === 'Erreur' ||
+                                  counterEl.textContent === '...';
+                                  
+                if (needsData && isServerReady) {
+                    console.log(`⚠️ [Check ${healthCheckCount}] Overlay vide, rechargement...`);
+                    fetchAndDisplayDirect();
+                }
+                
+                setTimeout(checkInterval, interval);
+            };
+            
+            // Démarrer après 3 secondes
+            setTimeout(checkInterval, 3000);
+        }
+        
+        // ==================================================================
         // 🚀 INITIALISATION - Attendre que le serveur soit prêt
         // ==================================================================
         
         // Démarrer l'initialisation robuste
         initializeOverlay();
+        
+        // Démarrer la vérification de santé après un court délai
+        setTimeout(startHealthCheck, 5000);
         
         // Note: Plus de refresh périodique nécessaire !
         // - Le WebSocket reçoit les mises à jour en temps réel
@@ -702,4 +819,5 @@
         // - Le polling serveur synchronise toutes les 10s (follows) et 60s (subs)
     </script>
 </body>
+</html>
 </html>

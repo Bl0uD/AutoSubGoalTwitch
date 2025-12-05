@@ -343,9 +343,17 @@ function createEventSubService({ stateManager, twitchApiService, batchingService
     
     /**
      * Gère une fin de sub
+     * En mode 'session', cet événement est ignoré (pas de décrémentation pendant le stream)
+     * En mode 'realtime', le compteur est décrémenté normalement
      * @param {Object} event
      */
     function handleSubEndEvent(event) {
+        // Vérifier le mode de compteur
+        if (stateManager.isSessionMode()) {
+            logEvent('INFO', `📉 Fin sub ignorée (mode session): ${event.user_name}`);
+            return;
+        }
+        
         logEvent('INFO', `📉 Fin sub: ${event.user_name}`);
         batchingService.addSubEndToBatch(1);
     }

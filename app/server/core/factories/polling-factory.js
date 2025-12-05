@@ -158,11 +158,17 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     
     /**
      * Synchronise uniquement les subs (appelé toutes les 60s - backup EventSub)
+     * En mode SESSION, on ne synchronise PAS pour éviter de perdre les subs "gagnés"
      * @param {string} source
      * @returns {Promise<Object>}
      */
     async function syncSubsOnly(source = 'polling') {
         if (!twitchApiService.isAuthenticated()) return { success: false };
+        
+        // En mode session, on ne synchronise pas les subs (on garde les gains)
+        if (stateManager.isSessionMode()) {
+            return { success: true, skipped: true, reason: 'session_mode' };
+        }
         
         const result = await twitchApiService.syncSubs(source);
         if (result.diff !== 0) {

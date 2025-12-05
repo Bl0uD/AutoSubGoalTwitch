@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script OBS pour SubCount Auto v3.1.0
+Script OBS pour SubCount Auto v3.1.1
 Démarre automatiquement le serveur SubCount Auto avec OBS
 et le ferme proprement à la fermeture d'OBS
 Inclut le système de vérification automatique des mises à jour
@@ -13,8 +13,8 @@ Installation dans OBS :
 4. Le serveur se lancera automatiquement
 
 Auteur: Bl0uD
-Date: 02/12/2025
-Version: 3.1.0 (Architecture DI + Corrections)
+Date: 05/12/2025
+Version: 3.1.1 (Mode Session + Auto-Refresh Overlays)
 """
 
 import obspython as obs
@@ -76,7 +76,7 @@ except ImportError:
 START_SERVER_BAT = os.path.join(PROJECT_ROOT, "app", "scripts", "START_SERVER.bat")
 LOG_FILE = os.path.join(PROJECT_ROOT, "app", "logs", "obs_subcount_auto.log")
 SERVER_URL = "http://localhost:8082"
-VERSION = "v3.1.0"
+VERSION = "v3.1.1"
 
 # Variables globales
 server_process = None
@@ -86,6 +86,8 @@ update_info = None
 CACHED_FONTS = None  # Cache des polices Windows
 server_health_status = False  # Statut santé du serveur
 global_settings = None  # Settings OBS accessibles globalement
+_refresh_timer = None  # Timer pour le rafraîchissement automatique
+_refresh_attempts = 0  # Compteur de tentatives de refresh
 
 # Configuration du logging
 logging.basicConfig(
@@ -1187,6 +1189,58 @@ def apply_custom_color(props, prop):
         log_message(f"❌ Erreur application couleur: {e}", level="error")
         return False
 
+def apply_sub_counter_mode(props, prop, settings):
+    """Applique le mode de comptage des subs (callback du dropdown)"""
+    try:
+        mode = obs.obs_data_get_string(settings, "sub_counter_mode")
+        
+        if not mode:
+            return False
+        
+        log_message(f"🔄 Changement mode compteur: {mode}", level="info")
+        
+        if not REQUESTS_AVAILABLE:
+            log_message("❌ Module requests non disponible", level="error")
+            return False
+        
+        # Appeler l'API pour changer le mode
+        response = requests.post(
+            f"{SERVER_URL}/api/sub-counter-mode",
+            json={"mode": mode},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                mode_name = "Session Live" if mode == "session" else "Temps Réel"
+                log_message(f"✅ Mode compteur changé: {mode_name}", level="info")
+                return True
+            else:
+                log_message(f"❌ Erreur API: {data.get('error', 'Inconnu')}", level="error")
+        else:
+            log_message(f"❌ Erreur HTTP: {response.status_code}", level="error")
+        
+        return False
+        
+    except Exception as e:
+        log_message(f"❌ Erreur changement mode: {e}", level="error")
+        return False
+
+def get_current_sub_counter_mode():
+    """Récupère le mode de comptage actuel depuis le serveur"""
+    try:
+        if not REQUESTS_AVAILABLE:
+            return "realtime"
+        
+        response = requests.get(f"{SERVER_URL}/api/sub-counter-mode", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("mode", "realtime")
+    except:
+        pass
+    return "realtime"
+
 def reset_overlay_config(props, prop):
     """Réinitialise la configuration des overlays aux valeurs par défaut"""
     if not OVERLAY_CONFIG_AVAILABLE:
@@ -1218,8 +1272,9 @@ def script_description():
 
 def script_load(settings):
     """Appelé quand le script est chargé dans OBS"""
-    global global_settings
+    global global_settings, _refresh_attempts
     global_settings = settings  # Sauvegarder les settings pour les réappliquer plus tard
+    _refresh_attempts = 0  # Reset le compteur de tentatives
     
     # Nettoyer les logs avant de commencer
     cleanup_log_file(LOG_FILE, max_size_mb=5, keep_lines=1000)
@@ -1246,71 +1301,205 @@ def script_load(settings):
     monitor_thread = threading.Thread(target=monitor_server, daemon=True)
     monitor_thread.start()
     
-    # Appliquer la configuration overlay sauvegardée après démarrage du serveur
-    if OVERLAY_CONFIG_AVAILABLE:
-        apply_thread = threading.Thread(target=apply_saved_overlay_config, args=(settings,), daemon=True)
-        apply_thread.start()
+    # La configuration overlay sera appliquée automatiquement par le timer
+    # juste avant le rafraîchissement des sources navigateur
+    
+    # Démarrer le timer OBS pour rafraîchir les sources navigateur
+    # Le timer s'exécute toutes les 3 secondes jusqu'à ce que le refresh réussisse
+    log_message("⏰ Démarrage du timer de rafraîchissement automatique (3s)", level="info")
+    obs.timer_add(try_refresh_browser_sources, 3000)
+
+
+def refresh_overlay_browser_sources():
+    """Rafraîchit toutes les sources navigateur qui contiennent overlay.html"""
+    global _refresh_attempts
+    
+    try:
+        sources = obs.obs_enum_sources()
+        if not sources:
+            log_message("⚠️ Aucune source trouvée dans OBS", level="warning")
+            return False
+        
+        refresh_count = 0
+        for source in sources:
+            source_id = obs.obs_source_get_id(source)
+            
+            # Vérifier si c'est une source navigateur
+            if source_id == "browser_source":
+                settings = obs.obs_source_get_settings(source)
+                url = obs.obs_data_get_string(settings, "url")
+                source_name = obs.obs_source_get_name(source)
+                
+                # Si l'URL contient overlay.html, rafraîchir
+                if url and "overlay.html" in url:
+                    log_message(f"🔄 Rafraîchissement source: {source_name}", level="info")
+                    
+                    # Méthode plus agressive: Changer temporairement l'URL puis la remettre
+                    # Cela force OBS à recharger complètement la page
+                    temp_url = url + ("&" if "?" in url else "?") + f"_refresh={int(time.time())}"
+                    obs.obs_data_set_string(settings, "url", temp_url)
+                    obs.obs_source_update(source, settings)
+                    
+                    # Remettre l'URL originale après un court délai (via le timer)
+                    # Pour l'instant, on garde l'URL avec le paramètre de cache-bust
+                    
+                    # Méthode alternative: proc_handler refresh
+                    proc_handler = obs.obs_source_get_proc_handler(source)
+                    if proc_handler:
+                        call_data = obs.calldata_create()
+                        obs.proc_handler_call(proc_handler, "refresh", call_data)
+                        obs.calldata_destroy(call_data)
+                    
+                    refresh_count += 1
+                
+                obs.obs_data_release(settings)
+        
+        obs.source_list_release(sources)
+        
+        if refresh_count > 0:
+            log_message(f"✅ {refresh_count} source(s) navigateur rafraîchie(s)", level="info")
+            _refresh_attempts = 0  # Reset le compteur après succès
+            return True
+        else:
+            log_message("⚠️ Aucune source overlay.html trouvée à rafraîchir", level="warning")
+            return False
+        
+    except Exception as e:
+        log_message(f"⚠️ Erreur rafraîchissement sources: {e}", level="warning")
+        return False
+
+
+def try_refresh_browser_sources(user_data=None):
+    """Callback du timer OBS pour tenter de rafraîchir les sources navigateur"""
+    global _refresh_timer, _refresh_attempts
+    
+    _refresh_attempts += 1
+    log_message(f"🔄 Tentative de rafraîchissement #{_refresh_attempts}", level="info")
+    
+    # Vérifier si le serveur est prêt
+    if not is_server_running:
+        log_message("⏳ Serveur pas encore démarré, nouvelle tentative dans 3s...", level="info")
+        if _refresh_attempts < 20:  # Max 20 tentatives (1 minute)
+            return  # Le timer va se répéter
+        else:
+            obs.timer_remove(try_refresh_browser_sources)
+            return
+    
+    # Vérifier si le serveur est healthy
+    if not is_server_healthy():
+        log_message("⏳ Serveur pas encore prêt (health check échoué), nouvelle tentative...", level="info")
+        if _refresh_attempts < 20:
+            return
+        else:
+            obs.timer_remove(try_refresh_browser_sources)
+            return
+    
+    # Serveur prêt, attendre encore un peu pour la stabilité
+    if _refresh_attempts < 3:  # Attendre au moins 9 secondes (3 tentatives x 3s)
+        log_message("⏳ Serveur prêt, stabilisation...", level="info")
+        return
+    
+    # À la 3ème tentative : appliquer la config sauvegardée AVANT le refresh
+    if _refresh_attempts == 3 and OVERLAY_CONFIG_AVAILABLE and global_settings:
+        log_message("🎨 Application de la configuration overlay sauvegardée...", level="info")
+        try:
+            apply_saved_overlay_config(global_settings)
+            # Attendre un peu que la config soit envoyée aux overlays via WebSocket
+            import time
+            time.sleep(0.5)
+        except Exception as e:
+            log_message(f"⚠️ Erreur application config: {e}", level="warning")
+    
+    # Rafraîchir les sources
+    success = refresh_overlay_browser_sources()
+    
+    if success:
+        log_message("✅ Rafraîchissement des overlays réussi!", level="info")
+        obs.timer_remove(try_refresh_browser_sources)
+    elif _refresh_attempts >= 20:
+        log_message("⚠️ Abandon du rafraîchissement après 20 tentatives", level="warning")
+        obs.timer_remove(try_refresh_browser_sources)
 
 
 def apply_saved_overlay_config(settings):
-    """Applique la configuration overlay sauvegardée après le démarrage du serveur"""
-    import time
+    """Applique la configuration overlay sauvegardée après le démarrage du serveur - EN UNE SEULE REQUÊTE"""
     
-    # Attendre que le serveur soit prêt (max 15 secondes)
-    for _ in range(30):
-        time.sleep(0.5)
-        if is_server_running and is_server_healthy():
-            break
-    else:
-        log_message("⚠️ Serveur non prêt, impossible d'appliquer la config sauvegardée", level="warning")
-        return
-    
-    # Attendre un peu plus pour que le serveur soit vraiment stable
-    time.sleep(1)
+    if not OVERLAY_CONFIG_AVAILABLE:
+        log_message("⚠️ Module overlay_config non disponible", level="warning")
+        return False
     
     try:
-        # Récupérer les valeurs sauvegardées
+        # Récupérer TOUTES les valeurs sauvegardées
         font_family = obs.obs_data_get_string(settings, "overlay_font")
         font_size = obs.obs_data_get_int(settings, "overlay_font_size")
         text_color = obs.obs_data_get_string(settings, "overlay_text_color")
         custom_color = obs.obs_data_get_string(settings, "overlay_custom_color")
         
-        # Appliquer la police si définie
-        if font_family:
-            overlay_config.update_font(family=font_family, size=f"{font_size}px")
-            log_message(f"🔄 Config restaurée - Police: {font_family} @ {font_size}px", level="info")
+        log_message(f"📋 Config sauvegardée - Police: '{font_family}' @ {font_size}px, Couleur: '{text_color}', Custom: '{custom_color}'", level="info")
         
-        # Appliquer la couleur (priorité à la couleur personnalisée si définie)
-        if custom_color and custom_color.strip() and custom_color != "#FFFFFF":
-            overlay_config.update_colors(text=custom_color)
-            log_message(f"🔄 Config restaurée - Couleur: {custom_color}", level="info")
-        elif text_color:
+        # Préparer les mises à jour
+        font_config = None
+        colors_config = None
+        
+        # Police
+        if font_family and font_family.strip():
+            font_config = {
+                'family': font_family.strip(),
+                'size': f"{font_size}px" if font_size > 0 else "64px"
+            }
+        
+        # Couleur - priorité à la couleur personnalisée
+        if custom_color and custom_color.strip() and custom_color.upper() != "#FFFFFF":
+            colors_config = {'text': custom_color.strip()}
+        elif text_color and text_color.strip():
             final_color = COLOR_MAP.get(text_color, text_color)
-            overlay_config.update_colors(text=final_color)
-            log_message(f"🔄 Config restaurée - Couleur: {text_color}", level="info")
+            colors_config = {'text': final_color}
+        
+        # Appliquer tout en une seule requête
+        if font_config or colors_config:
+            # Vider le cache pour forcer l'envoi
+            overlay_config.clear_cache()
+            
+            # Utiliser update_full_config pour envoyer tout d'un coup
+            result = overlay_config.update_full_config(
+                font=font_config,
+                colors=colors_config
+            )
+            
+            if result:
+                log_message(f"✅ Config restaurée - Police: {font_config}, Couleurs: {colors_config}", level="info")
+                return True
+            else:
+                log_message("⚠️ Échec de l'application de la config (serveur non accessible?)", level="warning")
+                return False
+        else:
+            log_message("ℹ️ Configuration overlay par défaut (aucune personnalisation)", level="info")
+            return True
             
     except Exception as e:
         log_message(f"⚠️ Erreur restauration config: {e}", level="warning")
+        import traceback
+        log_message(f"Traceback: {traceback.format_exc()}", level="error")
+        return False
 
 def script_unload():
     """Appelé quand le script est déchargé ou OBS se ferme"""
-    global is_server_running
+    global is_server_running, _refresh_attempts
     
     log_message("🎬 Script OBS SubCount Auto déchargé", level="info")
     is_server_running = False
+    _refresh_attempts = 0
+    
+    # Supprimer le timer de rafraîchissement
+    try:
+        obs.timer_remove(try_refresh_browser_sources)
+    except:
+        pass
     
     # Arrêter le serveur
     stop_server()
     
     log_message("👋 Arrêt complet du script OBS SubCount Auto", level="info")
-
-def script_tick(seconds):
-    """Appelé à chaque frame (pour mise à jour de l'interface)"""
-    # Vérifier la santé du serveur toutes les 5 secondes
-    if int(seconds) % 5 == 0 and seconds > 0:
-        # Vérification asynchrone pour ne pas bloquer OBS
-        if is_server_running:
-            threading.Thread(target=is_server_healthy, daemon=True).start()
 
 def script_update(settings):
     """Appelé quand les paramètres changent"""
@@ -1329,6 +1518,10 @@ def script_defaults(settings):
         obs.obs_data_set_default_int(settings, "overlay_font_size", 64)
         obs.obs_data_set_default_string(settings, "overlay_text_color", "white")
         obs.obs_data_set_default_string(settings, "overlay_custom_color", "#FFFFFF")
+    
+    # Charger le mode compteur actuel depuis le serveur
+    current_mode = get_current_sub_counter_mode()
+    obs.obs_data_set_default_string(settings, "sub_counter_mode", current_mode)
 
 def script_properties():
     """Propriétés configurables du script"""
@@ -1337,7 +1530,7 @@ def script_properties():
 	# ========== SECTION TWITCH (NOUVEAU) ==========
     obs.obs_properties_add_text(
         props, "section_twitch", 
-        "────── 🟣 CONFIGURATION TWITCH 🟣 ───────", 
+        "\n─ 🟣 CONFIGURATION TWITCH 🟣 ─", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1354,7 +1547,7 @@ def script_properties():
     # ========== SECTION SERVEUR ==========
     obs.obs_properties_add_text(
         props, "section_server", 
-        "\n───────── 📡 GESTION SERVEUR 📡 ─────────", 
+        "\n─ 📡 GESTION SERVEUR 📡 ─", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1384,7 +1577,7 @@ def script_properties():
         
         obs.obs_properties_add_text(
             props, "separator_overlays", 
-            "──────🎨 CONFIGURATION OVERLAYS 🎨──────", 
+            "─ 🎨 CONFIGURATION OVERLAYS 🎨 ─", 
             obs.OBS_TEXT_INFO
         )
         
@@ -1446,7 +1639,7 @@ def script_properties():
         # Séparateur OU
         obs.obs_properties_add_text(
             props, "color_separator", 
-            "───────────────── OU ────────────────", 
+            "\n      ─ OU ─", 
             obs.OBS_TEXT_INFO
         )
         
@@ -1479,14 +1672,14 @@ def script_properties():
     # ========== CONTRÔLES RAPIDES ==========
     obs.obs_properties_add_text(
         props, "section_controls", 
-        "\n────────🕹️ CONTRÔLES RAPIDES 🕹️─────────", 
+        "\n─ 🕹️ CONTRÔLES RAPIDES 🕹️ ─", 
         obs.OBS_TEXT_INFO
     )
 
     # ========== FOLLOWS ==========
     obs.obs_properties_add_text(
         props, "section_follows", 
-        "👥  FOLLOWS", 
+        "   👥  FOLLOWS", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1503,7 +1696,7 @@ def script_properties():
     # ========== SUBS ==========
     obs.obs_properties_add_text(
         props, "section_subs", 
-        "⭐  SUBS", 
+        "   ⭐  SUBS", 
         obs.OBS_TEXT_INFO
     )
     
@@ -1517,21 +1710,37 @@ def script_properties():
         lambda props, prop: remove_sub()
     )
     
+    # ========== MODE COMPTEUR SUBS ==========
+    obs.obs_properties_add_text(
+        props, "separator_mode", 
+        "\n─ 🔄 MODE COMPTEUR 🔄 ─", 
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Dropdown pour le mode
+    mode_list = obs.obs_properties_add_list(
+        props,
+        "sub_counter_mode",
+        "  ⚙️  Mode abonnements",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    obs.obs_property_list_add_string(mode_list, "📡 Temps Réel (sync complète)", "realtime")
+    obs.obs_property_list_add_string(mode_list, "🚀 Session Live (gains seulement)", "session")
+    
+    obs.obs_property_set_modified_callback(mode_list, apply_sub_counter_mode)
+    
     # ========== INTERFACES WEB ==========
     obs.obs_properties_add_text(
         props, "separator_web", 
-        "\n─────────🌐 INTERFACES WEB 🌐──────────", 
+        "\n─ 🌐 INTERFACES WEB 🌐 ─", 
         obs.OBS_TEXT_INFO
     )
 
     obs.obs_properties_add_button(
         props, "open_dashboard", "  🏠  Dashboard", 
         lambda props, prop: open_dashboard()
-    )
-    
-    obs.obs_properties_add_button(
-        props, "open_config", "  ⚙️  Configuration", 
-        lambda props, prop: open_config()
     )
     
     obs.obs_properties_add_button(

@@ -1,7 +1,7 @@
 /**
  * @file state-manager.js
  * @description Gestionnaire d'état centralisé avec événements
- * @version 3.1.0
+ * @version 3.1.1
  * 
  * Responsabilités:
  * - Stocker l'état complet de l'application
@@ -136,6 +136,13 @@ class StateManager extends EventEmitter {
                 isInitializing: true,
                 isPollingActive: false,
                 reconnectAttempts: 0
+            },
+            
+            // Configuration du mode de comptage des subs
+            // 'realtime' = comportement actuel (incrémente ET décrémente en temps réel)
+            // 'session' = sync au démarrage, puis seulement incrémente (pas de décrémentation pendant le stream)
+            settings: {
+                subCounterMode: initial.settings?.subCounterMode || 'realtime'
             },
             
             // Tracking
@@ -306,6 +313,63 @@ class StateManager extends EventEmitter {
     
     getLastKnownSubCount() {
         return this.#state.tracking.lastKnownSubCount;
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GETTERS/SETTERS - Settings (Mode de compteur)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Récupère le mode de compteur de subs
+     * @returns {'realtime'|'session'} Mode actuel
+     */
+    getSubCounterMode() {
+        return this.#state.settings.subCounterMode;
+    }
+    
+    /**
+     * Définit le mode de compteur de subs
+     * @param {'realtime'|'session'} mode - 'realtime' ou 'session'
+     * @returns {boolean} Succès
+     */
+    setSubCounterMode(mode) {
+        if (mode !== 'realtime' && mode !== 'session') {
+            this.emit(STATE_EVENTS.ERROR, {
+                message: 'Invalid sub counter mode',
+                value: mode
+            });
+            return false;
+        }
+        
+        const oldMode = this.#state.settings.subCounterMode;
+        if (oldMode === mode) return false;
+        
+        this.#state.settings.subCounterMode = mode;
+        
+        this.emit(STATE_EVENTS.CONFIG_CHANGED, {
+            setting: 'subCounterMode',
+            oldValue: oldMode,
+            newValue: mode
+        });
+        
+        this.#schedulePersist();
+        return true;
+    }
+    
+    /**
+     * Vérifie si le mode session est actif (pas de décrémentation)
+     * @returns {boolean}
+     */
+    isSessionMode() {
+        return this.#state.settings.subCounterMode === 'session';
+    }
+    
+    /**
+     * Récupère tous les settings
+     * @returns {Object}
+     */
+    getSettings() {
+        return { ...this.#state.settings };
     }
     
     // ═══════════════════════════════════════════════════════════════════════════
@@ -617,6 +681,7 @@ class StateManager extends EventEmitter {
                 currentSubGoal: this.getCurrentSubGoal()
             },
             overlay: { ...this.#state.overlay },
+            settings: { ...this.#state.settings },
             version: {
                 current: '3.1.0',
                 releaseDate: new Date().toISOString().split('T')[0]

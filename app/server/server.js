@@ -67,11 +67,12 @@ const app = express();
 // ─────────────────────────────────────────────────────────────────────────────
 
 console.log('✅ PROTECTION ACTIVE :');
-console.log('   • CORS restreint à localhost uniquement');
+console.log('   • CORS ouvert pour sources locales (OBS)');
 console.log('   • Tokens Twitch chiffrés AES-256-GCM');
 
+// CORS permissif pour OBS Browser Source (qui peut avoir une origine null ou file://)
 app.use(cors({
-    origin: ['http://localhost:8082', 'http://127.0.0.1:8082', 'http://localhost', 'http://127.0.0.1'],
+    origin: true, // Accepte toutes les origines (nécessaire pour OBS)
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-admin-password'],
     credentials: true
@@ -117,10 +118,6 @@ app.get('/', (req, res) => {
 
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'web', 'admin.html'));
-});
-
-app.get('/config', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'web', 'config.html'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -194,6 +191,60 @@ app.post('/api/overlay-config', (req, res) => {
     const config = req.body;
     stateManager.setOverlayConfig(config);
     res.json({ success: true, config: stateManager.getOverlayConfig() });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Settings - Mode de compteur de subs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/settings - Récupérer tous les settings
+ */
+app.get('/api/settings', (req, res) => {
+    res.json({
+        success: true,
+        settings: stateManager.getSettings()
+    });
+});
+
+/**
+ * GET /api/sub-counter-mode - Récupérer le mode actuel
+ */
+app.get('/api/sub-counter-mode', (req, res) => {
+    res.json({
+        success: true,
+        mode: stateManager.getSubCounterMode(),
+        description: stateManager.isSessionMode() 
+            ? 'Mode Session: Les subs ne diminuent pas pendant le stream' 
+            : 'Mode Temps Réel: Les subs augmentent et diminuent en temps réel'
+    });
+});
+
+/**
+ * POST /api/sub-counter-mode - Changer le mode
+ * Body: { mode: 'realtime' | 'session' }
+ */
+app.post('/api/sub-counter-mode', (req, res) => {
+    const { mode } = req.body;
+    
+    if (mode !== 'realtime' && mode !== 'session') {
+        return res.status(400).json({ 
+            error: 'Mode invalide. Utilisez "realtime" ou "session"' 
+        });
+    }
+    
+    const success = stateManager.setSubCounterMode(mode);
+    
+    logEvent('INFO', `⚙️ Mode compteur subs changé: ${mode}`);
+    
+    res.json({
+        success: true,
+        mode: stateManager.getSubCounterMode(),
+        changed: success,
+        description: stateManager.isSessionMode() 
+            ? 'Mode Session: Les subs ne diminuent pas pendant le stream' 
+            : 'Mode Temps Réel: Les subs augmentent et diminuent en temps réel'
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -625,7 +676,7 @@ async function start() {
         pollingService.start();
     } else {
         logEvent('INFO', '⚙️ Configuration Twitch requise');
-        console.log('   → Ouvrez http://localhost:8082/config pour vous connecter');
+        console.log('   → Ouvrez http://localhost:8082/ pour vous connecter');
     }
     
     // 6. Démarrer le serveur HTTP
@@ -638,7 +689,6 @@ async function start() {
         console.log('\n💡 ACCÈS :');
         console.log(`   • Dashboard: http://localhost:${PORT}/`);
         console.log(`   • Admin: http://localhost:${PORT}/admin`);
-        console.log(`   • Config: http://localhost:${PORT}/config`);
         console.log('\n');
     });
     

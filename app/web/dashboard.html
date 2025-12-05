@@ -204,10 +204,196 @@
             text-decoration: underline; 
         }
         
+        /* Switch Toggle Styles - Improved */
+        .mode-switch-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .mode-card {
+            flex: 1;
+            background: rgba(42, 42, 74, 0.4);
+            padding: 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mode-card:hover {
+            background: rgba(42, 42, 74, 0.7);
+            transform: translateY(-2px);
+        }
+        
+        .mode-card.active {
+            border-color: currentColor;
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        .mode-card.realtime {
+            color: #00ff88;
+        }
+        
+        .mode-card.realtime.active {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: #00ff88;
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.3);
+        }
+        
+        .mode-card.session {
+            color: #ff6b35;
+        }
+        
+        .mode-card.session.active {
+            background: rgba(255, 107, 53, 0.1);
+            border-color: #ff6b35;
+            box-shadow: 0 0 25px rgba(255, 107, 53, 0.3);
+        }
+        
+        .mode-card .mode-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .mode-card .mode-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .mode-card .mode-desc {
+            font-size: 0.85em;
+            color: #aaa;
+            line-height: 1.4;
+        }
+        
+        .mode-card.active .mode-desc {
+            color: #ccc;
+        }
+        
+        .mode-card .check-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: currentColor;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s ease;
+        }
+        
+        .mode-card.active .check-badge {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        .mode-card .check-badge::after {
+            content: '✓';
+            color: #0e0e23;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+        
+        /* Barre de statut actuel */
+        .current-mode-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .current-mode-bar.realtime {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 255, 136, 0.05));
+            border-left: 4px solid #00ff88;
+            color: #00ff88;
+        }
+        
+        .current-mode-bar.session {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(255, 107, 53, 0.05));
+            border-left: 4px solid #ff6b35;
+            color: #ff6b35;
+        }
+        
+        .current-mode-bar .pulse {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.4s ease;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #0e0e23;
+        }
+        
+        .toast.warning {
+            background: linear-gradient(135deg, #ff6b35, #ff8560);
+            color: #fff;
+        }
+        
+        /* Ancien toggle - masqué pour compatibilité */
+        .toggle-switch {
+            display: none;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        /* Ancien slider - masqué */
+        .toggle-slider, .mode-switch, .mode-status {
+            display: none;
+        }
+        
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: 1fr; }
             .count { font-size: 2em; }
             button { padding: 12px 20px; font-size: 0.9em; }
+            .mode-selector { flex-direction: column; }
+            .mode-card { padding: 15px; }
+            .mode-card .mode-icon { font-size: 1.5em; }
         }
     </style>
 </head>
@@ -246,6 +432,40 @@
             <!-- Contenu dynamique -->
         </div>
     </div>
+    
+    <div class="card">
+        <h2>⚙️ Mode Compteur Abonnements</h2>
+        <div class="mode-switch-container">
+            <!-- Barre de statut actuel -->
+            <div class="current-mode-bar realtime" id="currentModeBar">
+                <span class="pulse"></span>
+                <span id="currentModeText">Chargement...</span>
+            </div>
+            
+            <!-- Sélecteur de mode (2 cartes cliquables) -->
+            <div class="mode-selector">
+                <div class="mode-card realtime active" id="cardRealtime" onclick="selectMode('realtime')">
+                    <span class="check-badge"></span>
+                    <div class="mode-icon">📡</div>
+                    <div class="mode-name">Temps Réel</div>
+                    <div class="mode-desc">Les abonnements augmentent et diminuent en temps réel. Vous voyez les expirations immédiatement.</div>
+                </div>
+                
+                <div class="mode-card session" id="cardSession" onclick="selectMode('session')">
+                    <span class="check-badge"></span>
+                    <div class="mode-icon">🚀</div>
+                    <div class="mode-name">Session Live</div>
+                    <div class="mode-desc">Sync au démarrage, puis uniquement des gains pendant le stream. Idéal pour le live !</div>
+                </div>
+            </div>
+            
+            <!-- Input caché pour compatibilité -->
+            <input type="checkbox" id="modeToggle" style="display: none;">
+        </div>
+    </div>
+    
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
     
     <script>
         let ws;
@@ -307,7 +527,6 @@
                             <p style="color: #aaa; margin-bottom: 20px;">Connectez-vous pour synchroniser vos compteurs en temps réel</p>
                             <div class="flex">
                                 <button onclick="startDeviceAuth()" class="primary">Se connecter</button>
-                                <a href="http://localhost:8082/config"><button>Configuration</button></a>
                             </div>
                             <div id="deviceCodeSection" style="display: none;">
                                 <div class="device-code">
@@ -466,9 +685,102 @@
             }
         }
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // GESTION DU MODE COMPTEUR
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        // Charger le mode actuel
+        async function loadSubCounterMode() {
+            try {
+                const response = await fetch('http://localhost:8082/api/sub-counter-mode');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateModeUI(data.mode);
+                }
+            } catch (error) {
+                console.error('Erreur chargement mode:', error);
+                document.getElementById('currentModeText').textContent = 'Erreur de connexion';
+            }
+        }
+        
+        // Mettre à jour l'interface selon le mode
+        function updateModeUI(mode) {
+            const toggle = document.getElementById('modeToggle');
+            const currentBar = document.getElementById('currentModeBar');
+            const currentText = document.getElementById('currentModeText');
+            const cardRealtime = document.getElementById('cardRealtime');
+            const cardSession = document.getElementById('cardSession');
+            
+            const isSession = mode === 'session';
+            
+            // Mettre à jour le toggle caché
+            toggle.checked = isSession;
+            
+            // Mettre à jour la barre de statut
+            currentBar.className = 'current-mode-bar ' + mode;
+            currentText.textContent = isSession 
+                ? 'Mode Session Live actif — Les pertes sont ignorées'
+                : 'Mode Temps Réel actif — Sync complète avec Twitch';
+            
+            // Mettre à jour les cartes
+            cardRealtime.classList.toggle('active', !isSession);
+            cardSession.classList.toggle('active', isSession);
+        }
+        
+        // Sélectionner un mode (nouvelle fonction)
+        async function selectMode(newMode) {
+            const currentBar = document.getElementById('currentModeBar');
+            const currentClass = currentBar.classList.contains('session') ? 'session' : 'realtime';
+            
+            // Ne rien faire si c'est déjà le mode actif
+            if (currentClass === newMode) return;
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/sub-counter-mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: newMode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateModeUI(data.mode);
+                    
+                    // Afficher toast
+                    const toast = document.getElementById('toast');
+                    if (data.mode === 'session') {
+                        toast.className = 'toast warning show';
+                        toast.innerHTML = '🚀 Mode Session activé !';
+                    } else {
+                        toast.className = 'toast success show';
+                        toast.innerHTML = '📡 Mode Temps Réel activé !';
+                    }
+                    
+                    // Masquer le toast après 3s
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                    }, 3000);
+                } else {
+                    alert('Erreur: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erreur de connexion: ' + error.message);
+            }
+        }
+        
+        // Ancienne fonction pour compatibilité
+        async function toggleSubCounterMode() {
+            const toggle = document.getElementById('modeToggle');
+            const newMode = toggle.checked ? 'session' : 'realtime';
+            await selectMode(newMode);
+        }
+        
         // Initialisation
         connectWebSocket();
         checkAuthStatus();
+        loadSubCounterMode();
         
         // Rafraîchir toutes les 30 secondes
         setInterval(loadStats, 30000);

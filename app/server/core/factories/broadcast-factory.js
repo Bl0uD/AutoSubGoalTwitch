@@ -98,6 +98,7 @@ function createBroadcastService({ stateManager, goalsService, logger, constants 
     
     /**
      * Envoie les données initiales à un client compteur
+     * Envoie séparément les données follow et sub pour que chaque overlay reçoive le bon type
      * @param {WebSocket} ws
      */
     function sendInitialData(ws) {
@@ -107,19 +108,28 @@ function createBroadcastService({ stateManager, goalsService, logger, constants 
         const followGoalInfo = goalsService.getCurrentFollowGoal();
         const subGoalInfo = goalsService.getCurrentSubGoal();
         
-        const data = {
-            type: 'init',
-            follows: stateManager.getFollows(),
-            subs: stateManager.getSubs(),
-            followGoal: followGoalInfo,
-            subGoal: subGoalInfo,
-            // Format attendu par overlay.html pour chaque type
-            goal: followGoalInfo.goal, // Par défaut follow, l'overlay filtrera selon son type
-            timestamp: new Date().toISOString()
-        };
-        
         try {
-            ws.send(JSON.stringify(data));
+            // Envoyer les données follow (pour les overlays type=follow)
+            ws.send(JSON.stringify({
+                type: 'follow_update',
+                follows: stateManager.getFollows(),
+                followGoal: followGoalInfo,
+                goal: followGoalInfo.goal,
+                isInitial: true,
+                timestamp: new Date().toISOString()
+            }));
+            
+            // Envoyer les données sub (pour les overlays type=sub)
+            ws.send(JSON.stringify({
+                type: 'sub_update',
+                subs: stateManager.getSubs(),
+                subGoal: subGoalInfo,
+                goal: subGoalInfo.goal,
+                isInitial: true,
+                timestamp: new Date().toISOString()
+            }));
+            
+            logEvent('INFO', '📤 Données initiales envoyées au client');
         } catch (error) {
             logEvent('ERROR', '❌ Erreur envoi données initiales', { error: error.message });
         }
