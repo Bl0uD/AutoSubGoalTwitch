@@ -365,6 +365,14 @@ class StateManager extends EventEmitter {
     }
     
     /**
+     * Récupère le mode de compteur actuel
+     * @returns {'realtime'|'session'}
+     */
+    getSubCounterMode() {
+        return this.#state.settings.subCounterMode;
+    }
+    
+    /**
      * Vérifie si le mode session est actif (pas de décrémentation)
      * @returns {boolean}
      */

@@ -111,14 +111,20 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
             return { success: false, reason: 'not_authenticated' };
         }
         
-        // En mode session, seule la première sync (initial) est autorisée
-        // Les syncs manuelles (admin, dashboard) sont permises si forceSync=true
+        // En mode session, seule la sync initiale (démarrage OBS/serveur) est autorisée
+        // La sync 'initial' synchronise TOUJOURS (peu importe le mode) pour démarrage OBS propre
+        // Les syncs manuelles (admin, dashboard) nécessitent forceSync=true en mode session
         if (stateManager.isSessionMode() && source !== 'initial' && !forceSync) {
             logEvent('INFO', `🔒 Sync ignorée (mode session, source: ${source})`);
             return { success: true, skipped: true, reason: 'session_mode' };
         }
         
-        logEvent('INFO', `🔄 Synchronisation ${source}...`);
+        // Log spécifique pour la sync OBS au démarrage
+        if (source === 'initial') {
+            logEvent('INFO', `🔄 Synchronisation ${source}... (Mode: ${stateManager.getSubCounterMode()})`);
+        } else {
+            logEvent('INFO', `🔄 Synchronisation ${source}...`);
+        }
         
         const [followsResult, subsResult] = await Promise.all([
             twitchApiService.syncFollows(source),
