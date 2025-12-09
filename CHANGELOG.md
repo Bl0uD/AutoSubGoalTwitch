@@ -7,6 +7,35 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.1.2] - 2025-12-09
+
+### 🔴 Corrections Critiques
+- **Fix sync initiale mode session** : La sync au démarrage OBS synchronise TOUJOURS avec Twitch
+  - Garantit compteurs à jour peu importe le mode choisi
+  - `syncAll('initial')` contourne maintenant la protection mode session
+  - Log amélioré affiche le mode actif : `"Synchronisation initial... (Mode: session)"`
+- **Fix méthodes publiques** : `syncFollows()` et `syncSubs()` respectent le mode session
+  - Ajout paramètre `forceSync` pour override admin
+  - Évite contournement protection via API dashboard
+
+### ✨ Améliorations
+- **Événement MODE_CHANGED** : Émis lors du changement realtime/session
+- **Feedback utilisateur** : Dashboard informe si sync ignorée en mode session
+- **Logs enrichis** : Affichage du mode actif dans les logs de synchronisation
+- **Persistance mode OBS** : Le mode reste actif entre fermetures/réouvertures OBS
+
+### 📚 Documentation
+- **AUDIT_CODE_v3.1.1.md** : Analyse complète architecture avec 4 problèmes identifiés
+- **MODE_SESSION_OBS.md** : Guide complet comportement mode session + tests validation
+
+### 🧪 Tests Validés
+- ✅ Sync au démarrage en mode session
+- ✅ Sync au démarrage en mode realtime
+- ✅ Persistance mode entre sessions OBS
+- ✅ Protection mode session maintenue pendant stream
+
+---
+
 ## [3.1.1] - 2025-12-05
 
 ### ✨ Nouvelles fonctionnalités
