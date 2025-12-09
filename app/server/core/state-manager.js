@@ -31,6 +31,7 @@ const STATE_EVENTS = Object.freeze({
     // Configuration
     CONFIG_CHANGED: 'config:changed',
     OVERLAY_CONFIG_CHANGED: 'config:overlay:changed',
+    MODE_CHANGED: 'config:mode:changed',  // Nouveau : changement de mode realtime/session
     
     // Connexions
     EVENTSUB_CONNECTED: 'connection:eventsub:connected',
@@ -345,6 +346,13 @@ class StateManager extends EventEmitter {
         if (oldMode === mode) return false;
         
         this.#state.settings.subCounterMode = mode;
+        
+        // Émettre un événement spécifique pour le changement de mode
+        this.emit(STATE_EVENTS.MODE_CHANGED, {
+            oldMode: oldMode,
+            newMode: mode,
+            isSession: mode === 'session'
+        });
         
         this.emit(STATE_EVENTS.CONFIG_CHANGED, {
             setting: 'subCounterMode',

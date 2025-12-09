@@ -289,7 +289,8 @@ app.get('/admin/sync-twitch', async (req, res) => {
     }
     
     try {
-        const result = await pollingService.syncAll('admin');
+        // Force la sync même en mode session (admin override)
+        const result = await pollingService.syncAll('admin', true);
         
         // Si non authentifié
         if (!result.success && result.reason === 'not_authenticated') {
@@ -561,12 +562,25 @@ function startDeviceCodePolling() {
 
 app.get('/api/sync-twitch', async (req, res) => {
     try {
+        // Dashboard sync : en mode session, on ne force PAS (respect du mode)
+        // Mais on informe l'utilisateur si la sync est ignorée
         const result = await pollingService.syncAll('dashboard');
-        res.json({
-            success: result.success,
-            currentFollows: result.follows?.value || stateManager.getFollows(),
-            currentSubs: result.subs?.value || stateManager.getSubs()
-        });
+        
+        if (result.skipped && result.reason === 'session_mode') {
+            res.json({
+                success: true,
+                skipped: true,
+                message: 'Sync ignorée en mode session (utilisez admin pour forcer)',
+                currentFollows: stateManager.getFollows(),
+                currentSubs: stateManager.getSubs()
+            });
+        } else {
+            res.json({
+                success: result.success,
+                currentFollows: result.follows?.value || stateManager.getFollows(),
+                currentSubs: result.subs?.value || stateManager.getSubs()
+            });
+        }
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }

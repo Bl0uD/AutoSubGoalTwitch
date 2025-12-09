@@ -102,12 +102,20 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     /**
      * Synchronise tous les compteurs
      * @param {string} source - Source de la sync
+     * @param {boolean} forceSync - Force la sync même en mode session (pour admin)
      * @returns {Promise<Object>}
      */
-    async function syncAll(source = 'manual') {
+    async function syncAll(source = 'manual', forceSync = false) {
         if (!twitchApiService.isAuthenticated()) {
             logEvent('WARN', '⚠️ Non authentifié, sync ignorée');
             return { success: false, reason: 'not_authenticated' };
+        }
+        
+        // En mode session, seule la première sync (initial) est autorisée
+        // Les syncs manuelles (admin, dashboard) sont permises si forceSync=true
+        if (stateManager.isSessionMode() && source !== 'initial' && !forceSync) {
+            logEvent('INFO', `🔒 Sync ignorée (mode session, source: ${source})`);
+            return { success: true, skipped: true, reason: 'session_mode' };
         }
         
         logEvent('INFO', `🔄 Synchronisation ${source}...`);
@@ -185,19 +193,31 @@ function createPollingService({ stateManager, twitchApiService, timerRegistry, l
     
     /**
      * Synchronise uniquement les follows (API publique)
+     * Respecte le mode session : en mode session, retourne le compteur actuel sans sync
      * @param {string} source
+     * @param {boolean} forceSync - Force la sync même en mode session
      * @returns {Promise<Object>}
      */
-    async function syncFollows(source = 'manual') {
+    async function syncFollows(source = 'manual', forceSync = false) {
+        if (stateManager.isSessionMode() && !forceSync) {
+            logEvent('INFO', `🔒 Sync follows ignorée (mode session)`);
+            return { success: true, skipped: true, reason: 'session_mode', data: stateManager.getFollows() };
+        }
         return await twitchApiService.syncFollows(source);
     }
     
     /**
      * Synchronise uniquement les subs (API publique)
+     * Respecte le mode session : en mode session, retourne le compteur actuel sans sync
      * @param {string} source
+     * @param {boolean} forceSync - Force la sync même en mode session
      * @returns {Promise<Object>}
      */
-    async function syncSubs(source = 'manual') {
+    async function syncSubs(source = 'manual', forceSync = false) {
+        if (stateManager.isSessionMode() && !forceSync) {
+            logEvent('INFO', `🔒 Sync subs ignorée (mode session)`);
+            return { success: true, skipped: true, reason: 'session_mode', data: stateManager.getSubs() };
+        }
         return await twitchApiService.syncSubs(source);
     }
     

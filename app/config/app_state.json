@@ -1,8 +1,8 @@
 {
   "counters": {
-    "follows": 391,
+    "follows": 390,
     "subs": 0,
-    "lastUpdated": "2025-12-05T01:24:44.674Z"
+    "lastUpdated": "2025-12-05T01:25:54.210Z"
   },
   "goals": {
     "currentFollowGoal": 500,
@@ -10,15 +10,15 @@
   },
   "overlay": {
     "font": {
-      "family": "Arial",
+      "family": "Sea",
       "size": "64px"
     },
     "colors": {
-      "text": "white"
+      "text": "rgba(255,25,46,1)"
     }
   },
   "settings": {
-    "subCounterMode": "session"
+    "subCounterMode": "realtime"
   },
   "version": {
     "current": "3.1.1",
