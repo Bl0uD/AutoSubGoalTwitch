@@ -1,7 +1,7 @@
 {
   "name": "subcount-auto-device-code-grant",
-  "version": "3.1.1",
-  "description": "SubCount Auto v3.1.1 - Mode Session + Auto-Refresh Overlays",
+  "version": "3.1.2",
+  "description": "SubCount Auto v3.1.2 - Corrections Critiques + Mode Session OBS",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

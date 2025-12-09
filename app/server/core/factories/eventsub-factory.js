@@ -1,7 +1,7 @@
 /**
  * @file eventsub-factory.js
  * @description Factory pour le service EventSub Twitch
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère la connexion WebSocket EventSub et les événements temps réel

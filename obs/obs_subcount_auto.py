@@ -1283,7 +1283,7 @@ def script_load(settings):
     subcount_log_file = os.path.join(PROJECT_ROOT, 'app', 'logs', 'subcount_logs.txt')
     cleanup_log_file(subcount_log_file, max_size_mb=2, keep_lines=500)
     
-    log_message("🎬 Script OBS SubCount Auto v3.1.1 avec Auto-Update chargé", level="info")
+    log_message("🎬 Script OBS SubCount Auto v3.1.2 avec Auto-Update chargé", level="info")
     log_message(f"📂 Répertoire: {SCRIPT_DIR}", level="info")
     log_message(f"🚀 Fichier serveur: {START_SERVER_BAT}", level="info")
     log_message(f"📦 Version: {VERSION}", level="info")

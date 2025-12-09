@@ -1,7 +1,7 @@
 /**
  * @file dependency-container.js
  * @description Conteneur IoC simple pour injection de dépendances
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Inversion of Control (IoC) Container
  * 

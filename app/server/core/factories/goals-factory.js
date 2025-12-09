@@ -1,7 +1,7 @@
 /**
  * @file goals-factory.js
  * @description Factory pour le service de gestion des objectifs
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Aucune variable globale, état géré par StateManager

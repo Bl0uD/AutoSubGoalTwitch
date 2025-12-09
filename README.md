@@ -1,6 +1,6 @@
 ﻿# AutoSubGoalTwitch
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v3.1.0)
+[![Version](https://img.shields.io/badge/version-3.1.2-blue.svg)](https://github.com/Bl0uD/AutoSubGoalTwitch/releases/tag/v3.1.2)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.6.8-yellow.svg)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/node.js-14+-green.svg)](https://nodejs.org/)
@@ -10,7 +10,7 @@ Système de compteurs Twitch pour OBS Studio avec **architecture modulaire et co
 
 ---
 
-## ✨ Fonctionnalités v3.1.0
+## ✨ Fonctionnalités v3.1.2
 
 ### 🏗️ Architecture Moderne (Nouveau!)
 - **StateManager** : État centralisé avec EventEmitter
@@ -187,7 +187,7 @@ netstat -ano | findstr "8082 8083 8084"
 
 ---
 
-## 📊 Statistiques v3.1.0
+## 📊 Statistiques v3.1.2
 
 - **server.js** : 2670 → 700 lignes (**-74%**)
 - **Variables globales** : 20+ → 0 (**-100%**)
@@ -209,7 +209,7 @@ Voir [`LICENSE`](LICENSE) pour plus de détails.
 
 ### 🎉 Architecture Moderne • Configuration Dynamique • Services Découplés
 
-**v3.1.0** - Prêt pour le stream ! ✨
+**v3.1.2** - Prêt pour le stream ! ✨
 
 ⭐ **Star ce projet si il vous aide !** ⭐
 

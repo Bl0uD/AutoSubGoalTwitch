@@ -1,7 +1,7 @@
 /**
  * @file bootstrap.js
  * @description Initialisation de l'application avec injection de dépendances
- * @version 3.1.1
+ * @version 3.1.2
  * 
  * Ce fichier est responsable de:
  * - Créer le container IoC

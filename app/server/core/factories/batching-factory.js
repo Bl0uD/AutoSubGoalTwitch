@@ -1,7 +1,7 @@
 /**
  * @file batching-factory.js
  * @description Factory pour le service de batching des événements
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère l'accumulation et le traitement groupé des événements pour synchroniser

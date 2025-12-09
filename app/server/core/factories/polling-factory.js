@@ -1,7 +1,7 @@
 /**
  * @file polling-factory.js
  * @description Factory pour le service de polling API Twitch
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère le polling périodique de l'API Twitch pour les compteurs

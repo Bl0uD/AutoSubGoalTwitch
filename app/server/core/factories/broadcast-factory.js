@@ -1,7 +1,7 @@
 /**
  * @file broadcast-factory.js
  * @description Factory pour le service de diffusion WebSocket
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère les connexions WebSocket clients et la diffusion des mises à jour

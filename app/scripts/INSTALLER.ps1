@@ -34,7 +34,7 @@ if (-not (Test-Administrator)) {
 
 Write-Host ""
 Write-Host "===================================================================" -ForegroundColor Cyan
-Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.1.0" -ForegroundColor Cyan
+Write-Host "     INSTALLEUR AUTOSUBGOALTWITCH v3.1.2" -ForegroundColor Cyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "[OK] Droits administrateur confirmes" -ForegroundColor Green
@@ -573,7 +573,7 @@ function Create-ConfigFiles {
     }
   },
   "version": {
-    "current": "3.1.0",
+    "current": "3.1.2",
     "releaseDate": "2025-12-03",
     "changelog": [],
     "criticalFiles": [

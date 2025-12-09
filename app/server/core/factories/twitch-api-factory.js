@@ -1,7 +1,7 @@
 /**
  * @file twitch-api-factory.js
  * @description Factory pour le service API Twitch
- * @version 3.1.0
+ * @version 3.1.2
  * 
  * Pattern: Factory avec injection de dépendances
  * Gère les appels API Twitch, l'authentification et les tokens

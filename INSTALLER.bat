@@ -22,7 +22,7 @@ if %errorLevel% neq 0 (
 
 echo.
 echo ===================================================================
-echo      INSTALLEUR AUTOSUBGOALTWITCH v3.1.0
+echo      INSTALLEUR AUTOSUBGOALTWITCH v3.1.2
 echo ===================================================================
 echo.
 echo [OK] Droits administrateur confirmes
